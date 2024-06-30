@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35013.160
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CuttingStock", "CuttingStock.csproj", "{7A355C39-042C-490B-8771-9BFCDF686D05}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7A355C39-042C-490B-8771-9BFCDF686D05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A355C39-042C-490B-8771-9BFCDF686D05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A355C39-042C-490B-8771-9BFCDF686D05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A355C39-042C-490B-8771-9BFCDF686D05}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4113C20E-7104-42FC-9ADD-2900843D2290}
+	EndGlobalSection
+EndGlobal
