@@ -1,0 +1,23 @@
+{
+  "testCase": "TC-003",
+  "description": "자투리 발생 (폐기) - gamma 미만의 자투리 처리",
+  "stock": [
+    { "length": 10000, "quantity": 1 }
+  ],
+  "orders": [
+    { "length": 4500, "quantity": 2 }
+  ],
+  "parameters": {
+    "alpha": 1.0,
+    "beta": 500.0,
+    "gamma": 1500,
+    "delta": 1000
+  },
+  "expected": {
+    "totalCost": 1000,
+    "stockUsed": 1,
+    "welds": 0,
+    "wasteLength": 1000,
+    "reusableLeftover": 0
+  }
+}
