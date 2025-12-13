@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Authors>CuttingStock Team</Authors>
+    <Description>Core library for cutting stock optimization algorithms. Contains domain models, optimization algorithms (Greedy Knapsack, FFD, BFD), and business logic.</Description>
+    <PackageProjectUrl>https://github.com/zacala1/CuttingStock</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/zacala1/CuttingStock</RepositoryUrl>
+    <PackageTags>optimization;cutting-stock;bin-packing;algorithm;rebar</PackageTags>
+  </PropertyGroup>
+
+</Project>

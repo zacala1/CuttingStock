@@ -1,0 +1,25 @@
+{
+  "testCase": "TC-007",
+  "description": "예제 데이터 - 실제 사용 사례",
+  "stock": [
+    { "length": 12000, "quantity": 10 }
+  ],
+  "orders": [
+    { "length": 5000, "quantity": 5 },
+    { "length": 3000, "quantity": 8 },
+    { "length": 2000, "quantity": 6 }
+  ],
+  "parameters": {
+    "alpha": 1.0,
+    "beta": 500.0,
+    "gamma": 1000,
+    "delta": 1000
+  },
+  "expected": {
+    "minCost": 0,
+    "maxCost": 10000,
+    "minStockUsed": 6,
+    "maxStockUsed": 8,
+    "comment": "주문 총 길이 61000mm, 최소 재고 필요 6개"
+  }
+}
