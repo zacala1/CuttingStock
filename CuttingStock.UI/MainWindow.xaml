@@ -1,0 +1,334 @@
+<Window x:Class="CuttingStock.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:CuttingStock"
+        xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+        mc:Ignorable="d"
+        Title="철근 절단 최적화 프로그램" Height="800" Width="1400">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="400"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- 왼쪽 패널: 입력 -->
+        <Grid Grid.Column="0" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- 재고 입력 -->
+            <GroupBox Header="재고" Grid.Row="0" Margin="0,0,0,5">
+                <StackPanel>
+                    <DataGrid x:Name="stockGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10" KeyDown="DataGrid_KeyDown">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="길이 (mm)" Binding="{Binding Length}" Width="*"/>
+                            <DataGridTextColumn Header="수량" Binding="{Binding Quantity}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="재고 추가" Click="AddStock_Click" Margin="0,0,5,0" Width="80"/>
+                        <Button Content="파일 불러오기" Click="ImportStock_Click" Margin="0,0,5,0" Width="100"/>
+                        <Button Content="예제 로드" Click="LoadExample_Click" Width="80"/>
+                    </StackPanel>
+                    <TextBlock Text="※ 엑셀 붙여넣기(Ctrl+V) 지원" FontSize="11" Foreground="Gray" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- 주문 입력 -->
+            <GroupBox Header="주문" Grid.Row="1" Margin="0,5,0,0">
+                <StackPanel>
+                    <DataGrid x:Name="orderGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10" KeyDown="DataGrid_KeyDown">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="길이 (mm)" Binding="{Binding Length}" Width="*"/>
+                            <DataGridTextColumn Header="수량" Binding="{Binding Quantity}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="주문 추가" Click="AddOrder_Click" Width="80" Margin="0,0,5,0"/>
+                        <Button Content="파일 불러오기" Click="ImportOrder_Click" Width="100"/>
+                    </StackPanel>
+                    <TextBlock Text="※ 엑셀 붙여넣기(Ctrl+V) 지원" FontSize="11" Foreground="Gray" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                </StackPanel>
+            </GroupBox>
+        </Grid>
+
+        <!-- 오른쪽 패널: 설정 및 결과 -->
+        <Grid Grid.Column="1" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- 알고리즘 설정 -->
+            <GroupBox Header="알고리즘 설정" Grid.Row="0" Margin="0,0,0,10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 알고리즘 선택 -->
+                    <TextBlock Text="알고리즘 선택:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="5"/>
+                    <ComboBox x:Name="algorithmComboBox" Grid.Row="0" Grid.Column="1" Margin="5" SelectedIndex="0" SelectionChanged="AlgorithmComboBox_SelectionChanged">
+                        <ComboBoxItem Content="Greedy Knapsack DP (최고 품질, 느림)"/>
+                        <ComboBoxItem Content="First Fit Decreasing (최고 속도)"/>
+                        <ComboBoxItem Content="Best Fit Decreasing (균형 잡힌 성능/품질)"/>
+                        <ComboBoxItem Content="Column Generation (전역 최적화, 실험적)"/>
+                    </ComboBox>
+
+                    <!-- 파라미터 설정 -->
+                    <TextBlock Text="파라미터 설정:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="5,10,5,5"/>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Margin="5,10,5,5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Alpha -->
+                            <TextBlock Text="Alpha (자투리 비용):" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"/>
+                            <TextBox x:Name="alphaTextBox" Grid.Row="0" Grid.Column="1" Text="1.0" Margin="5" PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
+
+                            <!-- Beta -->
+                            <TextBlock Text="Beta (용접 비용):" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                            <TextBox x:Name="betaTextBox" Grid.Row="0" Grid.Column="3" Text="500" Margin="5" PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
+
+                            <!-- Gamma -->
+                            <TextBlock Text="Gamma (재사용 최소):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"/>
+                            <TextBox x:Name="gammaTextBox" Grid.Row="1" Grid.Column="1" Text="100" Margin="5" PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
+
+                            <!-- Delta -->
+                            <TextBlock Text="Delta (용접 최소):" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"/>
+                            <TextBox x:Name="deltaTextBox" Grid.Row="1" Grid.Column="3" Text="100" Margin="5" PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
+
+                            <!-- UsageOrder -->
+                            <TextBlock Text="재고 사용 순서:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"/>
+                            <ComboBox x:Name="usageOrderComboBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Margin="5" SelectedIndex="0">
+                                <ComboBoxItem Content="작은 것부터 (Small to Large)"/>
+                                <ComboBoxItem Content="큰 것부터 (Large to Small)"/>
+                            </ComboBox>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- 알고리즘별 고급 옵션 -->
+                    <TextBlock Text="고급 옵션:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Top" Margin="5,10,5,5"/>
+                    <Border Grid.Row="2" Grid.Column="1" Margin="5,10,5,5" BorderBrush="LightGray" BorderThickness="1" Padding="5">
+                        <StackPanel x:Name="advancedOptionsPanel">
+                            <TextBlock Text="(알고리즘을 선택하면 고급 옵션이 표시됩니다)" Foreground="Gray" FontStyle="Italic"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 용접 옵션 -->
+                    <TextBlock Text="용접 옵션:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="5"/>
+                    <CheckBox x:Name="enableWeldingCheckBox" Grid.Row="3" Grid.Column="1" Content="용접 활성화 (긴 주문을 여러 조각으로 분할)"
+                              Margin="5" VerticalAlignment="Center" IsChecked="False"/>
+
+                    <!-- 실행 버튼 -->
+                    <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,5">
+                        <Button Content="최적화 실행" Click="Calculate_Click" Width="120" Height="35" Margin="0,0,10,0" FontWeight="Bold"/>
+                        <Button Content="알고리즘 비교" Click="CompareAlgorithms_Click" Width="120" Height="35" FontWeight="Bold"/>
+                    </StackPanel>
+                    
+                    <!-- 진행 상태 표시 (오버레이) -->
+                    <Grid x:Name="loadingOverlay" Grid.Row="0" Grid.RowSpan="5" Grid.ColumnSpan="2" Background="#80FFFFFF" Visibility="Collapsed">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <ProgressBar x:Name="loadingProgressBar" IsIndeterminate="True" Width="200" Height="20"/>
+                            <TextBlock x:Name="loadingText" Text="계산 중..." HorizontalAlignment="Center" Margin="0,5,0,0" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </GroupBox>
+
+            <!-- 결과 표시 -->
+            <TabControl Grid.Row="1" x:Name="mainTabControl">
+                <!-- 단일 결과 탭 -->
+                <TabItem Header="최적화 결과">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <TextBox x:Name="resultTextBox" Grid.Row="0" IsReadOnly="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 FontFamily="Consolas"
+                                 Padding="10"/>
+                        
+                        <!-- 내보내기 버튼 -->
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
+                            <Button Content="CSV로 내보내기" Click="ExportToCsv_Click" Width="120" Margin="0,0,5,0"/>
+                            <Button Content="Excel로 내보내기" Click="ExportToExcel_Click" Width="120"/>
+                        </StackPanel>
+                    </Grid>
+                </TabItem>
+
+                <!-- 시각화 탭 -->
+                <TabItem Header="결과 시각화">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <!-- 범례 (Legend) -->
+                            <Border BorderBrush="LightGray" BorderThickness="1" Margin="10" Padding="5" Background="White">
+                                <StackPanel>
+                                    <TextBlock Text="범례 (Legend)" FontWeight="Bold" Margin="0,0,0,5"/>
+                                    <ItemsControl x:Name="legendItemsControl">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,15,5">
+                                                    <Rectangle Width="15" Height="15" Fill="{Binding Color}" Stroke="Gray" StrokeThickness="1" Margin="0,0,5,0"/>
+                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 시각화 메인 아이템 -->
+                            <ItemsControl x:Name="visualizationItemsControl" Margin="10">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,10" Padding="5">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="50"/>
+                                                </Grid.RowDefinitions>
+                                                
+                                                <!-- 정보 텍스트 -->
+                                                <TextBlock Grid.Row="0" Text="{Binding InfoText}" Margin="0,0,0,5"/>
+                                                
+                                                <!-- 바 시각화 -->
+                                                <Canvas Grid.Row="1" Width="{Binding TotalWidth}" Height="40" Background="#EEE">
+                                                    <ItemsControl ItemsSource="{Binding Blocks}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <Canvas/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid Width="{Binding Width}" Height="40" Canvas.Left="{Binding X}">
+                                                                    <Rectangle Fill="{Binding Color}" ToolTip="{Binding ToolTip}"/>
+                                                                    <TextBlock Text="{Binding Text}" 
+                                                                             Foreground="{Binding TextColor}" 
+                                                                             HorizontalAlignment="Center" 
+                                                                             VerticalAlignment="Center" 
+                                                                             FontSize="10" 
+                                                                             IsHitTestVisible="False"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Canvas>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- 비교 결과 탭 -->
+                <TabItem Header="알고리즘 비교">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="300"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- 비교 요약 테이블 -->
+                        <DataGrid x:Name="comparisonGrid" Grid.Row="0"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  Height="150"
+                                  Margin="10">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="알고리즘" Binding="{Binding AlgorithmName}" Width="200"/>
+                                <DataGridTextColumn Header="총 비용" Binding="{Binding TotalCost, StringFormat=N0}" Width="100"/>
+                                <DataGridTextColumn Header="낭비(mm)" Binding="{Binding WasteLength, StringFormat=N0}" Width="100"/>
+                                <DataGridTextColumn Header="재고 사용" Binding="{Binding StockUsed}" Width="80"/>
+                                <DataGridTextColumn Header="효율(%)" Binding="{Binding MaterialEfficiency, StringFormat=F2}" Width="80"/>
+                                <DataGridTextColumn Header="시간(ms)" Binding="{Binding ExecutionTimeMs, StringFormat=F3}" Width="100"/>
+                                <DataGridTextColumn Header="순위" Binding="{Binding Rank}" Width="60"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- 비교 차트 -->
+                        <GroupBox Header="비교 차트" Grid.Row="1" Margin="10,0,10,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="총 비용" HorizontalAlignment="Center" FontWeight="Bold" Margin="5"/>
+                                    <lvc:CartesianChart x:Name="costChart" Height="220"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="재료 효율 (%)" HorizontalAlignment="Center" FontWeight="Bold" Margin="5"/>
+                                    <lvc:CartesianChart x:Name="efficiencyChart" Height="220"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="실행 시간 (ms)" HorizontalAlignment="Center" FontWeight="Bold" Margin="5"/>
+                                    <lvc:CartesianChart x:Name="timeChart" Height="220"/>
+                                </StackPanel>
+                            </Grid>
+                        </GroupBox>
+
+                        <!-- 상세 비교 결과 -->
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <TextBox x:Name="comparisonTextBox" Grid.Row="0"
+                                     IsReadOnly="True"
+                                     VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Auto"
+                                     FontFamily="Consolas"
+                                     Padding="10"
+                                     Margin="10,0,10,10"/>
+                            
+                            <!-- 내보내기 버튼 -->
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10,0,10,10">
+                                <Button Content="비교 결과 CSV로 저장" Click="ExportComparisonToCsv_Click" Width="150" Margin="0,0,5,0"/>
+                                <Button Content="비교 결과 Excel로 저장" Click="ExportComparisonToExcel_Click" Width="150"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Grid>
+</Window>
