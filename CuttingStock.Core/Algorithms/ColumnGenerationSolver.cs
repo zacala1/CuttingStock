@@ -9,11 +9,20 @@ using CuttingStock.Core.Algorithms.Utilities;
 namespace CuttingStock.Core.Algorithms
 {
     /// <summary>
-    /// Column Generation Optimizer
-    /// 
+    /// Column Generation Optimizer (Enhanced with Multi-Stock Support)
+    ///
     /// Solves the Cutting Stock Problem using the Column Generation technique.
     /// Uses a custom Simplex solver for the Restricted Master Problem (RMP).
     /// Uses the Knapsack DP for the Pricing Problem (Sub-problem).
+    ///
+    /// Enhancements (v2.0):
+    /// - Multiple stock length support
+    /// - Per-stock pricing problem
+    /// - Improved integer solution generation
+    ///
+    /// References:
+    /// - Gilmore & Gomory (1961): "A Linear Programming Approach to the Cutting-Stock Problem"
+    /// - https://jump.dev/JuMP.jl/stable/tutorials/algorithms/cutting_stock_column_generation/
     /// </summary>
     public class ColumnGenerationSolver : ICuttingSolver
     {
@@ -21,7 +30,7 @@ namespace CuttingStock.Core.Algorithms
         public string Name => "Column Generation (LP)";
 
         /// <inheritdoc/>
-        public string Description => "Global Optimization Algorithm using Linear Programming and Column Generation (Simplex-based)";
+        public string Description => "Global Optimization using Linear Programming and Column Generation with Multi-Stock Support";
 
         /// <inheritdoc/>
         public string TimeComplexity => "Exponential (NP-Hard)";
@@ -34,119 +43,56 @@ namespace CuttingStock.Core.Algorithms
 
             try
             {
-                // 1. Initialization: Use only one stock length (Assumed to be the longest and most abundant)
-                // Real-world CSP with multiple stock lengths is more complex. Here we focus on single stock length.
-                var primaryStock = stock.OrderByDescending(s => s.Length).First();
-                int stockLength = primaryStock.Length;
-
-                // Flatten orders
-                var demand = orders.GroupBy(o => o.Length)
-                                 .ToDictionary(g => g.Key, g => g.Sum(o => o.Quantity));
-
-                var distinctLengths = demand.Keys.OrderByDescending(k => k).ToList();
-                int numConstraints = distinctLengths.Count;
-
-                // 2. Initial Columns Generation
-                // Add Identity Patterns (one cut per length) to form the Initial Basis for Simplex.
-                var patterns = new List<CuttingPatternColumn>();
-
-                // Mandatory Identity Patterns
-                for (int i = 0; i < numConstraints; i++)
+                // Validate inputs
+                var (isValid, errorMessage) = SolverUtils.ValidateInputs(stock, orders);
+                if (!isValid)
                 {
-                    var col = new CuttingPatternColumn(numConstraints);
-                    col.Counts[i] = 1;
-                    patterns.Add(col);
+                    result.Success = false;
+                    result.ErrorMessage = errorMessage;
+                    return result;
                 }
 
-                // Add Greedy Patterns to improve convergence and integer solution quality
-                foreach (var startLen in distinctLengths)
+                // Track remaining demand to verify all orders are fulfilled
+                var remainingDemand = orders.GroupBy(o => o.Length)
+                                            .ToDictionary(g => g.Key, g => g.Sum(o => o.Quantity));
+
+                // Check if we should use multi-stock or single-stock approach
+                var distinctStockLengths = stock.Select(s => s.Length).Distinct().OrderByDescending(l => l).ToList();
+
+                if (distinctStockLengths.Count == 1)
                 {
-                    var col = new CuttingPatternColumn(numConstraints);
-                    int currentRem = stockLength;
+                    // Single stock length - use original algorithm
+                    SolveSingleStock(result, stock, orders, options, progress);
+                }
+                else
+                {
+                    // Multiple stock lengths - use enhanced algorithm
+                    SolveMultiStock(result, stock, orders, options, progress);
+                }
 
-                    int startIdx = distinctLengths.IndexOf(startLen);
-                    if (startLen <= currentRem)
+                // Verify all orders were fulfilled
+                foreach (var plan in result.CuttingPlans)
+                {
+                    foreach (var cut in plan.Cuts)
                     {
-                        col.Counts[startIdx]++;
-                        currentRem -= startLen;
-                    }
-
-                    // Fill remaining space with largest possible items
-                    for (int i = 0; i < numConstraints; i++)
-                    {
-                        int len = distinctLengths[i];
-                        while (len <= currentRem)
+                        if (remainingDemand.TryGetValue(cut.Length, out int qty) && qty > 0)
                         {
-                            col.Counts[i]++;
-                            currentRem -= len;
+                            remainingDemand[cut.Length] = qty - 1;
                         }
-                    }
-
-                    if (!patterns.Any(p => p.Equals(col)))
-                    {
-                        patterns.Add(col);
                     }
                 }
 
-                bool improved = true;
-                int maxIterations = 100; // Prevent infinite loop
-                int iter = 0;
-
-                while (improved && iter < maxIterations)
+                int unfulfilledCount = remainingDemand.Values.Sum();
+                if (unfulfilledCount > 0)
                 {
-                    iter++;
-                    // Report progress (Approximate)
-                    progress?.Report((double)iter / maxIterations * 80.0);
-
-                    // 3. Solve RMP (Restricted Master Problem)
-                    var solver = new SimplexSolver();
-                    var dualValues = solver.SolveRelaxed(patterns, demand, distinctLengths);
-
-                    // 4. Solve Pricing Problem (Knapsack)
-                    // Find a pattern with Reduced Cost < 0 (Maximization: Reduced Cost > 0 if formulated as max)
-                    // Knapsack Value = Sum(dual_i * a_i) > 1
-
-                    var knapsackItems = new List<KnapsackItem>();
-                    for (int i = 0; i < numConstraints; i++)
-                    {
-                        knapsackItems.Add(new KnapsackItem
-                        {
-                            Length = distinctLengths[i],
-                            Value = dualValues[i],
-                            Index = i
-                        });
-                    }
-
-                    var newPattern = SolveKnapsack(knapsackItems, stockLength);
-
-                    // Check if new column improves the solution
-                    if (newPattern.TotalValue > 1.00001)
-                    {
-                        var col = new CuttingPatternColumn(numConstraints);
-                        foreach (var item in newPattern.Items)
-                        {
-                            col.Counts[item.Index]++;
-                        }
-
-                        if (!patterns.Any(p => p.Equals(col)))
-                        {
-                            patterns.Add(col);
-                        }
-                        else
-                        {
-                            improved = false;
-                        }
-                    }
-                    else
-                    {
-                        improved = false;
-                    }
+                    result.Success = false;
+                    result.ErrorMessage = $"Failed to process {unfulfilledCount} order(s). Insufficient stock or patterns.";
+                }
+                else
+                {
+                    result.Success = true;
                 }
 
-                // 5. Generate Integer Solution
-                GenerateSolutionHybrid(result, patterns, demand, distinctLengths, stockLength);
-
-                result.Success = true;
                 result.ExecutionTimeMs = stopwatch.Elapsed.TotalMilliseconds;
                 SolverUtils.CalculateResults(result, options);
 
@@ -159,6 +105,194 @@ namespace CuttingStock.Core.Algorithms
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Solves CSP with multiple stock lengths.
+        /// Runs column generation for each stock length and combines results.
+        /// </summary>
+        private void SolveMultiStock(SolverResult result, List<RebarStock> stock, List<Order> orders, SolverOptions options, IProgress<double>? progress)
+        {
+            var currentDemand = orders.GroupBy(o => o.Length)
+                                      .ToDictionary(g => g.Key, g => g.Sum(o => o.Quantity));
+
+            var stockByLength = stock.GroupBy(s => s.Length)
+                                     .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
+
+            var sortedStockLengths = options.UsageOrder == StockUsageOrder.LargeToSmall
+                ? stockByLength.Keys.OrderByDescending(l => l).ToList()
+                : stockByLength.Keys.OrderBy(l => l).ToList();
+
+            int totalProgress = 0;
+            int progressPerStock = 80 / Math.Max(1, sortedStockLengths.Count);
+
+            foreach (var stockLength in sortedStockLengths)
+            {
+                if (!currentDemand.Any(kv => kv.Value > 0))
+                    break;
+
+                int availableStock = stockByLength[stockLength];
+                if (availableStock <= 0)
+                    continue;
+
+                // Filter demands that can fit in this stock
+                var feasibleDemand = currentDemand
+                    .Where(kv => kv.Key <= stockLength && kv.Value > 0)
+                    .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+                if (!feasibleDemand.Any())
+                    continue;
+
+                // Run column generation for this stock length
+                var subResult = new SolverResult();
+                SolveSingleStockInternal(subResult, stockLength, availableStock, feasibleDemand, progress);
+
+                // Update demand based on what was cut
+                foreach (var plan in subResult.CuttingPlans)
+                {
+                    foreach (var cut in plan.Cuts)
+                    {
+                        if (currentDemand.ContainsKey(cut.Length) && currentDemand[cut.Length] > 0)
+                        {
+                            currentDemand[cut.Length]--;
+                        }
+                    }
+                    result.CuttingPlans.Add(plan);
+                }
+
+                // Update available stock
+                stockByLength[stockLength] -= subResult.CuttingPlans.Count;
+
+                totalProgress += progressPerStock;
+                progress?.Report(totalProgress);
+            }
+        }
+
+        /// <summary>
+        /// Original single-stock algorithm wrapper.
+        /// </summary>
+        private void SolveSingleStock(SolverResult result, List<RebarStock> stock, List<Order> orders, SolverOptions options, IProgress<double>? progress)
+        {
+            var primaryStock = stock.OrderByDescending(s => s.Length).First();
+            int stockLength = primaryStock.Length;
+            int availableStock = stock.Where(s => s.Length == stockLength).Sum(s => s.Quantity);
+
+            var demand = orders.GroupBy(o => o.Length)
+                              .ToDictionary(g => g.Key, g => g.Sum(o => o.Quantity));
+
+            SolveSingleStockInternal(result, stockLength, availableStock, demand, progress);
+        }
+
+        /// <summary>
+        /// Internal single-stock column generation implementation.
+        /// </summary>
+        private void SolveSingleStockInternal(SolverResult result, int stockLength, int maxStockCount, Dictionary<int, int> demand, IProgress<double>? progress)
+        {
+            var distinctLengths = demand.Keys.OrderByDescending(k => k).ToList();
+            int numConstraints = distinctLengths.Count;
+
+            if (numConstraints == 0)
+                return;
+
+            // 2. Initial Columns Generation
+            // Add Identity Patterns (one cut per length) to form the Initial Basis for Simplex.
+            var patterns = new List<CuttingPatternColumn>();
+
+            // Mandatory Identity Patterns
+            for (int i = 0; i < numConstraints; i++)
+            {
+                var col = new CuttingPatternColumn(numConstraints);
+                col.Counts[i] = 1;
+                patterns.Add(col);
+            }
+
+            // Add Greedy Patterns to improve convergence and integer solution quality
+            foreach (var startLen in distinctLengths)
+            {
+                var col = new CuttingPatternColumn(numConstraints);
+                int currentRem = stockLength;
+
+                int startIdx = distinctLengths.IndexOf(startLen);
+                if (startLen <= currentRem)
+                {
+                    col.Counts[startIdx]++;
+                    currentRem -= startLen;
+                }
+
+                // Fill remaining space with largest possible items
+                for (int i = 0; i < numConstraints; i++)
+                {
+                    int len = distinctLengths[i];
+                    while (len <= currentRem)
+                    {
+                        col.Counts[i]++;
+                        currentRem -= len;
+                    }
+                }
+
+                if (!patterns.Any(p => p.Equals(col)))
+                {
+                    patterns.Add(col);
+                }
+            }
+
+            bool improved = true;
+            int maxIterations = 100; // Prevent infinite loop
+            int iter = 0;
+
+            while (improved && iter < maxIterations)
+            {
+                iter++;
+                // Report progress (Approximate)
+                progress?.Report((double)iter / maxIterations * 80.0);
+
+                // 3. Solve RMP (Restricted Master Problem)
+                var solver = new SimplexSolver();
+                var dualValues = solver.SolveRelaxed(patterns, demand, distinctLengths);
+
+                // 4. Solve Pricing Problem (Knapsack)
+                // Find a pattern with Reduced Cost < 0 (Maximization: Reduced Cost > 0 if formulated as max)
+                // Knapsack Value = Sum(dual_i * a_i) > 1
+
+                var knapsackItems = new List<KnapsackItem>();
+                for (int i = 0; i < numConstraints; i++)
+                {
+                    knapsackItems.Add(new KnapsackItem
+                    {
+                        Length = distinctLengths[i],
+                        Value = dualValues[i],
+                        Index = i
+                    });
+                }
+
+                var newPattern = SolveKnapsack(knapsackItems, stockLength);
+
+                // Check if new column improves the solution
+                if (newPattern.TotalValue > 1.00001)
+                {
+                    var col = new CuttingPatternColumn(numConstraints);
+                    foreach (var item in newPattern.Items)
+                    {
+                        col.Counts[item.Index]++;
+                    }
+
+                    if (!patterns.Any(p => p.Equals(col)))
+                    {
+                        patterns.Add(col);
+                    }
+                    else
+                    {
+                        improved = false;
+                    }
+                }
+                else
+                {
+                    improved = false;
+                }
+            }
+
+            // 5. Generate Integer Solution (respecting stock limit)
+            GenerateSolutionHybrid(result, patterns, demand, distinctLengths, stockLength, maxStockCount);
         }
 
         private KnapsackResult SolveKnapsack(List<KnapsackItem> items, int capacity)
@@ -203,13 +337,15 @@ namespace CuttingStock.Core.Algorithms
             List<CuttingPatternColumn> patterns,
             Dictionary<int, int> demand,
             List<int> lengths,
-            int stockLength)
+            int stockLength,
+            int maxStockCount)
         {
             var currentDemand = new Dictionary<int, int>(demand);
+            int usedStockCount = 0;
 
             // Refine LP solution to Integer Solution greedily
             // Priority: Minimize Waste > Maximize Satisfaction Count
-            while (currentDemand.Any(kv => kv.Value > 0))
+            while (currentDemand.Any(kv => kv.Value > 0) && usedStockCount < maxStockCount)
             {
                 var bestPatternIndex = -1;
                 double bestScore = -double.MaxValue;
@@ -277,8 +413,9 @@ namespace CuttingStock.Core.Algorithms
 
                 var selected = patterns[bestPatternIndex];
 
-                // Apply the selected pattern 'bestMaxApply' times
-                for (int iter = 0; iter < bestMaxApply; iter++)
+                // Apply the selected pattern 'bestMaxApply' times (respecting stock limit)
+                int actualApplyCount = Math.Min(bestMaxApply, maxStockCount - usedStockCount);
+                for (int applyIter = 0; applyIter < actualApplyCount; applyIter++)
                 {
                     var plan = new CuttingPlan { StockLength = stockLength, Cuts = new List<Cut>() };
 
@@ -299,18 +436,23 @@ namespace CuttingStock.Core.Algorithms
                     // Calculate leftover
                     plan.Leftover = stockLength - plan.Cuts.Sum(c => c.Length);
                     result.CuttingPlans.Add(plan);
+                    usedStockCount++;
 
-                    // Check if everything is done inside the loop to break early
-                    if (!currentDemand.Any(kv => kv.Value > 0)) break;
+                    // Check if everything is done or stock exhausted
+                    if (!currentDemand.Any(kv => kv.Value > 0) || usedStockCount >= maxStockCount) break;
                 }
             }
 
-            // Handle any remaining demand with simple cuts (One-Cut per Stock)
-            foreach (var kv in currentDemand.Where(kv => kv.Value > 0))
+            // Handle any remaining demand with simple cuts (One-Cut per Stock, respecting limit)
+            foreach (var kv in currentDemand.Where(kv => kv.Value > 0).ToList())
             {
+                if (usedStockCount >= maxStockCount) break;
+
                 int len = kv.Key;
                 int qty = kv.Value;
-                for (int i = 0; i < qty; i++)
+                int canUse = Math.Min(qty, maxStockCount - usedStockCount);
+
+                for (int i = 0; i < canUse; i++)
                 {
                     var plan = new CuttingPlan
                     {
@@ -319,6 +461,7 @@ namespace CuttingStock.Core.Algorithms
                         Leftover = stockLength - len
                     };
                     result.CuttingPlans.Add(plan);
+                    usedStockCount++;
                 }
             }
         }
@@ -342,7 +485,6 @@ namespace CuttingStock.Core.Algorithms
                 // Col n: RHS
 
                 double[,] tableau = new double[m + 1, n + 1];
-                int[] basis = new int[m]; // Index of basis variable for each row
 
                 // 1. Initialize Tableau
                 for (int i = 0; i < m; i++)
@@ -355,9 +497,6 @@ namespace CuttingStock.Core.Algorithms
 
                     // RHS
                     tableau[i, n] = demand[lengths[i]];
-
-                    // Initial Basis: Assuming first m columns form Identity Matrix
-                    basis[i] = i;
                 }
 
                 // Objective: Minimize Z = Sum(c_j * x_j) with c_j = 1
@@ -382,7 +521,7 @@ namespace CuttingStock.Core.Algorithms
                 int maxIter = 1000;
                 const double epsilon = 1e-9;
 
-                for (int iter = 0; iter < maxIter; iter++)
+                for (int simplexIter = 0; simplexIter < maxIter; simplexIter++)
                 {
                     // Find Entering Variable (Most negative reduced cost)
                     int enteringCol = -1;
@@ -421,7 +560,6 @@ namespace CuttingStock.Core.Algorithms
 
                     // Pivot
                     Pivot(tableau, m, n, leavingRow, enteringCol);
-                    basis[leavingRow] = enteringCol;
                 }
 
                 // 3. Extract Dual Values

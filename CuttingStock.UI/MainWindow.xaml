@@ -72,6 +72,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
@@ -141,14 +142,24 @@
                     <CheckBox x:Name="enableWeldingCheckBox" Grid.Row="3" Grid.Column="1" Content="용접 활성화 (긴 주문을 여러 조각으로 분할)"
                               Margin="5" VerticalAlignment="Center" IsChecked="False"/>
 
+                    <!-- Pattern Reduction 옵션 -->
+                    <TextBlock Text="패턴 축소:" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Margin="5"/>
+                    <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="5">
+                        <CheckBox x:Name="enablePatternReductionCheckBox" Content="패턴 수 제한"
+                                  VerticalAlignment="Center" Checked="PatternReductionCheckBox_Checked" Unchecked="PatternReductionCheckBox_Unchecked"/>
+                        <TextBlock Text="최대 패턴 수:" VerticalAlignment="Center" Margin="15,0,5,0"/>
+                        <TextBox x:Name="maxPatternCountTextBox" Text="0" Width="50" IsEnabled="False"
+                                 PreviewTextInput="IntegerTextBox_PreviewTextInput" ToolTip="0 = 무제한"/>
+                    </StackPanel>
+
                     <!-- 실행 버튼 -->
-                    <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,5">
+                    <StackPanel Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,5">
                         <Button Content="최적화 실행" Click="Calculate_Click" Width="120" Height="35" Margin="0,0,10,0" FontWeight="Bold"/>
                         <Button Content="알고리즘 비교" Click="CompareAlgorithms_Click" Width="120" Height="35" FontWeight="Bold"/>
                     </StackPanel>
-                    
+
                     <!-- 진행 상태 표시 (오버레이) -->
-                    <Grid x:Name="loadingOverlay" Grid.Row="0" Grid.RowSpan="5" Grid.ColumnSpan="2" Background="#80FFFFFF" Visibility="Collapsed">
+                    <Grid x:Name="loadingOverlay" Grid.Row="0" Grid.RowSpan="6" Grid.ColumnSpan="2" Background="#80FFFFFF" Visibility="Collapsed">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                             <ProgressBar x:Name="loadingProgressBar" IsIndeterminate="True" Width="200" Height="20"/>
                             <TextBlock x:Name="loadingText" Text="계산 중..." HorizontalAlignment="Center" Margin="0,5,0,0" FontWeight="Bold"/>

@@ -191,6 +191,18 @@ namespace CuttingStock.Core.Algorithms.Utilities
             if (result.CuttingPlans.Count < 2)
                 return;
 
+            // Phase 1: Original redistribution
+            RedistributeCuts(result, options);
+
+            // Phase 2: Local Search (2-opt style swap)
+            LocalSearchOptimize(result, options, maxIterations: 100);
+        }
+
+        /// <summary>
+        /// Original redistribution logic - moves cuts from high-leftover plans to low-leftover plans.
+        /// </summary>
+        private static void RedistributeCuts(SolverResult result, SolverOptions options)
+        {
             var sortedPlans = result.CuttingPlans
                 .Select((plan, index) => (plan, index))
                 .OrderByDescending(x => x.plan.Leftover)
@@ -243,6 +255,117 @@ namespace CuttingStock.Core.Algorithms.Utilities
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Local Search optimization using 2-opt style swapping.
+        /// Tries to swap cuts between pairs of plans to reduce total waste.
+        /// Reference: https://link.springer.com/article/10.1186/2251-712X-8-24
+        /// </summary>
+        private static void LocalSearchOptimize(SolverResult result, SolverOptions options, int maxIterations)
+        {
+            bool improved = true;
+            int iteration = 0;
+
+            while (improved && iteration < maxIterations)
+            {
+                improved = false;
+                iteration++;
+
+                for (int i = 0; i < result.CuttingPlans.Count - 1; i++)
+                {
+                    for (int j = i + 1; j < result.CuttingPlans.Count; j++)
+                    {
+                        var planA = result.CuttingPlans[i];
+                        var planB = result.CuttingPlans[j];
+
+                        // Skip if either plan has welded cuts (to preserve weld groups)
+                        if (planA.Cuts.Any(c => c.WeldGroupId.HasValue) ||
+                            planB.Cuts.Any(c => c.WeldGroupId.HasValue))
+                            continue;
+
+                        // Try swapping each cut from A with each cut from B
+                        if (TrySwapCuts(planA, planB, options))
+                        {
+                            improved = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Tries to find a beneficial swap between two plans.
+        /// Returns true if a swap was made.
+        /// </summary>
+        private static bool TrySwapCuts(CuttingPlan planA, CuttingPlan planB, SolverOptions options)
+        {
+            int currentWaste = CalculateWaste(planA, options) + CalculateWaste(planB, options);
+
+            // Pre-compute total used lengths once (O(n) instead of O(n) per iteration)
+            int totalUsedA = planA.Cuts.Sum(c => c.Length);
+            int totalUsedB = planB.Cuts.Sum(c => c.Length);
+
+            foreach (var cutA in planA.Cuts.ToList())
+            {
+                foreach (var cutB in planB.Cuts.ToList())
+                {
+                    // Check if swap is feasible (doesn't exceed stock length)
+                    int newAUsed = totalUsedA - cutA.Length + cutB.Length;
+                    int newBUsed = totalUsedB - cutB.Length + cutA.Length;
+
+                    if (newAUsed > planA.StockLength || newBUsed > planB.StockLength)
+                        continue;
+
+                    // Calculate new leftovers
+                    int newALeftover = planA.StockLength - newAUsed;
+                    int newBLeftover = planB.StockLength - newBUsed;
+
+                    // Calculate new waste
+                    int newWasteA = newALeftover < options.Gamma ? newALeftover : 0;
+                    int newWasteB = newBLeftover < options.Gamma ? newBLeftover : 0;
+                    int newWaste = newWasteA + newWasteB;
+
+                    // Accept if waste is reduced
+                    if (newWaste < currentWaste)
+                    {
+                        // Perform swap
+                        planA.Cuts.Remove(cutA);
+                        planB.Cuts.Remove(cutB);
+
+                        planA.Cuts.Add(new Cut
+                        {
+                            Length = cutB.Length,
+                            OrderIndex = cutB.OrderIndex,
+                            RequiresWelding = cutB.RequiresWelding,
+                            WeldGroupId = cutB.WeldGroupId
+                        });
+
+                        planB.Cuts.Add(new Cut
+                        {
+                            Length = cutA.Length,
+                            OrderIndex = cutA.OrderIndex,
+                            RequiresWelding = cutA.RequiresWelding,
+                            WeldGroupId = cutA.WeldGroupId
+                        });
+
+                        planA.Leftover = newALeftover;
+                        planB.Leftover = newBLeftover;
+
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Calculates waste for a single plan.
+        /// </summary>
+        private static int CalculateWaste(CuttingPlan plan, SolverOptions options)
+        {
+            return plan.Leftover < options.Gamma ? plan.Leftover : 0;
         }
 
         #endregion
