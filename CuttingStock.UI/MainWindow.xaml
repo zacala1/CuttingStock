@@ -82,9 +82,7 @@
                     <!-- 알고리즘 선택 -->
                     <TextBlock Text="알고리즘 선택:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="5"/>
                     <ComboBox x:Name="algorithmComboBox" Grid.Row="0" Grid.Column="1" Margin="5" SelectedIndex="0" SelectionChanged="AlgorithmComboBox_SelectionChanged">
-                        <ComboBoxItem Content="Greedy Knapsack DP (최고 품질, 느림)"/>
-                        <ComboBoxItem Content="First Fit Decreasing (최고 속도)"/>
-                        <ComboBoxItem Content="Best Fit Decreasing (균형 잡힌 성능/품질)"/>
+                        <ComboBoxItem Content="Greedy Knapsack DP (근최적, 빠름)"/>
                         <ComboBoxItem Content="Column Generation (전역 최적화, 실험적)"/>
                     </ComboBox>
 

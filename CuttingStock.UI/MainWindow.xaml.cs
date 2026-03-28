@@ -292,10 +292,8 @@ namespace CuttingStock
             return algorithmComboBox.SelectedIndex switch
             {
                 0 => new GreedyKnapsackSolver(),
-                // 1 => new FirstFitDecreasingSolver(),
-                // 2 => new BestFitDecreasingSolver(),
                 1 => new ColumnGenerationSolver(),
-                _ => new GreedyKnapsackSolver() // 기본값
+                _ => new GreedyKnapsackSolver()
             };
         }
 
@@ -321,64 +319,21 @@ namespace CuttingStock
             switch (algorithmComboBox.SelectedIndex)
             {
                 case 0: // Greedy Knapsack
-                    var greedyInfo = new TextBlock
+                    advancedOptionsPanel.Children.Add(new TextBlock
                     {
-                        Text = "• DP 기반 최적 조합 탐색\n• 자투리 최소화 우선\n• 추가 설정 없음",
+                        Text = "• DP 기반 최적 조합 탐색 (Multi-Pass)\n• 자투리 최소화 우선\n• 용접 지원",
                         FontStyle = FontStyles.Italic,
                         Foreground = System.Windows.Media.Brushes.DarkGray
-                    };
-                    advancedOptionsPanel.Children.Add(greedyInfo);
+                    });
                     break;
 
-                case 1: // FFD
-                    var ffdPanel = new StackPanel();
-                    ffdPanel.Children.Add(new TextBlock
+                case 1: // Column Generation
+                    advancedOptionsPanel.Children.Add(new TextBlock
                     {
-                        Text = "First Fit 전략 설정:",
-                        FontWeight = FontWeights.Bold,
-                        Margin = new Thickness(0, 0, 0, 5)
-                    });
-                    ffdPanel.Children.Add(new TextBlock
-                    {
-                        Text = "• 첫 번째로 들어가는 재고에 배치\n• 최고 속도 (O(S × Q))\n• 추가 설정 없음",
+                        Text = "• Linear Programming 기반 전역 최적화\n• 이론적으로 가장 최적에 가까움\n• 대규모 입력 시 느릴 수 있음",
                         FontStyle = FontStyles.Italic,
                         Foreground = System.Windows.Media.Brushes.DarkGray
                     });
-                    advancedOptionsPanel.Children.Add(ffdPanel);
-                    break;
-
-                case 2: // BFD
-                    var bfdPanel = new StackPanel();
-                    bfdPanel.Children.Add(new TextBlock
-                    {
-                        Text = "Best Fit 전략 설정:",
-                        FontWeight = FontWeights.Bold,
-                        Margin = new Thickness(0, 0, 0, 5)
-                    });
-                    bfdPanel.Children.Add(new TextBlock
-                    {
-                        Text = "• 남은 공간이 가장 작은 재고에 배치\n• FFD보다 10-15% 품질 개선\n• 추가 설정 없음",
-                        FontStyle = FontStyles.Italic,
-                        Foreground = System.Windows.Media.Brushes.DarkGray
-                    });
-                    advancedOptionsPanel.Children.Add(bfdPanel);
-                    break;
-
-                case 3: // Column Generation
-                    var cgPanel = new StackPanel();
-                    cgPanel.Children.Add(new TextBlock
-                    {
-                        Text = "Column Generation 설정:",
-                        FontWeight = FontWeights.Bold,
-                        Margin = new Thickness(0, 0, 0, 5)
-                    });
-                    cgPanel.Children.Add(new TextBlock
-                    {
-                        Text = "• Linear Programming 기반 전역 최적화\n• 이론적으로 가장 최적에 가까움\n• 매우 느릴 수 있음",
-                        FontStyle = FontStyles.Italic,
-                        Foreground = System.Windows.Media.Brushes.DarkGray
-                    });
-                    advancedOptionsPanel.Children.Add(cgPanel);
                     break;
             }
         }
@@ -464,15 +419,17 @@ namespace CuttingStock
         }
 
 
+        private static readonly Regex IntegerRegex = new("[^0-9]+", RegexOptions.Compiled);
+        private static readonly Regex DecimalRegex = new("[^0-9.]+", RegexOptions.Compiled);
+
         private void IntegerTextBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
         {
-            e.Handled = new Regex("[^0-9]+").IsMatch(e.Text);
+            e.Handled = IntegerRegex.IsMatch(e.Text);
         }
 
         private void DecimalTextBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
         {
-            // 숫자와 점(.)만 허용
-            e.Handled = new Regex("[^0-9.]+").IsMatch(e.Text);
+            e.Handled = DecimalRegex.IsMatch(e.Text);
         }
 
         private void PatternReductionCheckBox_Checked(object sender, RoutedEventArgs e)
@@ -610,7 +567,7 @@ namespace CuttingStock
 
         #region 알고리즘 비교
 
-        private void CompareAlgorithms_Click(object sender, RoutedEventArgs e)
+        private async void CompareAlgorithms_Click(object sender, RoutedEventArgs e)
         {
             if (Stocks.Count == 0 || Orders.Count == 0)
             {
@@ -620,6 +577,10 @@ namespace CuttingStock
 
             try
             {
+                loadingOverlay.Visibility = Visibility.Visible;
+                loadingProgressBar.IsIndeterminate = true;
+                loadingText.Text = "알고리즘 비교 중...";
+
                 var stock = Stocks.ToList();
                 var orders = Orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
                 var parameters = GetParameters();
@@ -629,46 +590,58 @@ namespace CuttingStock
                 var optimizers = new List<ICuttingSolver>
                 {
                     new GreedyKnapsackSolver(),
-                    // new FirstFitDecreasingSolver(),
-                    // new BestFitDecreasingSolver()
+                    new ColumnGenerationSolver()
                 };
 
-                ComparisonResults.Clear();
-                var detailedReports = new System.Text.StringBuilder();
-                detailedReports.AppendLine("═══════════════════════════════════════════════════");
-                detailedReports.AppendLine("  알고리즘 상세 비교");
-                detailedReports.AppendLine("═══════════════════════════════════════════════════");
-                detailedReports.AppendLine();
-
-                foreach (var optimizer in optimizers)
+                // Run comparison on background thread
+                var (comparisonResults, detailedReport) = await Task.Run(() =>
                 {
-                    var result = optimizer.Solve(stock, orders, parameters);
+                    var results = new List<ComparisonResult>();
+                    var reports = new System.Text.StringBuilder();
+                    reports.AppendLine("═══════════════════════════════════════════════════");
+                    reports.AppendLine("  알고리즘 상세 비교");
+                    reports.AppendLine("═══════════════════════════════════════════════════");
+                    reports.AppendLine();
 
-                    ComparisonResults.Add(new ComparisonResult
+                    foreach (var optimizer in optimizers)
                     {
-                        AlgorithmName = optimizer.Name,
-                        TotalCost = result.TotalCost,
-                        WasteLength = result.WasteLength,
-                        StockUsed = result.StockUsed,
-                        MaterialEfficiency = result.MaterialEfficiency,
-                        ExecutionTimeMs = result.ExecutionTimeMs,
-                        Success = result.Success
-                    });
+                        var ordersCopy = orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
+                        var result = optimizer.Solve(stock, ordersCopy, parameters);
 
-                    detailedReports.AppendLine($"┌─────────────────────────────────────────────────");
-                    detailedReports.AppendLine($"│ {optimizer.Name}");
-                    detailedReports.AppendLine($"│ 시간 복잡도: {optimizer.TimeComplexity}");
-                    detailedReports.AppendLine($"└─────────────────────────────────────────────────");
-                    if (result.Success)
-                    {
-                        detailedReports.AppendLine(result.GetDetailedReport(parameters));
+                        results.Add(new ComparisonResult
+                        {
+                            AlgorithmName = optimizer.Name,
+                            TotalCost = result.TotalCost,
+                            WasteLength = result.WasteLength,
+                            StockUsed = result.StockUsed,
+                            MaterialEfficiency = result.MaterialEfficiency,
+                            ExecutionTimeMs = result.ExecutionTimeMs,
+                            Success = result.Success
+                        });
+
+                        reports.AppendLine($"┌─────────────────────────────────────────────────");
+                        reports.AppendLine($"│ {optimizer.Name}");
+                        reports.AppendLine($"│ 시간 복잡도: {optimizer.TimeComplexity}");
+                        reports.AppendLine($"└─────────────────────────────────────────────────");
+                        if (result.Success)
+                        {
+                            reports.AppendLine(result.GetDetailedReport(parameters));
+                        }
+                        else
+                        {
+                            reports.AppendLine($"실패: {result.ErrorMessage}");
+                        }
+                        reports.AppendLine();
+                        reports.AppendLine();
                     }
-                    else
-                    {
-                        detailedReports.AppendLine($"❌ 실패: {result.ErrorMessage}");
-                    }
-                    detailedReports.AppendLine();
-                    detailedReports.AppendLine();
+
+                    return (results, reports.ToString());
+                });
+
+                ComparisonResults.Clear();
+                foreach (var cr in comparisonResults)
+                {
+                    ComparisonResults.Add(cr);
                 }
 
                 var sortedResults = ComparisonResults
@@ -683,15 +656,17 @@ namespace CuttingStock
 
                 UpdateCharts();
 
-                mainTabControl.SelectedIndex = 1;
+                mainTabControl.SelectedIndex = 2;
 
-                comparisonTextBox.Text = detailedReports.ToString();
+                comparisonTextBox.Text = detailedReport;
+
+                loadingOverlay.Visibility = Visibility.Collapsed;
 
                 var bestAlgorithm = sortedResults.FirstOrDefault();
                 if (bestAlgorithm != null)
                 {
                     MessageBox.Show($"알고리즘 비교가 완료되었습니다!\n\n" +
-                                   $"🏆 최고 성능: {bestAlgorithm.AlgorithmName}\n" +
+                                   $"최고 성능: {bestAlgorithm.AlgorithmName}\n" +
                                    $"   총 비용: {bestAlgorithm.TotalCost:N0}원\n" +
                                    $"   재료 효율: {bestAlgorithm.MaterialEfficiency:F2}%\n" +
                                    $"   실행 시간: {bestAlgorithm.ExecutionTimeMs:F3}ms",
@@ -700,6 +675,7 @@ namespace CuttingStock
             }
             catch (Exception ex)
             {
+                loadingOverlay.Visibility = Visibility.Collapsed;
                 MessageBox.Show($"오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
