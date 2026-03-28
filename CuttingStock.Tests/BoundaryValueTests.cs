@@ -228,9 +228,10 @@ namespace CuttingStock.Tests
 
         [Test]
         [Category("Parameter")]
-        public void SolverOptions_Validate_ValidParams_ShouldReturnTrue()
+        public void SolverOptions_ValidParams_ShouldNotThrow()
         {
-            // Arrange
+            // Setter validation covers all constraints;
+            // valid values should not throw
             var param = new SolverOptions
             {
                 Alpha = 1.0f,
@@ -239,12 +240,10 @@ namespace CuttingStock.Tests
                 Delta = 100
             };
 
-            // Act
-            var (isValid, errorMessage) = param.Validate();
-
-            // Assert
-            isValid.Should().BeTrue();
-            errorMessage.Should().BeNull();
+            param.Alpha.Should().Be(1.0f);
+            param.Beta.Should().Be(500.0f);
+            param.Gamma.Should().Be(100);
+            param.Delta.Should().Be(100);
         }
 
         #endregion

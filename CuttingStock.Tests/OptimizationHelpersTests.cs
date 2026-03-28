@@ -28,25 +28,6 @@ namespace CuttingStock.Tests
         }
 
         [Test]
-        public void FlattenOrdersDescending_ShouldSortAndFlatten()
-        {
-            var orders = new List<Order>
-            {
-                new Order(100, 2),
-                new Order(200, 1),
-                new Order(50, 3)
-            };
-
-            var result = SolverUtils.FlattenOrdersDescending(orders);
-
-            result.Should().HaveCount(6); // 2 + 1 + 3
-            result[0].Should().Be(200);
-            result[1].Should().Be(100);
-            result[2].Should().Be(100);
-            result[3].Should().Be(50);
-        }
-
-        [Test]
         public void SortStock_SmallToLarge_ShouldSortAscending()
         {
             var stock = new List<RebarStock>

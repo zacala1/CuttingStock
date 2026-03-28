@@ -11,25 +11,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
     /// </summary>
     public static class SolverUtils
     {
-        #region Constants
-
-        /// <summary>
-        /// Maximum usage per order in Pass 1.
-        /// </summary>
-        public const int PASS1_MAX_PER_ORDER = 2;
-
-        /// <summary>
-        /// Maximum usage per order in Pass 2.
-        /// </summary>
-        public const int PASS2_MAX_PER_ORDER = 5;
-
-        /// <summary>
-        /// Top ratio for post-processing (1/3).
-        /// </summary>
-        public const int POSTPROCESS_TOP_RATIO = 3;
-
-        #endregion
-
         #region Exception Handling
 
         /// <summary>
@@ -48,15 +29,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
         {
             result.Success = false;
             result.ErrorMessage = $"Failed to process {remainingCount} order(s).";
-        }
-
-        /// <summary>
-        /// Sets insufficient stock error message.
-        /// </summary>
-        public static void SetInsufficientStockError(SolverResult result, int remainingCount)
-        {
-            result.Success = false;
-            result.ErrorMessage = $"Insufficient stock. Failed to process {remainingCount} order(s).";
         }
 
         #endregion
@@ -124,17 +96,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
         }
 
         /// <summary>
-        /// Flattens and sorts orders in descending order by length.
-        /// </summary>
-        public static List<int> FlattenOrdersDescending(List<Order> orders)
-        {
-            return orders
-                .OrderByDescending(o => o.Length)
-                .SelectMany(o => Enumerable.Repeat(o.Length, o.Quantity))
-                .ToList();
-        }
-
-        /// <summary>
         /// Sorts orders by scarcity (low quantity first).
         /// </summary>
         public static List<Order> SortOrdersByScarcity(List<Order> orders)
@@ -172,8 +133,9 @@ namespace CuttingStock.Core.Algorithms.Utilities
 
             result.WeldCount = weldGroups.Sum(g => g.Count() - 1);
 
-            result.TotalCost = (int)(result.WasteLength * options.Alpha +
-                                    result.WeldCount * options.Beta);
+            result.TotalCost = (int)Math.Round(
+                result.WasteLength * (double)options.Alpha +
+                result.WeldCount * (double)options.Beta);
         }
 
         #endregion

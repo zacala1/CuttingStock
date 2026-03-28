@@ -75,26 +75,6 @@ namespace CuttingStock.Core.Domain
         /// </summary>
         public int MaxPatternCount { get; set; } = 0;
 
-        /// <summary>
-        /// Validates the options.
-        /// </summary>
-        /// <returns>Validation result (isValid, errorMessage)</returns>
-        public (bool isValid, string? errorMessage) Validate()
-        {
-            if (Alpha < 0)
-                return (false, "Alpha (Waste Cost) must be non-negative.");
-
-            if (Beta < 0)
-                return (false, "Beta (Weld Cost) must be non-negative.");
-
-            if (Gamma < 0)
-                return (false, "Gamma (Min Reusable Length) must be non-negative.");
-
-            if (Delta <= 0)
-                return (false, "Delta (Min Weld Length) must be greater than 0.");
-
-            return (true, null);
-        }
     }
 
     /// <summary>
@@ -175,9 +155,9 @@ namespace CuttingStock.Core.Domain
         {
             get
             {
-                var totalStockLength = CuttingPlans.Sum(p => p.StockLength);
+                long totalStockLength = CuttingPlans.Sum(p => (long)p.StockLength);
                 if (totalStockLength == 0) return 0;
-                var totalUsedLength = CuttingPlans.Sum(p => p.Cuts.Sum(c => c.Length));
+                long totalUsedLength = CuttingPlans.Sum(p => p.Cuts.Sum(c => (long)c.Length));
                 return 100.0 * totalUsedLength / totalStockLength;
             }
         }
