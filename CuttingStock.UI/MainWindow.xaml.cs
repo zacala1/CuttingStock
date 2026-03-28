@@ -177,7 +177,8 @@ namespace CuttingStock
                     if (columns.Length >= 2)
                     {
                         if (int.TryParse(columns[0].Trim(), out int length) &&
-                            int.TryParse(columns[1].Trim(), out int quantity))
+                            int.TryParse(columns[1].Trim(), out int quantity) &&
+                            length > 0 && quantity > 0)
                         {
                             if (collection is ObservableCollection<RebarStock> stockList)
                             {
@@ -221,12 +222,18 @@ namespace CuttingStock
                     if (ext == ".csv")
                     {
                         var lines = File.ReadAllLines(dialog.FileName);
-                        foreach (var line in lines.Skip(1)) // Skip header assumption
+                        // Skip first row only if it looks like a header (non-numeric)
+                        var dataLines = lines.Length > 0 && !int.TryParse(lines[0].Split(',')[0].Trim(), out _)
+                            ? lines.Skip(1)
+                            : lines;
+
+                        foreach (var line in dataLines)
                         {
                             var parts = line.Split(',');
                             if (parts.Length >= 2 &&
-                                int.TryParse(parts[0], out int len) &&
-                                int.TryParse(parts[1], out int qty))
+                                int.TryParse(parts[0].Trim(), out int len) &&
+                                int.TryParse(parts[1].Trim(), out int qty) &&
+                                len > 0 && qty > 0)
                             {
                                 if (collection is ObservableCollection<RebarStock> s) s.Add(new RebarStock(len, qty));
                                 else if (collection is ObservableCollection<Order> o) o.Add(new Order(len, qty));
@@ -241,12 +248,17 @@ namespace CuttingStock
                         var rangeUsed = ws.RangeUsed();
                         if (rangeUsed != null)
                         {
-                            var rows = rangeUsed.RowsUsed().Skip(1); // Skip header
+                            var allRows = rangeUsed.RowsUsed().ToList();
+                            // Skip first row only if it looks like a header
+                            var dataRows = allRows.Count > 0 && !int.TryParse(allRows[0].Cell(1).GetValue<string>(), out _)
+                                ? allRows.Skip(1)
+                                : allRows;
 
-                            foreach (var row in rows)
+                            foreach (var row in dataRows)
                             {
                                 if (int.TryParse(row.Cell(1).GetValue<string>(), out int len) &&
-                                    int.TryParse(row.Cell(2).GetValue<string>(), out int qty))
+                                    int.TryParse(row.Cell(2).GetValue<string>(), out int qty) &&
+                                    len > 0 && qty > 0)
                                 {
                                     if (collection is ObservableCollection<RebarStock> s) s.Add(new RebarStock(len, qty));
                                     else if (collection is ObservableCollection<Order> o) o.Add(new Order(len, qty));
@@ -292,16 +304,6 @@ namespace CuttingStock
         #region 파라미터 및 알고리즘 선택
 
         /// <summary>
-        /// UI에서 입력된 최적화 파라미터를 읽어와 객체로 변환
-        ///
-        /// 파라미터:
-        /// - Alpha: 자투리 1mm당 비용 (원/mm)
-        /// - Beta: 용접 1회당 비용 (원/회)
-        /// - Gamma: 재사용 가능한 자투리 최소 길이 (mm)
-        /// - Delta: 용접 가능한 조각 최소 길이 (mm)
-        /// - UsageOrder: 재고 사용 순서 (작은 것부터 / 큰 것부터)
-        /// </summary>
-        /// <summary>
         /// UI 파라미터를 파싱하여 SolverOptions를 반환합니다.
         /// 파싱 실패 시 null을 반환합니다.
         /// </summary>
@@ -343,14 +345,6 @@ namespace CuttingStock
             };
         }
 
-        /// <summary>
-        /// 사용자가 선택한 알고리즘의 인스턴스 생성
-        ///
-        /// 지원 알고리즘:
-        /// 0: Greedy Knapsack DP - DP 기반 로컬 최적화
-        /// 1: First Fit Decreasing (FFD) - 빠른 휴리스틱
-        /// 2: Best Fit Decreasing (BFD) - 개선된 휴리스틱
-        /// </summary>
         private ICuttingSolver GetSelectedOptimizer()
         {
             return algorithmComboBox.SelectedIndex switch
@@ -455,15 +449,6 @@ namespace CuttingStock
                 });
 
                 _lastSingleResult = result;
-
-                if (!result.Success)
-                {
-                    SetRunningState(false);
-                    MessageBox.Show($"최적화 실패: {result.ErrorMessage}",
-                                   "최적화 실패", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-
                 mainTabControl.SelectedIndex = 0;
 
                 resultTextBox.Text = $"═══════════════════════════════════════════════════\n" +
@@ -472,23 +457,32 @@ namespace CuttingStock
                                     $"═══════════════════════════════════════════════════\n\n" +
                                     result.GetDetailedReport(parameters);
 
-                GenerateVisualizationData(result);
+                if (result.Success && result.CuttingPlans.Count > 0)
+                {
+                    GenerateVisualizationData(result);
+                    visualizationPlaceholder.Visibility = Visibility.Collapsed;
+                    visualizationScrollViewer.Visibility = Visibility.Visible;
+                }
 
-                // 시각화 탭: placeholder 숨기고 콘텐츠 표시
-                visualizationPlaceholder.Visibility = Visibility.Collapsed;
-                visualizationScrollViewer.Visibility = Visibility.Visible;
-
-                // 내보내기 버튼 활성화
+                // 내보내기는 부분 결과라도 가능하게
                 btnExportCsv.IsEnabled = true;
                 btnExportExcel.IsEnabled = true;
 
                 SetRunningState(false);
 
-                MessageBox.Show($"최적화가 완료되었습니다!\n\n" +
-                               $"총 비용: {result.TotalCost:N0}원\n" +
-                               $"재료 효율: {result.MaterialEfficiency:F2}%\n" +
-                               $"실행 시간: {result.ExecutionTimeMs:F3}ms",
-                               "최적화 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (!result.Success)
+                {
+                    MessageBox.Show($"최적화 실패: {result.ErrorMessage}\n\n부분 결과는 결과 탭에서 확인 가능합니다.",
+                                   "최적화 실패", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                else
+                {
+                    MessageBox.Show($"최적화가 완료되었습니다!\n\n" +
+                                   $"총 비용: {result.TotalCost:N0}원\n" +
+                                   $"재료 효율: {result.MaterialEfficiency:F2}%\n" +
+                                   $"실행 시간: {result.ExecutionTimeMs:F3}ms",
+                                   "최적화 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
             catch (Exception ex)
             {
@@ -749,6 +743,10 @@ namespace CuttingStock
                 mainTabControl.SelectedIndex = 2;
 
                 comparisonTextBox.Text = detailedReport;
+
+                // 비교 탭: placeholder 숨기고 콘텐츠 표시
+                comparisonPlaceholder.Visibility = Visibility.Collapsed;
+                comparisonContent.Visibility = Visibility.Visible;
 
                 // 내보내기 버튼 활성화
                 btnExportCompCsv.IsEnabled = true;

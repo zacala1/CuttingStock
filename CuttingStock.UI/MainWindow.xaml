@@ -289,6 +289,13 @@
                 <!-- 비교 결과 탭 -->
                 <TabItem Header="알고리즘 비교">
                     <Grid>
+                        <!-- 빈 상태 가이드 -->
+                        <TextBlock x:Name="comparisonPlaceholder"
+                                   Text="'알고리즘 비교' 버튼을 클릭하면 결과가 표시됩니다."
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="Gray" FontSize="14" FontStyle="Italic"/>
+
+                        <Grid x:Name="comparisonContent" Visibility="Collapsed">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="300"/>
@@ -358,6 +365,7 @@
                                 <Button x:Name="btnExportCompCsv" Content="비교 결과 CSV로 저장" Click="ExportComparisonToCsv_Click" Width="150" Margin="0,0,5,0" IsEnabled="False"/>
                                 <Button x:Name="btnExportCompExcel" Content="비교 결과 Excel로 저장" Click="ExportComparisonToExcel_Click" Width="150" IsEnabled="False"/>
                             </StackPanel>
+                        </Grid>
                         </Grid>
                     </Grid>
                 </TabItem>
