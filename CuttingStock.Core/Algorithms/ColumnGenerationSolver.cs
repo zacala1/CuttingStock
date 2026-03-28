@@ -61,12 +61,10 @@ namespace CuttingStock.Core.Algorithms
 
                 if (distinctStockLengths.Count == 1)
                 {
-                    // Single stock length - use original algorithm
                     SolveSingleStock(result, stock, orders, options, progress);
                 }
                 else
                 {
-                    // Multiple stock lengths - use enhanced algorithm
                     SolveMultiStock(result, stock, orders, options, progress);
                 }
 
@@ -93,15 +91,18 @@ namespace CuttingStock.Core.Algorithms
                     result.Success = true;
                 }
 
-                result.ExecutionTimeMs = stopwatch.Elapsed.TotalMilliseconds;
                 SolverUtils.CalculateResults(result, options);
-
                 progress?.Report(100.0);
             }
             catch (Exception ex)
             {
                 result.Success = false;
                 result.ErrorMessage = ex.Message;
+            }
+            finally
+            {
+                stopwatch.Stop();
+                result.ExecutionTimeMs = stopwatch.Elapsed.TotalMilliseconds;
             }
 
             return result;
@@ -578,6 +579,10 @@ namespace CuttingStock.Core.Algorithms
             {
                 double pivotVal = tableau[pivotRow, pivotCol];
 
+                // Guard against near-zero pivot to prevent numerical instability
+                if (Math.Abs(pivotVal) < 1e-12)
+                    return;
+
                 // 1. Normalize Pivot Row
                 for (int j = 0; j <= n; j++)
                 {
@@ -602,14 +607,27 @@ namespace CuttingStock.Core.Algorithms
             }
         }
 
-        private class CuttingPatternColumn
+        private class CuttingPatternColumn : IEquatable<CuttingPatternColumn>
         {
             public int[] Counts { get; }
             public CuttingPatternColumn(int size) { Counts = new int[size]; }
 
-            public bool Equals(CuttingPatternColumn other)
+            public bool Equals(CuttingPatternColumn? other)
             {
+                if (other is null) return false;
                 return Counts.SequenceEqual(other.Counts);
+            }
+
+            public override bool Equals(object? obj)
+            {
+                return Equals(obj as CuttingPatternColumn);
+            }
+
+            public override int GetHashCode()
+            {
+                var hash = new HashCode();
+                foreach (var c in Counts) hash.Add(c);
+                return hash.ToHashCode();
             }
         }
 
