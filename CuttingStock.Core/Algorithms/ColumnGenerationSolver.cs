@@ -21,7 +21,7 @@ namespace CuttingStock.Core.Algorithms
     /// - Improved integer solution generation
     ///
     /// References:
-    /// - Gilmore & Gomory (1961): "A Linear Programming Approach to the Cutting-Stock Problem"
+    /// - Gilmore and Gomory (1961): "A Linear Programming Approach to the Cutting-Stock Problem"
     /// - https://jump.dev/JuMP.jl/stable/tutorials/algorithms/cutting_stock_column_generation/
     /// </summary>
     public class ColumnGenerationSolver : ICuttingSolver
