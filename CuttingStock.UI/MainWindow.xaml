@@ -6,10 +6,12 @@
         xmlns:local="clr-namespace:CuttingStock"
         xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
         mc:Ignorable="d"
-        Title="철근 절단 최적화 프로그램" Height="800" Width="1400">
+        Title="철근 절단 최적화 프로그램" Height="800" Width="1400"
+        MinHeight="600" MinWidth="900">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="400"/>
+            <ColumnDefinition Width="400" MinWidth="250"/>
+            <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
@@ -18,12 +20,14 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- 재고 입력 -->
             <GroupBox Header="재고" Grid.Row="0" Margin="0,0,0,5">
                 <StackPanel>
-                    <DataGrid x:Name="stockGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10" KeyDown="DataGrid_KeyDown">
+                    <DataGrid x:Name="stockGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
+                              KeyDown="DataGrid_KeyDown" CellEditEnding="DataGrid_CellEditEnding" CanUserDeleteRows="True">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="길이 (mm)" Binding="{Binding Length}" Width="*"/>
                             <DataGridTextColumn Header="수량" Binding="{Binding Quantity}" Width="*"/>
@@ -31,17 +35,18 @@
                     </DataGrid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Content="재고 추가" Click="AddStock_Click" Margin="0,0,5,0" Width="80"/>
-                        <Button Content="파일 불러오기" Click="ImportStock_Click" Margin="0,0,5,0" Width="100"/>
-                        <Button Content="예제 로드" Click="LoadExample_Click" Width="80"/>
+                        <Button Content="선택 삭제" Click="DeleteSelectedStock_Click" Margin="0,0,5,0" Width="80"/>
+                        <Button Content="파일 불러오기" Click="ImportStock_Click" Width="100"/>
                     </StackPanel>
-                    <TextBlock Text="※ 엑셀 붙여넣기(Ctrl+V) 지원" FontSize="11" Foreground="Gray" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                    <TextBlock Text="※ 엑셀 붙여넣기(Ctrl+V) 지원 / Delete키로 행 삭제" FontSize="11" Foreground="Gray" HorizontalAlignment="Center" Margin="0,5,0,0"/>
                 </StackPanel>
             </GroupBox>
 
             <!-- 주문 입력 -->
             <GroupBox Header="주문" Grid.Row="1" Margin="0,5,0,0">
                 <StackPanel>
-                    <DataGrid x:Name="orderGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10" KeyDown="DataGrid_KeyDown">
+                    <DataGrid x:Name="orderGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
+                              KeyDown="DataGrid_KeyDown" CellEditEnding="DataGrid_CellEditEnding" CanUserDeleteRows="True">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="길이 (mm)" Binding="{Binding Length}" Width="*"/>
                             <DataGridTextColumn Header="수량" Binding="{Binding Quantity}" Width="*"/>
@@ -49,15 +54,26 @@
                     </DataGrid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Content="주문 추가" Click="AddOrder_Click" Width="80" Margin="0,0,5,0"/>
+                        <Button Content="선택 삭제" Click="DeleteSelectedOrder_Click" Margin="0,0,5,0" Width="80"/>
                         <Button Content="파일 불러오기" Click="ImportOrder_Click" Width="100"/>
                     </StackPanel>
-                    <TextBlock Text="※ 엑셀 붙여넣기(Ctrl+V) 지원" FontSize="11" Foreground="Gray" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                    <TextBlock Text="※ 엑셀 붙여넣기(Ctrl+V) 지원 / Delete키로 행 삭제" FontSize="11" Foreground="Gray" HorizontalAlignment="Center" Margin="0,5,0,0"/>
                 </StackPanel>
             </GroupBox>
+
+            <!-- 공통 버튼: 예제 로드 / 초기화 -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
+                <Button Content="예제 로드" Click="LoadExample_Click" Width="100" Margin="0,0,10,0"/>
+                <Button Content="전체 초기화" Click="ClearAll_Click" Width="100"/>
+            </StackPanel>
         </Grid>
 
+        <!-- GridSplitter -->
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                      Background="LightGray" ResizeBehavior="PreviousAndNext" Cursor="SizeWE"/>
+
         <!-- 오른쪽 패널: 설정 및 결과 -->
-        <Grid Grid.Column="1" Margin="10">
+        <Grid Grid.Column="2" Margin="10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -152,8 +168,8 @@
 
                     <!-- 실행 버튼 -->
                     <StackPanel Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,5">
-                        <Button Content="최적화 실행" Click="Calculate_Click" Width="120" Height="35" Margin="0,0,10,0" FontWeight="Bold"/>
-                        <Button Content="알고리즘 비교" Click="CompareAlgorithms_Click" Width="120" Height="35" FontWeight="Bold"/>
+                        <Button x:Name="btnCalculate" Content="최적화 실행" Click="Calculate_Click" Width="120" Height="35" Margin="0,0,10,0" FontWeight="Bold"/>
+                        <Button x:Name="btnCompare" Content="알고리즘 비교" Click="CompareAlgorithms_Click" Width="120" Height="35" FontWeight="Bold"/>
                     </StackPanel>
 
                     <!-- 진행 상태 표시 (오버레이) -->
@@ -175,91 +191,99 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        
+
                         <TextBox x:Name="resultTextBox" Grid.Row="0" IsReadOnly="True"
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Auto"
                                  FontFamily="Consolas"
                                  Padding="10"/>
-                        
+
                         <!-- 내보내기 버튼 -->
                         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
-                            <Button Content="CSV로 내보내기" Click="ExportToCsv_Click" Width="120" Margin="0,0,5,0"/>
-                            <Button Content="Excel로 내보내기" Click="ExportToExcel_Click" Width="120"/>
+                            <Button x:Name="btnExportCsv" Content="CSV로 내보내기" Click="ExportToCsv_Click" Width="120" Margin="0,0,5,0" IsEnabled="False"/>
+                            <Button x:Name="btnExportExcel" Content="Excel로 내보내기" Click="ExportToExcel_Click" Width="120" IsEnabled="False"/>
                         </StackPanel>
                     </Grid>
                 </TabItem>
 
                 <!-- 시각화 탭 -->
                 <TabItem Header="결과 시각화">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <!-- 범례 (Legend) -->
-                            <Border BorderBrush="LightGray" BorderThickness="1" Margin="10" Padding="5" Background="White">
-                                <StackPanel>
-                                    <TextBlock Text="범례 (Legend)" FontWeight="Bold" Margin="0,0,0,5"/>
-                                    <ItemsControl x:Name="legendItemsControl">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal"/>
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Orientation="Horizontal" Margin="0,0,15,5">
-                                                    <Rectangle Width="15" Height="15" Fill="{Binding Color}" Stroke="Gray" StrokeThickness="1" Margin="0,0,5,0"/>
-                                                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
+                    <Grid>
+                        <!-- 빈 상태 가이드 -->
+                        <TextBlock x:Name="visualizationPlaceholder"
+                                   Text="최적화를 먼저 실행하면 결과가 시각화됩니다."
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="Gray" FontSize="14" FontStyle="Italic"/>
 
-                            <!-- 시각화 메인 아이템 -->
-                            <ItemsControl x:Name="visualizationItemsControl" Margin="10">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,10" Padding="5">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="50"/>
-                                                </Grid.RowDefinitions>
-                                                
-                                                <!-- 정보 텍스트 -->
-                                                <TextBlock Grid.Row="0" Text="{Binding InfoText}" Margin="0,0,0,5"/>
-                                                
-                                                <!-- 바 시각화 -->
-                                                <Canvas Grid.Row="1" Width="{Binding TotalWidth}" Height="40" Background="#EEE">
-                                                    <ItemsControl ItemsSource="{Binding Blocks}">
-                                                        <ItemsControl.ItemsPanel>
-                                                            <ItemsPanelTemplate>
-                                                                <Canvas/>
-                                                            </ItemsPanelTemplate>
-                                                        </ItemsControl.ItemsPanel>
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <Grid Width="{Binding Width}" Height="40" Canvas.Left="{Binding X}">
-                                                                    <Rectangle Fill="{Binding Color}" ToolTip="{Binding ToolTip}"/>
-                                                                    <TextBlock Text="{Binding Text}" 
-                                                                             Foreground="{Binding TextColor}" 
-                                                                             HorizontalAlignment="Center" 
-                                                                             VerticalAlignment="Center" 
-                                                                             FontSize="10" 
-                                                                             IsHitTestVisible="False"/>
-                                                                </Grid>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </Canvas>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </ScrollViewer>
+                        <ScrollViewer x:Name="visualizationScrollViewer" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                            <StackPanel>
+                                <!-- 범례 (Legend) -->
+                                <Border BorderBrush="LightGray" BorderThickness="1" Margin="10" Padding="5" Background="White">
+                                    <StackPanel>
+                                        <TextBlock Text="범례 (Legend)" FontWeight="Bold" Margin="0,0,0,5"/>
+                                        <ItemsControl x:Name="legendItemsControl">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,15,5">
+                                                        <Rectangle Width="15" Height="15" Fill="{Binding Color}" Stroke="Gray" StrokeThickness="1" Margin="0,0,5,0"/>
+                                                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 시각화 메인 아이템 -->
+                                <ItemsControl x:Name="visualizationItemsControl" Margin="10">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,10" Padding="5">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="50"/>
+                                                    </Grid.RowDefinitions>
+
+                                                    <!-- 정보 텍스트 -->
+                                                    <TextBlock Grid.Row="0" Text="{Binding InfoText}" Margin="0,0,0,5"/>
+
+                                                    <!-- 바 시각화 -->
+                                                    <Canvas Grid.Row="1" Width="{Binding TotalWidth}" Height="40" Background="#EEE">
+                                                        <ItemsControl ItemsSource="{Binding Blocks}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <Canvas/>
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Grid Width="{Binding Width}" Height="40" Canvas.Left="{Binding X}">
+                                                                        <Rectangle Fill="{Binding Color}" ToolTip="{Binding ToolTip}"/>
+                                                                        <TextBlock Text="{Binding Text}"
+                                                                                 Foreground="{Binding TextColor}"
+                                                                                 HorizontalAlignment="Center"
+                                                                                 VerticalAlignment="Center"
+                                                                                 FontSize="10"
+                                                                                 IsHitTestVisible="False"/>
+                                                                    </Grid>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </Canvas>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
                 </TabItem>
 
                 <!-- 비교 결과 탭 -->
@@ -320,7 +344,7 @@
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            
+
                             <TextBox x:Name="comparisonTextBox" Grid.Row="0"
                                      IsReadOnly="True"
                                      VerticalScrollBarVisibility="Auto"
@@ -328,11 +352,11 @@
                                      FontFamily="Consolas"
                                      Padding="10"
                                      Margin="10,0,10,10"/>
-                            
+
                             <!-- 내보내기 버튼 -->
                             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10,0,10,10">
-                                <Button Content="비교 결과 CSV로 저장" Click="ExportComparisonToCsv_Click" Width="150" Margin="0,0,5,0"/>
-                                <Button Content="비교 결과 Excel로 저장" Click="ExportComparisonToExcel_Click" Width="150"/>
+                                <Button x:Name="btnExportCompCsv" Content="비교 결과 CSV로 저장" Click="ExportComparisonToCsv_Click" Width="150" Margin="0,0,5,0" IsEnabled="False"/>
+                                <Button x:Name="btnExportCompExcel" Content="비교 결과 Excel로 저장" Click="ExportComparisonToExcel_Click" Width="150" IsEnabled="False"/>
                             </StackPanel>
                         </Grid>
                     </Grid>

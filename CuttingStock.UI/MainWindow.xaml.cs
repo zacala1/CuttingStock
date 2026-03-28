@@ -74,10 +74,11 @@ namespace CuttingStock
             ImportFromFile(Stocks);
         }
 
-        /// <summary>
-        /// 주문 추가 버튼 클릭 이벤트
-        /// 기본값: 5000mm × 1개
-        /// </summary>
+        private void DeleteSelectedStock_Click(object sender, RoutedEventArgs e)
+        {
+            DeleteSelectedItems(stockGrid, Stocks);
+        }
+
         private void AddOrder_Click(object sender, RoutedEventArgs e)
         {
             Orders.Add(new Order(5000, 1));
@@ -86,6 +87,53 @@ namespace CuttingStock
         private void ImportOrder_Click(object sender, RoutedEventArgs e)
         {
             ImportFromFile(Orders);
+        }
+
+        private void DeleteSelectedOrder_Click(object sender, RoutedEventArgs e)
+        {
+            DeleteSelectedItems(orderGrid, Orders);
+        }
+
+        private void ClearAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (MessageBox.Show("재고와 주문 데이터를 모두 삭제하시겠습니까?", "전체 초기화",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            {
+                Stocks.Clear();
+                Orders.Clear();
+            }
+        }
+
+        private static void DeleteSelectedItems<T>(DataGrid grid, ObservableCollection<T> collection)
+        {
+            var selected = grid.SelectedItems.Cast<T>().ToList();
+            if (selected.Count == 0)
+            {
+                MessageBox.Show("삭제할 항목을 선택해주세요.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            foreach (var item in selected)
+            {
+                collection.Remove(item);
+            }
+        }
+
+        /// <summary>
+        /// DataGrid 셀 편집 완료 시 유효성 검사
+        /// 양의 정수만 허용하며, 잘못된 값은 되돌림
+        /// </summary>
+        private void DataGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            if (e.EditAction == DataGridEditAction.Cancel) return;
+
+            if (e.EditingElement is TextBox textBox)
+            {
+                if (!int.TryParse(textBox.Text, out int value) || value <= 0)
+                {
+                    MessageBox.Show("양의 정수를 입력해주세요.", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    e.Cancel = true;
+                }
+            }
         }
 
         /// <summary>
@@ -253,30 +301,46 @@ namespace CuttingStock
         /// - Delta: 용접 가능한 조각 최소 길이 (mm)
         /// - UsageOrder: 재고 사용 순서 (작은 것부터 / 큰 것부터)
         /// </summary>
-        private SolverOptions GetParameters()
+        /// <summary>
+        /// UI 파라미터를 파싱하여 SolverOptions를 반환합니다.
+        /// 파싱 실패 시 null을 반환합니다.
+        /// </summary>
+        private SolverOptions? GetParameters()
         {
-            try
+            if (!float.TryParse(alphaTextBox.Text, CultureInfo.InvariantCulture, out float alpha) || alpha < 0)
             {
-                return new SolverOptions
-                {
-                    Alpha = float.Parse(alphaTextBox.Text, CultureInfo.InvariantCulture),
-                    Beta = float.Parse(betaTextBox.Text, CultureInfo.InvariantCulture),
-                    Gamma = int.Parse(gammaTextBox.Text),
-                    Delta = int.Parse(deltaTextBox.Text),
-                    UsageOrder = usageOrderComboBox.SelectedIndex == 0
-                        ? StockUsageOrder.SmallToLarge
-                        : StockUsageOrder.LargeToSmall,
-                    EnableWelding = enableWeldingCheckBox.IsChecked ?? false,
-                    EnablePatternReduction = enablePatternReductionCheckBox.IsChecked ?? false,
-                    MaxPatternCount = int.TryParse(maxPatternCountTextBox.Text, out int maxPattern) ? maxPattern : 0
-                };
+                MessageBox.Show("Alpha 값을 올바르게 입력해주세요. (0 이상의 숫자)", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return null;
             }
-            catch (Exception ex)
+            if (!float.TryParse(betaTextBox.Text, CultureInfo.InvariantCulture, out float beta) || beta < 0)
             {
-                MessageBox.Show($"파라미터 입력 오류: {ex.Message}\n올바른 숫자를 입력해주세요.",
-                               "입력 오류", MessageBoxButton.OK, MessageBoxImage.Error);
-                throw;
+                MessageBox.Show("Beta 값을 올바르게 입력해주세요. (0 이상의 숫자)", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return null;
             }
+            if (!int.TryParse(gammaTextBox.Text, out int gamma) || gamma < 0)
+            {
+                MessageBox.Show("Gamma 값을 올바르게 입력해주세요. (0 이상의 정수)", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return null;
+            }
+            if (!int.TryParse(deltaTextBox.Text, out int delta) || delta <= 0)
+            {
+                MessageBox.Show("Delta 값을 올바르게 입력해주세요. (1 이상의 정수)", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return null;
+            }
+
+            return new SolverOptions
+            {
+                Alpha = alpha,
+                Beta = beta,
+                Gamma = gamma,
+                Delta = delta,
+                UsageOrder = usageOrderComboBox.SelectedIndex == 0
+                    ? StockUsageOrder.SmallToLarge
+                    : StockUsageOrder.LargeToSmall,
+                EnableWelding = enableWeldingCheckBox.IsChecked ?? false,
+                EnablePatternReduction = enablePatternReductionCheckBox.IsChecked ?? false,
+                MaxPatternCount = int.TryParse(maxPatternCountTextBox.Text, out int maxPattern) ? maxPattern : 0
+            };
         }
 
         /// <summary>
@@ -342,6 +406,13 @@ namespace CuttingStock
 
         #region 최적화 실행
 
+        private void SetRunningState(bool running)
+        {
+            btnCalculate.IsEnabled = !running;
+            btnCompare.IsEnabled = !running;
+            loadingOverlay.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private async void Calculate_Click(object sender, RoutedEventArgs e)
         {
             if (Stocks.Count == 0 || Orders.Count == 0)
@@ -350,14 +421,15 @@ namespace CuttingStock
                 return;
             }
 
+            var parameters = GetParameters();
+            if (parameters == null) return;
+
             try
             {
-                loadingOverlay.Visibility = Visibility.Visible;
+                SetRunningState(true);
 
-                // UI 스레드에서 필요한 데이터 캡처
                 var stock = Stocks.ToList();
                 var orders = Orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
-                var parameters = GetParameters();
                 var optimizer = GetSelectedOptimizer();
 
                 _lastParameters = parameters;
@@ -386,7 +458,7 @@ namespace CuttingStock
 
                 if (!result.Success)
                 {
-                    loadingOverlay.Visibility = Visibility.Collapsed;
+                    SetRunningState(false);
                     MessageBox.Show($"최적화 실패: {result.ErrorMessage}",
                                    "최적화 실패", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
@@ -400,10 +472,17 @@ namespace CuttingStock
                                     $"═══════════════════════════════════════════════════\n\n" +
                                     result.GetDetailedReport(parameters);
 
-                // 시각화 데이터 생성
                 GenerateVisualizationData(result);
 
-                loadingOverlay.Visibility = Visibility.Collapsed;
+                // 시각화 탭: placeholder 숨기고 콘텐츠 표시
+                visualizationPlaceholder.Visibility = Visibility.Collapsed;
+                visualizationScrollViewer.Visibility = Visibility.Visible;
+
+                // 내보내기 버튼 활성화
+                btnExportCsv.IsEnabled = true;
+                btnExportExcel.IsEnabled = true;
+
+                SetRunningState(false);
 
                 MessageBox.Show($"최적화가 완료되었습니다!\n\n" +
                                $"총 비용: {result.TotalCost:N0}원\n" +
@@ -413,7 +492,7 @@ namespace CuttingStock
             }
             catch (Exception ex)
             {
-                loadingOverlay.Visibility = Visibility.Collapsed;
+                SetRunningState(false);
                 MessageBox.Show($"오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -429,7 +508,16 @@ namespace CuttingStock
 
         private void DecimalTextBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
         {
-            e.Handled = DecimalRegex.IsMatch(e.Text);
+            if (DecimalRegex.IsMatch(e.Text))
+            {
+                e.Handled = true;
+                return;
+            }
+            // Block second decimal point
+            if (e.Text == "." && sender is TextBox tb && tb.Text.Contains('.'))
+            {
+                e.Handled = true;
+            }
         }
 
         private void PatternReductionCheckBox_Checked(object sender, RoutedEventArgs e)
@@ -575,15 +663,17 @@ namespace CuttingStock
                 return;
             }
 
+            var parameters = GetParameters();
+            if (parameters == null) return;
+
             try
             {
-                loadingOverlay.Visibility = Visibility.Visible;
+                SetRunningState(true);
                 loadingProgressBar.IsIndeterminate = true;
                 loadingText.Text = "알고리즘 비교 중...";
 
                 var stock = Stocks.ToList();
                 var orders = Orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
-                var parameters = GetParameters();
 
                 _lastParameters = parameters;
 
@@ -660,7 +750,11 @@ namespace CuttingStock
 
                 comparisonTextBox.Text = detailedReport;
 
-                loadingOverlay.Visibility = Visibility.Collapsed;
+                // 내보내기 버튼 활성화
+                btnExportCompCsv.IsEnabled = true;
+                btnExportCompExcel.IsEnabled = true;
+
+                SetRunningState(false);
 
                 var bestAlgorithm = sortedResults.FirstOrDefault();
                 if (bestAlgorithm != null)
@@ -675,7 +769,7 @@ namespace CuttingStock
             }
             catch (Exception ex)
             {
-                loadingOverlay.Visibility = Visibility.Collapsed;
+                SetRunningState(false);
                 MessageBox.Show($"오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -928,8 +1022,8 @@ namespace CuttingStock
 
             writer.WriteLine("철근 절단 최적화 결과");
             writer.WriteLine($"날짜,{DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            writer.WriteLine($"알고리즘,{optimizer.Name}");
-            writer.WriteLine($"시간 복잡도,{optimizer.TimeComplexity}");
+            writer.WriteLine($"알고리즘,{CsvEscape(optimizer.Name)}");
+            writer.WriteLine($"시간 복잡도,{CsvEscape(optimizer.TimeComplexity)}");
             writer.WriteLine();
 
             writer.WriteLine("파라미터");
@@ -1025,6 +1119,13 @@ namespace CuttingStock
             workbook.SaveAs(filename);
         }
 
+        private static string CsvEscape(string value)
+        {
+            if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
+                return $"\"{value.Replace("\"", "\"\"")}\"";
+            return value;
+        }
+
         private void ExportComparisonResultsToCsv(string filename)
         {
             using var writer = new StreamWriter(filename, false, System.Text.Encoding.UTF8);
@@ -1037,7 +1138,7 @@ namespace CuttingStock
 
             foreach (var result in ComparisonResults.OrderBy(r => r.Rank))
             {
-                writer.WriteLine($"{result.AlgorithmName},{result.TotalCost},{result.WasteLength}," +
+                writer.WriteLine($"{CsvEscape(result.AlgorithmName)},{result.TotalCost},{result.WasteLength}," +
                                $"{result.StockUsed},{result.MaterialEfficiency:F2},{result.ExecutionTimeMs:F3},{result.Rank}");
             }
         }
