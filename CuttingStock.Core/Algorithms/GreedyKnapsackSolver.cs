@@ -112,12 +112,8 @@ namespace CuttingStock.Core.Algorithms
             IProgress<double>? progress,
             long initialTotalOrderQuantity)
         {
-            // Initialize usedStockCounts once and pass between passes
-            var usedStockCounts = new Dictionary<RebarStock, int>();
-            foreach (var s in sortedStock)
-            {
-                usedStockCounts[s] = 0;
-            }
+            // Initialize usedStockCounts by index to avoid mutable object as Dictionary key
+            var usedStockCounts = new int[sortedStock.Count];
 
             ProcessPass(sortedStock, sortedOrders, options, result, allLeftovers,
                         totalStockCount, 2, "Pass1", progress, initialTotalOrderQuantity, usedStockCounts);
@@ -146,11 +142,12 @@ namespace CuttingStock.Core.Algorithms
             string passName,
             IProgress<double>? progress,
             long initialTotalOrderQuantity,
-            Dictionary<RebarStock, int> usedStockCounts)
+            int[] usedStockCounts)
         {
-            foreach (var stockItem in sortedStock)
+            for (int stockIdx = 0; stockIdx < sortedStock.Count; stockIdx++)
             {
-                var availableCount = stockItem.Quantity - usedStockCounts[stockItem];
+                var stockItem = sortedStock[stockIdx];
+                var availableCount = stockItem.Quantity - usedStockCounts[stockIdx];
 
                 for (int i = 0; i < availableCount; i++)
                 {
@@ -215,7 +212,7 @@ namespace CuttingStock.Core.Algorithms
                         };
 
                         result.CuttingPlans.Add(plan);
-                        usedStockCounts[stockItem]++;
+                        usedStockCounts[stockIdx]++;
 
                         if (plan.Leftover >= options.Gamma)
                         {
@@ -241,7 +238,7 @@ namespace CuttingStock.Core.Algorithms
                             };
 
                             result.CuttingPlans.Add(plan);
-                            usedStockCounts[stockItem]++;
+                            usedStockCounts[stockIdx]++;
 
                             if (plan.Leftover >= options.Gamma)
                             {
@@ -289,8 +286,6 @@ namespace CuttingStock.Core.Algorithms
                 [0] = new List<int>()
             };
 
-            var reachableLengths = new HashSet<int> { 0 };
-
             var maxUsagePerOrder = new Dictionary<int, int>();
             foreach (var order in orders)
             {
@@ -300,19 +295,26 @@ namespace CuttingStock.Core.Algorithms
 
             foreach (var order in orders.Where(o => o.Quantity > 0))
             {
-                var newLengths = new List<int>();
+                var newEntries = new List<KeyValuePair<int, List<int>>>();
                 var maxUsage = maxUsagePerOrder.GetValueOrDefault(order.Length, 1);
 
-                foreach (var currentLength in reachableLengths)
+                foreach (var kvp in dp)
                 {
+                    var currentLength = kvp.Key;
+                    var currentCuts = kvp.Value;
+
+                    // Build frequency count for this order's length in currentCuts
+                    int alreadyUsed = 0;
+                    foreach (var c in currentCuts)
+                    {
+                        if (c == order.Length) alreadyUsed++;
+                    }
+
                     for (int count = 1; count <= maxUsage; count++)
                     {
                         var newLength = currentLength + order.Length * count;
                         if (newLength > stockLength)
                             break;
-
-                        var currentCuts = dp.GetValueOrDefault(currentLength, new List<int>());
-                        var alreadyUsed = currentCuts.Count(c => c == order.Length);
 
                         if (alreadyUsed + count > order.Quantity)
                             continue;
@@ -328,24 +330,21 @@ namespace CuttingStock.Core.Algorithms
 
                         if (!dp.ContainsKey(newLength))
                         {
-                            dp[newLength] = newCuts;
-                            newLengths.Add(newLength);
+                            newEntries.Add(new KeyValuePair<int, List<int>>(newLength, newCuts));
                         }
                         else
                         {
-                            var existingCuts = dp[newLength];
-
-                            if (newCuts.Count < existingCuts.Count)
+                            if (newCuts.Count < dp[newLength].Count)
                             {
-                                dp[newLength] = newCuts;
+                                newEntries.Add(new KeyValuePair<int, List<int>>(newLength, newCuts));
                             }
                         }
                     }
                 }
 
-                foreach (var len in newLengths)
+                foreach (var entry in newEntries)
                 {
-                    reachableLengths.Add(len);
+                    dp[entry.Key] = entry.Value;
                 }
             }
 
@@ -420,14 +419,17 @@ namespace CuttingStock.Core.Algorithms
             SolverResult result)
         {
             int weldGroupId = 1;
-            var stockUsage = sortedStock.ToDictionary(s => s, s => 0);
+            var stockUsage = new int[sortedStock.Count];
 
             foreach (var plan in result.CuttingPlans)
             {
-                var matchingStock = sortedStock.FirstOrDefault(s => s.Length == plan.StockLength);
-                if (matchingStock != null)
+                for (int si = 0; si < sortedStock.Count; si++)
                 {
-                    stockUsage[matchingStock]++;
+                    if (sortedStock[si].Length == plan.StockLength)
+                    {
+                        stockUsage[si]++;
+                        break;
+                    }
                 }
             }
 
@@ -437,12 +439,13 @@ namespace CuttingStock.Core.Algorithms
                 var neededLength = order.Length;
                 var pieces = new List<(int length, int stockLength)>();
 
-                foreach (var stockItem in sortedStock)
+                for (int si = 0; si < sortedStock.Count; si++)
                 {
+                    var stockItem = sortedStock[si];
                     if (neededLength <= 0)
                         break;
 
-                    var usedFromThisStock = stockUsage[stockItem];
+                    var usedFromThisStock = stockUsage[si];
                     var availableStocks = stockItem.Quantity - usedFromThisStock;
 
                     while (availableStocks > 0 && neededLength > 0)
@@ -452,7 +455,7 @@ namespace CuttingStock.Core.Algorithms
                         {
                             pieces.Add((pieceLength, stockItem.Length));
                             neededLength -= pieceLength;
-                            stockUsage[stockItem]++;
+                            stockUsage[si]++;
                             availableStocks--;
                         }
                         else
@@ -468,20 +471,15 @@ namespace CuttingStock.Core.Algorithms
 
                     foreach (var (pieceLength, stockLength) in pieces)
                     {
-                        var plan = result.CuttingPlans.FirstOrDefault(p =>
-                            p.StockLength == stockLength &&
-                            p.Leftover >= pieceLength);
-
-                        if (plan == null)
+                        // Always create a new plan for welded pieces to avoid
+                        // corrupting existing plans' leftover calculations
+                        var plan = new CuttingPlan
                         {
-                            plan = new CuttingPlan
-                            {
-                                StockLength = stockLength,
-                                Cuts = new List<Cut>(),
-                                Leftover = stockLength
-                            };
-                            result.CuttingPlans.Add(plan);
-                        }
+                            StockLength = stockLength,
+                            Cuts = new List<Cut>(),
+                            Leftover = stockLength
+                        };
+                        result.CuttingPlans.Add(plan);
 
                         var cut = new Cut
                         {

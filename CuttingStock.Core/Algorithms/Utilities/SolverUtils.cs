@@ -392,12 +392,13 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 var neededLength = orderLength;
                 var pieces = new List<(int length, int stockLength)>();
 
-                foreach (var stockItem in stock)
+                for (int si = 0; si < stock.Count; si++)
                 {
+                    var stockItem = stock[si];
                     if (neededLength <= 0)
                         break;
 
-                    var usedFromThisStock = stockUsage[stockItem];
+                    var usedFromThisStock = stockUsage[si];
                     var availableStocks = stockItem.Quantity - usedFromThisStock;
 
                     while (availableStocks > 0 && neededLength > 0)
@@ -407,7 +408,7 @@ namespace CuttingStock.Core.Algorithms.Utilities
                         {
                             pieces.Add((pieceLength, stockItem.Length));
                             neededLength -= pieceLength;
-                            stockUsage[stockItem]++;
+                            stockUsage[si]++;
                             availableStocks--;
                         }
                         else
@@ -423,20 +424,13 @@ namespace CuttingStock.Core.Algorithms.Utilities
 
                     foreach (var (pieceLength, stockLength) in pieces)
                     {
-                        var plan = result.CuttingPlans.FirstOrDefault(p =>
-                            p.StockLength == stockLength &&
-                            p.Leftover >= pieceLength);
-
-                        if (plan == null)
+                        var plan = new CuttingPlan
                         {
-                            plan = new CuttingPlan
-                            {
-                                StockLength = stockLength,
-                                Cuts = new List<Cut>(),
-                                Leftover = stockLength
-                            };
-                            result.CuttingPlans.Add(plan);
-                        }
+                            StockLength = stockLength,
+                            Cuts = new List<Cut>(),
+                            Leftover = stockLength
+                        };
+                        result.CuttingPlans.Add(plan);
 
                         var cut = new Cut
                         {
@@ -462,30 +456,26 @@ namespace CuttingStock.Core.Algorithms.Utilities
         }
 
         /// <summary>
-        /// Initializes stock usage tracking.
+        /// Initializes stock usage tracking using index-based array.
         /// </summary>
-        private static Dictionary<RebarStock, int> InitializeStockUsage(
+        private static int[] InitializeStockUsage(
             List<RebarStock> stock,
             int alreadyUsedStockCount)
         {
-            var stockUsage = new Dictionary<RebarStock, int>();
+            var stockUsage = new int[stock.Count];
             int remainingToSkip = alreadyUsedStockCount;
 
-            foreach (var stockItem in stock)
+            for (int i = 0; i < stock.Count; i++)
             {
-                if (remainingToSkip >= stockItem.Quantity)
+                if (remainingToSkip >= stock[i].Quantity)
                 {
-                    stockUsage[stockItem] = stockItem.Quantity;
-                    remainingToSkip -= stockItem.Quantity;
+                    stockUsage[i] = stock[i].Quantity;
+                    remainingToSkip -= stock[i].Quantity;
                 }
                 else if (remainingToSkip > 0)
                 {
-                    stockUsage[stockItem] = remainingToSkip;
+                    stockUsage[i] = remainingToSkip;
                     remainingToSkip = 0;
-                }
-                else
-                {
-                    stockUsage[stockItem] = 0;
                 }
             }
 
@@ -503,36 +493,31 @@ namespace CuttingStock.Core.Algorithms.Utilities
         public static void UpdateOrders(List<Order> orders, List<int> cuts)
         {
             var cutCounts = cuts.GroupBy(c => c).ToDictionary(g => g.Key, g => g.Count());
-
-            var orderIndexMap = new Dictionary<int, int>();
-            for (int i = 0; i < orders.Count; i++)
-            {
-                var order = orders[i];
-                if (order.Quantity > 0 && !orderIndexMap.ContainsKey(order.Length))
-                {
-                    orderIndexMap[order.Length] = i;
-                }
-            }
-
             var indicesToRemove = new List<int>();
 
             foreach (var kvp in cutCounts)
             {
                 var cutLength = kvp.Key;
-                var neededCount = kvp.Value;
+                var remaining = kvp.Value;
 
-                if (orderIndexMap.TryGetValue(cutLength, out int index))
+                // Distribute across all orders with this length (not just the first)
+                for (int i = 0; i < orders.Count && remaining > 0; i++)
                 {
-                    var order = orders[index];
-                    var newQuantity = order.Quantity - neededCount;
+                    var order = orders[i];
+                    if (order.Length != cutLength || order.Quantity <= 0)
+                        continue;
+
+                    var deduct = Math.Min(order.Quantity, remaining);
+                    remaining -= deduct;
+                    var newQuantity = order.Quantity - deduct;
 
                     if (newQuantity > 0)
                     {
-                        orders[index] = new Order(order.Length, newQuantity);
+                        orders[i] = new Order(order.Length, newQuantity);
                     }
                     else
                     {
-                        indicesToRemove.Add(index);
+                        indicesToRemove.Add(i);
                     }
                 }
             }
