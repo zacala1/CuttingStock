@@ -243,39 +243,41 @@
                                 <ItemsControl x:Name="visualizationItemsControl" Margin="10">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,10" Padding="5">
+                                            <Border BorderBrush="#CCC" BorderThickness="1" Margin="0,0,0,8" Padding="8" CornerRadius="3" Background="White">
                                                 <Grid>
                                                     <Grid.RowDefinitions>
                                                         <RowDefinition Height="Auto"/>
-                                                        <RowDefinition Height="50"/>
+                                                        <RowDefinition Height="Auto"/>
                                                     </Grid.RowDefinitions>
 
                                                     <!-- 정보 텍스트 -->
-                                                    <TextBlock Grid.Row="0" Text="{Binding InfoText}" Margin="0,0,0,5"/>
+                                                    <TextBlock Grid.Row="0" Text="{Binding InfoText}" Margin="0,0,0,4" FontWeight="SemiBold"/>
 
-                                                    <!-- 바 시각화 -->
-                                                    <Canvas Grid.Row="1" Width="{Binding TotalWidth}" Height="40" Background="#EEE">
+                                                    <!-- 바 시각화: StackPanel 기반 -->
+                                                    <Border Grid.Row="1" BorderBrush="#999" BorderThickness="1" Height="38" Background="#F5F5F5">
                                                         <ItemsControl ItemsSource="{Binding Blocks}">
                                                             <ItemsControl.ItemsPanel>
                                                                 <ItemsPanelTemplate>
-                                                                    <Canvas/>
+                                                                    <StackPanel Orientation="Horizontal"/>
                                                                 </ItemsPanelTemplate>
                                                             </ItemsControl.ItemsPanel>
                                                             <ItemsControl.ItemTemplate>
                                                                 <DataTemplate>
-                                                                    <Grid Width="{Binding Width}" Height="40" Canvas.Left="{Binding X}">
-                                                                        <Rectangle Fill="{Binding Color}" ToolTip="{Binding ToolTip}"/>
+                                                                    <Border Width="{Binding Width}" Height="36"
+                                                                            Background="{Binding Color}"
+                                                                            BorderBrush="{Binding BorderColor}" BorderThickness="0,0,1,0"
+                                                                            ToolTip="{Binding ToolTip}">
                                                                         <TextBlock Text="{Binding Text}"
                                                                                  Foreground="{Binding TextColor}"
                                                                                  HorizontalAlignment="Center"
                                                                                  VerticalAlignment="Center"
                                                                                  FontSize="10"
-                                                                                 IsHitTestVisible="False"/>
-                                                                    </Grid>
+                                                                                 TextTrimming="None"/>
+                                                                    </Border>
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>
                                                         </ItemsControl>
-                                                    </Canvas>
+                                                    </Border>
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>

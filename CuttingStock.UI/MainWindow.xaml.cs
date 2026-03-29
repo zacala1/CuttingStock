@@ -532,81 +532,136 @@ namespace CuttingStock
 
         private void GenerateVisualizationData(SolverResult result)
         {
-            var visItems = new System.Collections.ObjectModel.ObservableCollection<VisualizationRow>();
-            var legendItems = new System.Collections.ObjectModel.ObservableCollection<LegendItem>();
+            var visItems = new List<VisualizationRow>();
+            var legendItems = new List<LegendItem>();
             var random = new Random(12345);
             var colorCache = new Dictionary<int, System.Windows.Media.Brush>();
 
-            // 스케일링 팩터 계산 (화면에 맞추기 위함)
-            // 최대 길이를 기준으로 800px에 맞춤 (스크롤뷰어 내부라 더 커도 되지만 일단 핏하게)
-            double maxStockLength = result.CuttingPlans.Any() ? result.CuttingPlans.Max(p => p.StockLength) : 10000;
-            double scale = 800.0 / Math.Max(1, maxStockLength);
+            // 바 전체 폭 (px)
+            const double barTotalWidth = 750.0;
 
-            foreach (var plan in result.CuttingPlans)
+            // 패턴 그룹핑: 동일 절단 패턴끼리 묶기
+            var grouped = result.CuttingPlans
+                .GroupBy(p => PatternKey(p))
+                .Select(g => (Plan: g.First(), Count: g.Count()))
+                .ToList();
+
+            int groupNum = 1;
+            foreach (var (plan, count) in grouped)
             {
+                double scale = barTotalWidth / Math.Max(1, plan.StockLength);
+
+                // 절단 목록 문자열
+                var cutLengths = string.Join(" + ", plan.Cuts.Select(c => $"{c.Length}"));
+                string countLabel = count > 1 ? $"  [x {count}개]" : "";
+                string effPercent = plan.StockLength > 0
+                    ? $"{100.0 * plan.Cuts.Sum(c => c.Length) / plan.StockLength:F1}%"
+                    : "0%";
+
                 var row = new VisualizationRow
                 {
-                    InfoText = $"Stock: {plan.StockLength}mm (Leftover: {plan.Leftover}mm)",
-                    TotalWidth = plan.StockLength * scale
+                    InfoText = $"#{groupNum}: 재고 {plan.StockLength}mm → [{cutLengths}] 잔여 {plan.Leftover}mm (효율 {effPercent}){countLabel}"
                 };
 
-                double currentX = 0;
                 foreach (var cut in plan.Cuts)
                 {
-                    if (!colorCache.ContainsKey(cut.Length))
-                    {
-                        var color = System.Windows.Media.Color.FromRgb(
-                            (byte)random.Next(50, 255),
-                            (byte)random.Next(50, 255),
-                            (byte)random.Next(50, 255));
-                        var brush = new System.Windows.Media.SolidColorBrush(color);
-                        colorCache[cut.Length] = brush;
-
-                        // 범례 추가
-                        legendItems.Add(new LegendItem { Color = brush, Label = $"{cut.Length}mm" });
-                    }
+                    EnsureColor(colorCache, legendItems, random, cut.Length);
 
                     double width = cut.Length * scale;
-
-                    // 텍스트 표시 여부 결정 (가로 공간이 충분할 때만)
-                    string toolTip = $"Length: {cut.Length}mm";
-                    string label = width > 40 ? $"{cut.Length}" : ""; // 40px 이상일 때만 텍스트 표시
+                    double pct = 100.0 * cut.Length / plan.StockLength;
+                    string label = width > 45 ? $"{cut.Length}" : "";
 
                     row.Blocks.Add(new VisualizationBlock
                     {
                         Width = width,
-                        X = currentX,
                         Color = colorCache[cut.Length],
-                        ToolTip = toolTip,
+                        BorderColor = System.Windows.Media.Brushes.White,
+                        ToolTip = $"{cut.Length}mm ({pct:F1}%)",
                         Text = label,
-                        TextColor = IsBright(colorCache[cut.Length]) ? System.Windows.Media.Brushes.Black : System.Windows.Media.Brushes.White
+                        TextColor = IsBright(colorCache[cut.Length])
+                            ? System.Windows.Media.Brushes.Black
+                            : System.Windows.Media.Brushes.White
                     });
-                    currentX += width;
                 }
 
-                // 자투리 표시 (회색)
+                // 잔여 블록
                 if (plan.Leftover > 0)
                 {
                     double wWidth = plan.Leftover * scale;
+                    bool isWaste = plan.Leftover < (_lastParameters?.Gamma ?? 100);
+                    var bgBrush = isWaste
+                        ? System.Windows.Media.Brushes.MistyRose
+                        : System.Windows.Media.Brushes.LightGray;
+                    var borderBrush = isWaste
+                        ? System.Windows.Media.Brushes.IndianRed
+                        : System.Windows.Media.Brushes.Gray;
+                    string wasteLabel = isWaste ? "낭비" : "재사용";
+
                     row.Blocks.Add(new VisualizationBlock
                     {
                         Width = wWidth,
-                        X = currentX,
-                        Color = System.Windows.Media.Brushes.LightGray,
-                        ToolTip = $"Leftover: {plan.Leftover}mm",
-                        Text = wWidth > 40 ? $"{plan.Leftover}" : "",
-                        TextColor = System.Windows.Media.Brushes.Black
+                        Color = bgBrush,
+                        BorderColor = borderBrush,
+                        ToolTip = $"잔여 {plan.Leftover}mm ({wasteLabel})",
+                        Text = wWidth > 45 ? $"{plan.Leftover}" : "",
+                        TextColor = isWaste
+                            ? System.Windows.Media.Brushes.DarkRed
+                            : System.Windows.Media.Brushes.DimGray
                     });
                 }
 
                 visItems.Add(row);
+                groupNum++;
             }
 
-            // 범례는 길이 순 정렬
-            var sortedLegend = new System.Collections.ObjectModel.ObservableCollection<LegendItem>(legendItems.OrderBy(i => int.Parse(i.Label.Replace("mm", ""))));
+            var sortedLegend = legendItems.OrderBy(i => int.Parse(i.Label.Replace("mm", ""))).ToList();
+
+            // 잔여 범례 추가
+            sortedLegend.Add(new LegendItem { Color = System.Windows.Media.Brushes.LightGray, Label = "잔여 (재사용)" });
+            sortedLegend.Add(new LegendItem { Color = System.Windows.Media.Brushes.MistyRose, Label = "잔여 (낭비)" });
 
             visualizationItemsControl.ItemsSource = visItems;
             legendItemsControl.ItemsSource = sortedLegend;
+        }
+
+        private static string PatternKey(CuttingPlan plan)
+        {
+            var cuts = string.Join(",", plan.Cuts.Select(c => c.Length).OrderBy(l => l));
+            return $"{plan.StockLength}|{cuts}|{plan.Leftover}";
+        }
+
+        private static void EnsureColor(Dictionary<int, System.Windows.Media.Brush> cache,
+            List<LegendItem> legendItems, Random random, int length)
+        {
+            if (cache.ContainsKey(length)) return;
+
+            // HSL-based colors for better distinction
+            double hue = (cache.Count * 137.508) % 360; // golden angle
+            var color = HslToRgb(hue, 0.55, 0.55);
+            var brush = new System.Windows.Media.SolidColorBrush(color);
+            brush.Freeze();
+            cache[length] = brush;
+            legendItems.Add(new LegendItem { Color = brush, Label = $"{length}mm" });
+        }
+
+        private static System.Windows.Media.Color HslToRgb(double h, double s, double l)
+        {
+            double c = (1 - Math.Abs(2 * l - 1)) * s;
+            double x = c * (1 - Math.Abs((h / 60) % 2 - 1));
+            double m = l - c / 2;
+            double r, g, b;
+
+            if (h < 60) { r = c; g = x; b = 0; }
+            else if (h < 120) { r = x; g = c; b = 0; }
+            else if (h < 180) { r = 0; g = c; b = x; }
+            else if (h < 240) { r = 0; g = x; b = c; }
+            else if (h < 300) { r = x; g = 0; b = c; }
+            else { r = c; g = 0; b = x; }
+
+            return System.Windows.Media.Color.FromRgb(
+                (byte)((r + m) * 255),
+                (byte)((g + m) * 255),
+                (byte)((b + m) * 255));
         }
 
         private bool IsBright(System.Windows.Media.Brush brush)
@@ -623,18 +678,15 @@ namespace CuttingStock
         public class VisualizationRow
         {
             public required string InfoText { get; set; }
-            public double TotalWidth { get; set; }
-            public System.Collections.ObjectModel.ObservableCollection<VisualizationBlock> Blocks { get; set; } = new System.Collections.ObjectModel.ObservableCollection<VisualizationBlock>();
+            public List<VisualizationBlock> Blocks { get; set; } = new();
         }
 
         public class VisualizationBlock
         {
             public double Width { get; set; }
-            public double X { get; set; }
             public required System.Windows.Media.Brush Color { get; set; }
+            public required System.Windows.Media.Brush BorderColor { get; set; }
             public required string ToolTip { get; set; }
-
-            // 텍스트 표시용 속성 추가
             public required string Text { get; set; }
             public required System.Windows.Media.Brush TextColor { get; set; }
         }
