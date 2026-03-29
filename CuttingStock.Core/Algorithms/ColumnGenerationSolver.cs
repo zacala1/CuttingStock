@@ -80,7 +80,7 @@ namespace CuttingStock.Core.Algorithms
                     }
                 }
 
-                int unfulfilledCount = remainingDemand.Values.Sum();
+                int unfulfilledCount = remainingDemand.Values.Where(v => v > 0).Sum();
                 if (unfulfilledCount > 0)
                 {
                     result.Success = false;

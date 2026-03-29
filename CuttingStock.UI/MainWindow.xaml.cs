@@ -340,8 +340,8 @@ namespace CuttingStock
                     ? StockUsageOrder.SmallToLarge
                     : StockUsageOrder.LargeToSmall,
                 EnableWelding = enableWeldingCheckBox.IsChecked ?? false,
-                EnablePatternReduction = enablePatternReductionCheckBox.IsChecked ?? false,
-                MaxPatternCount = int.TryParse(maxPatternCountTextBox.Text, out int maxPattern) ? maxPattern : 0
+                EnablePatternReduction = false,
+                MaxPatternCount = 0
             };
         }
 
@@ -514,21 +514,6 @@ namespace CuttingStock
             }
         }
 
-        private void PatternReductionCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            if (maxPatternCountTextBox != null)
-            {
-                maxPatternCountTextBox.IsEnabled = true;
-            }
-        }
-
-        private void PatternReductionCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (maxPatternCountTextBox != null)
-            {
-                maxPatternCountTextBox.IsEnabled = false;
-            }
-        }
 
         private void GenerateVisualizationData(SolverResult result)
         {
