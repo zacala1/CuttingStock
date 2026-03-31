@@ -346,8 +346,6 @@ namespace CuttingStock
                     ? StockUsageOrder.SmallToLarge
                     : StockUsageOrder.LargeToSmall,
                 EnableWelding = enableWeldingCheckBox.IsChecked ?? false,
-                EnablePatternReduction = false,
-                MaxPatternCount = 0
             };
         }
 

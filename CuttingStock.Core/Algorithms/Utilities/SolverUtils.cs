@@ -111,16 +111,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
         #region Kerf Helpers
 
         /// <summary>
-        /// Calculates total material consumed by cuts including kerf losses.
-        /// For N cuts, there are (N-1) kerf gaps between them.
-        /// </summary>
-        public static int CutsConsumed(List<int> cutLengths, int kerf)
-        {
-            if (cutLengths.Count == 0) return 0;
-            return cutLengths.Sum() + Math.Max(0, cutLengths.Count - 1) * kerf;
-        }
-
-        /// <summary>
         /// Calculates leftover for a plan considering kerf.
         /// </summary>
         public static int ComputeLeftover(int stockLength, List<Cut> cuts, int kerf)
@@ -211,10 +201,12 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 {
                     var (smallPlan, smallIndex) = sortedPlans[j];
 
-                    if (smallPlan.Leftover >= smallestCut.Length)
+                    int spaceNeeded = smallestCut.Length + (smallPlan.Cuts.Count > 0 ? options.Kerf : 0);
+                    if (smallPlan.Leftover >= spaceNeeded)
                     {
-                        var newLargeLeftover = largePlan.Leftover + smallestCut.Length;
-                        var newSmallLeftover = smallPlan.Leftover - smallestCut.Length;
+                        var newLargeLeftover = ComputeLeftover(largePlan.StockLength,
+                            largePlan.Cuts.Where(c => c != smallestCut).ToList(), options.Kerf);
+                        var newSmallLeftover = smallPlan.Leftover - spaceNeeded;
 
                         var currentWaste = (largePlan.Leftover < options.Gamma ? largePlan.Leftover : 0) +
                                           (smallPlan.Leftover < options.Gamma ? smallPlan.Leftover : 0);
@@ -234,7 +226,7 @@ namespace CuttingStock.Core.Algorithms.Utilities
                                 WeldGroupId = smallestCut.WeldGroupId
                             };
                             smallPlan.Cuts.Add(newCut);
-                            smallPlan.Leftover = newSmallLeftover;
+                            smallPlan.Leftover = ComputeLeftover(smallPlan.StockLength, smallPlan.Cuts, options.Kerf);
 
                             break;
                         }
@@ -297,27 +289,28 @@ namespace CuttingStock.Core.Algorithms.Utilities
         private static bool TrySwapCuts(CuttingPlan planA, CuttingPlan planB, SolverOptions options)
         {
             int currentWaste = CalculateWaste(planA, options) + CalculateWaste(planB, options);
+            int kerf = options.Kerf;
 
-            // Pre-compute total used lengths once (O(n) instead of O(n) per iteration)
-            int totalUsedA = planA.Cuts.Sum(c => c.Length);
-            int totalUsedB = planB.Cuts.Sum(c => c.Length);
+            // Kerf-aware used length: sum(cuts) + (numCuts - 1) * kerf
+            int kerfA = Math.Max(0, planA.Cuts.Count - 1) * kerf;
+            int kerfB = Math.Max(0, planB.Cuts.Count - 1) * kerf;
+            int totalUsedA = planA.Cuts.Sum(c => c.Length) + kerfA;
+            int totalUsedB = planB.Cuts.Sum(c => c.Length) + kerfB;
 
             foreach (var cutA in planA.Cuts.ToList())
             {
                 foreach (var cutB in planB.Cuts.ToList())
                 {
-                    // Check if swap is feasible (doesn't exceed stock length)
+                    // Swap doesn't change cut count, so kerf stays the same
                     int newAUsed = totalUsedA - cutA.Length + cutB.Length;
                     int newBUsed = totalUsedB - cutB.Length + cutA.Length;
 
                     if (newAUsed > planA.StockLength || newBUsed > planB.StockLength)
                         continue;
 
-                    // Calculate new leftovers
                     int newALeftover = planA.StockLength - newAUsed;
                     int newBLeftover = planB.StockLength - newBUsed;
 
-                    // Calculate new waste
                     int newWasteA = newALeftover < options.Gamma ? newALeftover : 0;
                     int newWasteB = newBLeftover < options.Gamma ? newBLeftover : 0;
                     int newWaste = newWasteA + newWasteB;

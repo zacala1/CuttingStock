@@ -74,19 +74,6 @@ namespace CuttingStock.Core.Domain
         /// </summary>
         public bool EnableWelding { get; set; } = false;
 
-        /// <summary>
-        /// Enable pattern reduction to minimize setup changes.
-        /// When enabled, the solver tries to use fewer unique cutting patterns.
-        /// Reference: https://journals.sagepub.com/doi/10.1243/09544054JEM966
-        /// </summary>
-        public bool EnablePatternReduction { get; set; } = false;
-
-        /// <summary>
-        /// Maximum number of unique patterns to use (0 = unlimited).
-        /// Only effective when EnablePatternReduction is true.
-        /// </summary>
-        public int MaxPatternCount { get; set; } = 0;
-
     }
 
     /// <summary>

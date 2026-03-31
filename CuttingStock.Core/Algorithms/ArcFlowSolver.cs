@@ -232,16 +232,18 @@ namespace CuttingStock.Core.Algorithms
             }
 
             // Demand constraints: for each item, total flow across all stocks >= demand
+            // Group item flows by itemLen for O(1) lookup
+            var flowsByItem = itemFlows
+                .GroupBy(kvp => kvp.Key.itemLen)
+                .ToDictionary(g => g.Key, g => g.Select(kvp => kvp.Value).ToList());
+
             foreach (int itemLen in itemLengths)
             {
                 var totalFlow = new LinearExpr();
-                foreach (int sLen in stockLengths)
+                if (flowsByItem.TryGetValue(itemLen, out var flows))
                 {
-                    foreach (var kvp in itemFlows)
-                    {
-                        if (kvp.Key.stockLen == sLen && kvp.Key.itemLen == itemLen)
-                            totalFlow += kvp.Value;
-                    }
+                    foreach (var flow in flows)
+                        totalFlow += flow;
                 }
                 solver.Add(totalFlow >= demand[itemLen]);
             }
