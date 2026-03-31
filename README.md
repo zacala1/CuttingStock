@@ -1,102 +1,78 @@
 # Cutting Stock Optimization
 
-철근 절단 최적화 문제(Cutting Stock Problem)를 해결하는 다양한 알고리즘을 구현한 프로젝트입니다.
+철근 절단 최적화 문제(Cutting Stock Problem)를 해결하는 3가지 알고리즘을 구현한 .NET 8 WPF 데스크톱 애플리케이션입니다.
 
 ## 프로젝트 구조
 
-- **CuttingStock.Core**: 핵심 알고리즘 및 모델
+- **CuttingStock.Core**: 알고리즘, 도메인 모델, 유틸리티 (OR-Tools 포함)
 - **CuttingStock.UI**: WPF 기반 사용자 인터페이스
-- **CuttingStock.Tests**: 단위 테스트 및 통합 테스트
-- **CuttingStock.Benchmarks**: 성능 벤치마크
+- **CuttingStock.Tests**: 단위 테스트 및 통합 테스트 (254개)
+- **CuttingStock.Benchmarks**: BenchmarkDotNet 성능 벤치마크
 
 ## 구현된 알고리즘
 
-### 1. Greedy Knapsack DP
-**장점:**
-- 빠른 실행 속도: O(S × L × N)
-- 각 재고에서 자투리 최소화
-- 구현이 단순하고 이해하기 쉬움
+### 1. Greedy Knapsack DP (근최적, 빠름)
 
-**단점:**
-- 전역 최적화 부재 (재고별 로컬 최적화)
-- 재고 순서에 따라 결과가 달라질 수 있음
+Multi-pass 동적 프로그래밍 기반 휴리스틱.
 
-**알고리즘의 한계:**
+- **전략**: Pass1(균등 분배) -> Pass2(잔여) -> Pass3(채우기) + 후처리(swap/relocate)
+- **복잡도**: O(N x L x Passes)
+- **장점**: 빠른 속도, 용접 지원, kerf 지원
+- **단점**: 전역 최적해 보장 없음
 
-1. **자투리 재사용 제약**
-   - 자투리는 개별적으로만 재사용 가능 (독립적 처리)
-   - 여러 자투리를 합쳐서 큰 주문을 만들 수 없음
-   - **예시**: 4000mm 자투리 2개로 6000mm 주문 처리 불가 (용접 없이)
+### 2. Column Generation LP (전역 최적화)
 
-2. **Greedy 한계**
-   - 각 재고를 순차적으로 처리하므로 전역 최적해 보장 안 됨
-   - 재고를 효율적으로 사용하지 못해 일부 주문 미처리 가능
-   - **예시**: 10000mm×2개로 6000mm×3개 처리 불가
-     - 각 재고에 6000mm 1개씩만 배치 가능 (총 2개)
-     - 남은 1개는 자투리 4000mm 2개로는 만들 수 없음
+Gilmore-Gomory 열 생성법 기반 LP 솔버.
 
-3. **왜 한계인가?**
-   - **Bounded Knapsack 제약**: 한 재고에서 같은 주문을 order.Quantity개까지만 사용 가능
-   - **독립적 자투리 처리**: ProcessLeftovers는 각 자투리를 독립적으로 처리하므로 여러 개를 합칠 수 없음
-   - **순차적 처리**: 재고를 하나씩 처리하므로, 나중 재고에서 더 효율적인 조합을 찾을 수 없음
+- **전략**: Simplex로 RMP 풀기 -> Knapsack으로 pricing -> Floor-then-Residual 정수 라운딩
+- **복잡도**: LP 반복 수에 따라 가변
+- **장점**: LP 최적에 근접한 정수해, 대규모 주문 유형에 강함
+- **단점**: 커스텀 Simplex 구현으로 수치 안정성 제한
 
-4. **해결 방법**
-   - 용접 활성화 (`EnableWelding=true`): 여러 조각 결합 가능
-   - 재고 크기 조정: 주문에 맞는 적절한 재고 준비
-   - 다른 알고리즘 사용: BFD, FFD 등 고려
+### 3. Arc Flow MIP (정확 최적, OR-Tools)
 
-### 2. Best Fit Decreasing (BFD)
-가장 적합한 재고를 우선적으로 사용하는 전략
+Arc Flow 네트워크 모델 + SCIP MIP 솔버.
 
-### 3. First Fit Decreasing (FFD)
-첫 번째로 맞는 재고를 사용하는 전략
+- **전략**: DAG 그래프 모델링 -> GCD 노드 압축 -> MIP 최적해 -> Flow 분해
+- **복잡도**: MIP (30초 시간 제한)
+- **장점**: 수학적으로 증명된 최적해, kerf 자연 지원, 다중 재고 지원
+- **단점**: OR-Tools 의존성, 대규모 문제에서 느릴 수 있음
 
-### 4. Column Generation (LP)
-**장점:**
-- 전역 최적화 가능 (이론적 최적해에 근접)
-- 대규모 문제에서도 높은 자재 효율성
-- 선형 계획법(Simplex)과 Knapsack(Pricing Problem)을 결합하여 최적 패턴 생성
+## 파라미터
 
-**단점:**
-- 실행 속도가 다른 휴리스틱보다 느릴 수 있음
-- 매우 복잡한 구현 난이도 (NP-Hard 문제 접근)
+| 파라미터 | 설명 | 기본값 |
+|---------|------|--------|
+| Alpha | 자투리 1mm당 비용 (원/mm) | 1.0 |
+| Beta | 용접 1회당 비용 (원/회) | 500 |
+| Gamma | 재사용 가능한 최소 자투리 길이 (mm) | 100 |
+| Delta | 용접 가능한 최소 조각 길이 (mm) | 100 |
+| Kerf | 톱날 두께 (mm). 절단마다 소비되는 재료 손실 | 0 |
 
 ## 주요 기능
 
-- **동적 계획법 (Dynamic Programming)**: 각 재고에 대해 최적의 절단 조합 계산
-- **자투리 재사용**: Gamma 값 이상의 자투리를 다음 주문에 재사용
-- **용접 지원**: 긴 주문을 여러 조각으로 분할하여 처리 (옵션)
-- **다양한 비용 요소 고려**:
-  - Alpha: 자투리 비용
-  - Beta: 용접 비용
-  - Gamma: 재사용 가능한 최소 자투리 길이
-  - Delta: 용접 가능한 최소 조각 길이
+- 3가지 알고리즘 선택 및 비교
+- Kerf(톱날 두께) 지원 - 현실 절단 손실 반영
+- 용접 지원 - 긴 주문을 여러 조각으로 분할
+- 후처리 최적화 - 2-opt swap + relocate 연산
+- 결과 시각화 - 패턴 그룹핑 막대 차트
+- CSV/Excel 내보내기
+- 엑셀 붙여넣기(Ctrl+V) 지원
+
+## 의존성
+
+- .NET 8.0
+- [Google.OrTools](https://developers.google.com/optimization) 9.11 (Arc Flow MIP 솔버)
+- LiveChartsCore.SkiaSharpView.WPF (차트)
+- ClosedXML (Excel 내보내기)
+- NUnit + FluentAssertions (테스트)
 
 ## 빌드 및 실행
 
 ```bash
-# 빌드
 dotnet build
-
-# 테스트 실행
 dotnet test
-
-# UI 실행
 dotnet run --project CuttingStock.UI
 ```
-
-## 테스트
-
-프로젝트는 다음과 같은 테스트를 포함합니다:
-- 단위 테스트: 각 알고리즘의 기본 동작 검증
-- 통합 테스트: 복잡한 시나리오 테스트
-- 성능 테스트: 대규모 데이터셋에 대한 실행 시간 검증
-- 버그 수정 회귀 테스트: 이전 버그가 재발하지 않는지 확인
-
-**주의사항**:
-- 일부 테스트는 알고리즘의 한계로 인해 실패할 수 있습니다.
-- 이는 버그가 아니라 알고리즘의 설계상 한계입니다.
-- 용접을 활성화하거나 적절한 재고 크기를 사용하면 해결됩니다.
 
 ## 라이선스
 
