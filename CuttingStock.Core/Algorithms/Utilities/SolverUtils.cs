@@ -11,25 +11,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
     /// </summary>
     public static class SolverUtils
     {
-        #region Constants
-
-        /// <summary>
-        /// Maximum usage per order in Pass 1.
-        /// </summary>
-        public const int PASS1_MAX_PER_ORDER = 2;
-
-        /// <summary>
-        /// Maximum usage per order in Pass 2.
-        /// </summary>
-        public const int PASS2_MAX_PER_ORDER = 5;
-
-        /// <summary>
-        /// Top ratio for post-processing (1/3).
-        /// </summary>
-        public const int POSTPROCESS_TOP_RATIO = 3;
-
-        #endregion
-
         #region Exception Handling
 
         /// <summary>
@@ -48,15 +29,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
         {
             result.Success = false;
             result.ErrorMessage = $"Failed to process {remainingCount} order(s).";
-        }
-
-        /// <summary>
-        /// Sets insufficient stock error message.
-        /// </summary>
-        public static void SetInsufficientStockError(SolverResult result, int remainingCount)
-        {
-            result.Success = false;
-            result.ErrorMessage = $"Insufficient stock. Failed to process {remainingCount} order(s).";
         }
 
         #endregion
@@ -124,17 +96,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
         }
 
         /// <summary>
-        /// Flattens and sorts orders in descending order by length.
-        /// </summary>
-        public static List<int> FlattenOrdersDescending(List<Order> orders)
-        {
-            return orders
-                .OrderByDescending(o => o.Length)
-                .SelectMany(o => Enumerable.Repeat(o.Length, o.Quantity))
-                .ToList();
-        }
-
-        /// <summary>
         /// Sorts orders by scarcity (low quantity first).
         /// </summary>
         public static List<Order> SortOrdersByScarcity(List<Order> orders)
@@ -143,6 +104,30 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 .OrderBy(o => o.Quantity)
                 .ThenByDescending(o => o.Length)
                 .ToList();
+        }
+
+        #endregion
+
+        #region Kerf Helpers
+
+        /// <summary>
+        /// Calculates total material consumed by cuts including kerf losses.
+        /// For N cuts, there are (N-1) kerf gaps between them.
+        /// </summary>
+        public static int CutsConsumed(List<int> cutLengths, int kerf)
+        {
+            if (cutLengths.Count == 0) return 0;
+            return cutLengths.Sum() + Math.Max(0, cutLengths.Count - 1) * kerf;
+        }
+
+        /// <summary>
+        /// Calculates leftover for a plan considering kerf.
+        /// </summary>
+        public static int ComputeLeftover(int stockLength, List<Cut> cuts, int kerf)
+        {
+            if (cuts.Count == 0) return stockLength;
+            int consumed = cuts.Sum(c => c.Length) + Math.Max(0, cuts.Count - 1) * kerf;
+            return Math.Max(0, stockLength - consumed);
         }
 
         #endregion
@@ -172,8 +157,9 @@ namespace CuttingStock.Core.Algorithms.Utilities
 
             result.WeldCount = weldGroups.Sum(g => g.Count() - 1);
 
-            result.TotalCost = (int)(result.WasteLength * options.Alpha +
-                                    result.WeldCount * options.Beta);
+            result.TotalCost = (int)Math.Round(
+                result.WasteLength * (double)options.Alpha +
+                result.WeldCount * (double)options.Beta);
         }
 
         #endregion
@@ -191,6 +177,18 @@ namespace CuttingStock.Core.Algorithms.Utilities
             if (result.CuttingPlans.Count < 2)
                 return;
 
+            // Phase 1: Original redistribution
+            RedistributeCuts(result, options);
+
+            // Phase 2: Local Search (2-opt style swap)
+            LocalSearchOptimize(result, options, maxIterations: 100);
+        }
+
+        /// <summary>
+        /// Original redistribution logic - moves cuts from high-leftover plans to low-leftover plans.
+        /// </summary>
+        private static void RedistributeCuts(SolverResult result, SolverOptions options)
+        {
             var sortedPlans = result.CuttingPlans
                 .Select((plan, index) => (plan, index))
                 .OrderByDescending(x => x.plan.Leftover)
@@ -245,128 +243,178 @@ namespace CuttingStock.Core.Algorithms.Utilities
             }
         }
 
-        #endregion
-
-        #region Welding
-
         /// <summary>
-        /// Processes remaining orders using welding.
+        /// Local Search optimization using 2-opt style swapping.
+        /// Tries to swap cuts between pairs of plans to reduce total waste.
+        /// Reference: https://link.springer.com/article/10.1186/2251-712X-8-24
         /// </summary>
-        public static int ProcessWeldedOrders(
-            List<int> remainingOrders,
-            List<RebarStock> stock,
-            int alreadyUsedStockCount,
-            SolverOptions options,
-            SolverResult result)
+        private static void LocalSearchOptimize(SolverResult result, SolverOptions options, int maxIterations)
         {
-            int weldGroupId = 1;
+            bool improved = true;
+            int iteration = 0;
 
-            var stockUsage = InitializeStockUsage(stock, alreadyUsedStockCount);
-
-            for (int i = remainingOrders.Count - 1; i >= 0; i--)
+            while (improved && iteration < maxIterations)
             {
-                var orderLength = remainingOrders[i];
-                var neededLength = orderLength;
-                var pieces = new List<(int length, int stockLength)>();
+                improved = false;
+                iteration++;
 
-                foreach (var stockItem in stock)
+                for (int i = 0; i < result.CuttingPlans.Count - 1; i++)
                 {
-                    if (neededLength <= 0)
-                        break;
-
-                    var usedFromThisStock = stockUsage[stockItem];
-                    var availableStocks = stockItem.Quantity - usedFromThisStock;
-
-                    while (availableStocks > 0 && neededLength > 0)
+                    for (int j = i + 1; j < result.CuttingPlans.Count; j++)
                     {
-                        var pieceLength = Math.Min(stockItem.Length, neededLength);
-                        if (pieceLength >= options.Delta)
+                        var planA = result.CuttingPlans[i];
+                        var planB = result.CuttingPlans[j];
+
+                        // Skip if either plan has welded cuts (to preserve weld groups)
+                        if (planA.Cuts.Any(c => c.WeldGroupId.HasValue) ||
+                            planB.Cuts.Any(c => c.WeldGroupId.HasValue))
+                            continue;
+
+                        // Try swapping cuts between plans
+                        if (TrySwapCuts(planA, planB, options))
                         {
-                            pieces.Add((pieceLength, stockItem.Length));
-                            neededLength -= pieceLength;
-                            stockUsage[stockItem]++;
-                            availableStocks--;
+                            improved = true;
+                            continue;
                         }
-                        else
+
+                        // Try relocating a cut from A to B or B to A
+                        if (TryRelocateCut(planA, planB, options) || TryRelocateCut(planB, planA, options))
                         {
-                            break;
+                            improved = true;
                         }
                     }
                 }
 
-                if (neededLength <= 0 && pieces.Count > 0)
-                {
-                    bool requiresWelding = pieces.Count > 1;
-
-                    foreach (var (pieceLength, stockLength) in pieces)
-                    {
-                        var plan = result.CuttingPlans.FirstOrDefault(p =>
-                            p.StockLength == stockLength &&
-                            p.Leftover >= pieceLength);
-
-                        if (plan == null)
-                        {
-                            plan = new CuttingPlan
-                            {
-                                StockLength = stockLength,
-                                Cuts = new List<Cut>(),
-                                Leftover = stockLength
-                            };
-                            result.CuttingPlans.Add(plan);
-                        }
-
-                        var cut = new Cut
-                        {
-                            Length = pieceLength,
-                            OrderIndex = 0,
-                            RequiresWelding = requiresWelding,
-                            WeldGroupId = requiresWelding ? weldGroupId : null
-                        };
-
-                        plan.Cuts.Add(cut);
-                        plan.Leftover -= pieceLength;
-                    }
-
-                    if (requiresWelding)
-                    {
-                        weldGroupId++;
-                    }
-                    remainingOrders.RemoveAt(i);
-                }
+                // Remove plans that became empty after relocations
+                result.CuttingPlans.RemoveAll(p => p.Cuts.Count == 0);
             }
-
-            return weldGroupId - 1;
         }
 
         /// <summary>
-        /// Initializes stock usage tracking.
+        /// Tries to find a beneficial swap between two plans.
+        /// Returns true if a swap was made.
         /// </summary>
-        private static Dictionary<RebarStock, int> InitializeStockUsage(
-            List<RebarStock> stock,
-            int alreadyUsedStockCount)
+        private static bool TrySwapCuts(CuttingPlan planA, CuttingPlan planB, SolverOptions options)
         {
-            var stockUsage = new Dictionary<RebarStock, int>();
-            int remainingToSkip = alreadyUsedStockCount;
+            int currentWaste = CalculateWaste(planA, options) + CalculateWaste(planB, options);
 
-            foreach (var stockItem in stock)
+            // Pre-compute total used lengths once (O(n) instead of O(n) per iteration)
+            int totalUsedA = planA.Cuts.Sum(c => c.Length);
+            int totalUsedB = planB.Cuts.Sum(c => c.Length);
+
+            foreach (var cutA in planA.Cuts.ToList())
             {
-                if (remainingToSkip >= stockItem.Quantity)
+                foreach (var cutB in planB.Cuts.ToList())
                 {
-                    stockUsage[stockItem] = stockItem.Quantity;
-                    remainingToSkip -= stockItem.Quantity;
-                }
-                else if (remainingToSkip > 0)
-                {
-                    stockUsage[stockItem] = remainingToSkip;
-                    remainingToSkip = 0;
-                }
-                else
-                {
-                    stockUsage[stockItem] = 0;
+                    // Check if swap is feasible (doesn't exceed stock length)
+                    int newAUsed = totalUsedA - cutA.Length + cutB.Length;
+                    int newBUsed = totalUsedB - cutB.Length + cutA.Length;
+
+                    if (newAUsed > planA.StockLength || newBUsed > planB.StockLength)
+                        continue;
+
+                    // Calculate new leftovers
+                    int newALeftover = planA.StockLength - newAUsed;
+                    int newBLeftover = planB.StockLength - newBUsed;
+
+                    // Calculate new waste
+                    int newWasteA = newALeftover < options.Gamma ? newALeftover : 0;
+                    int newWasteB = newBLeftover < options.Gamma ? newBLeftover : 0;
+                    int newWaste = newWasteA + newWasteB;
+
+                    // Accept if waste is reduced
+                    if (newWaste < currentWaste)
+                    {
+                        // Perform swap
+                        planA.Cuts.Remove(cutA);
+                        planB.Cuts.Remove(cutB);
+
+                        planA.Cuts.Add(new Cut
+                        {
+                            Length = cutB.Length,
+                            OrderIndex = cutB.OrderIndex,
+                            RequiresWelding = cutB.RequiresWelding,
+                            WeldGroupId = cutB.WeldGroupId
+                        });
+
+                        planB.Cuts.Add(new Cut
+                        {
+                            Length = cutA.Length,
+                            OrderIndex = cutA.OrderIndex,
+                            RequiresWelding = cutA.RequiresWelding,
+                            WeldGroupId = cutA.WeldGroupId
+                        });
+
+                        planA.Leftover = newALeftover;
+                        planB.Leftover = newBLeftover;
+
+                        return true;
+                    }
                 }
             }
 
-            return stockUsage;
+            return false;
+        }
+
+        /// <summary>
+        /// Tries to move a cut from source plan to target plan to reduce waste or eliminate a bar.
+        /// </summary>
+        private static bool TryRelocateCut(CuttingPlan source, CuttingPlan target, SolverOptions options)
+        {
+            if (source.Cuts.Count == 0) return false;
+
+            int currentWaste = CalculateWaste(source, options) + CalculateWaste(target, options);
+            int totalUsedTarget = target.Cuts.Sum(c => c.Length) + Math.Max(0, target.Cuts.Count - 1) * options.Kerf;
+
+            foreach (var cut in source.Cuts.ToList())
+            {
+                if (cut.WeldGroupId.HasValue) continue; // don't relocate welded cuts
+
+                // Check if target can fit this cut (including kerf for the new joint)
+                int additionalKerf = target.Cuts.Count > 0 ? options.Kerf : 0;
+                int newTargetUsed = totalUsedTarget + cut.Length + additionalKerf;
+                if (newTargetUsed > target.StockLength) continue;
+
+                int newTargetLeftover = target.StockLength - newTargetUsed;
+
+                // Compute source leftover after removing cut
+                var remainingSourceCuts = source.Cuts.Where(c => c != cut).ToList();
+                int newSourceLeftover = ComputeLeftover(source.StockLength, remainingSourceCuts, options.Kerf);
+
+                int newWasteSource = newSourceLeftover < options.Gamma ? newSourceLeftover : 0;
+                int newWasteTarget = newTargetLeftover < options.Gamma ? newTargetLeftover : 0;
+
+                // Eliminating a bar (source becomes empty) is always valuable
+                bool eliminatesBar = remainingSourceCuts.Count == 0;
+                int newWaste = eliminatesBar ? newWasteTarget : newWasteSource + newWasteTarget;
+
+                if (newWaste < currentWaste || (eliminatesBar && newWaste <= currentWaste))
+                {
+                    source.Cuts.Remove(cut);
+                    source.Leftover = newSourceLeftover;
+
+                    target.Cuts.Add(new Cut
+                    {
+                        Length = cut.Length,
+                        OrderIndex = cut.OrderIndex,
+                        RequiresWelding = cut.RequiresWelding,
+                        WeldGroupId = cut.WeldGroupId
+                    });
+                    target.Leftover = newTargetLeftover;
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Calculates waste for a single plan.
+        /// </summary>
+        private static int CalculateWaste(CuttingPlan plan, SolverOptions options)
+        {
+            return plan.Leftover < options.Gamma ? plan.Leftover : 0;
         }
 
         #endregion
@@ -380,36 +428,31 @@ namespace CuttingStock.Core.Algorithms.Utilities
         public static void UpdateOrders(List<Order> orders, List<int> cuts)
         {
             var cutCounts = cuts.GroupBy(c => c).ToDictionary(g => g.Key, g => g.Count());
-
-            var orderIndexMap = new Dictionary<int, int>();
-            for (int i = 0; i < orders.Count; i++)
-            {
-                var order = orders[i];
-                if (order.Quantity > 0 && !orderIndexMap.ContainsKey(order.Length))
-                {
-                    orderIndexMap[order.Length] = i;
-                }
-            }
-
             var indicesToRemove = new List<int>();
 
             foreach (var kvp in cutCounts)
             {
                 var cutLength = kvp.Key;
-                var neededCount = kvp.Value;
+                var remaining = kvp.Value;
 
-                if (orderIndexMap.TryGetValue(cutLength, out int index))
+                // Distribute across all orders with this length (not just the first)
+                for (int i = 0; i < orders.Count && remaining > 0; i++)
                 {
-                    var order = orders[index];
-                    var newQuantity = order.Quantity - neededCount;
+                    var order = orders[i];
+                    if (order.Length != cutLength || order.Quantity <= 0)
+                        continue;
+
+                    var deduct = Math.Min(order.Quantity, remaining);
+                    remaining -= deduct;
+                    var newQuantity = order.Quantity - deduct;
 
                     if (newQuantity > 0)
                     {
-                        orders[index] = new Order(order.Length, newQuantity);
+                        orders[i] = new Order(order.Length, newQuantity);
                     }
                     else
                     {
-                        indicesToRemove.Add(index);
+                        indicesToRemove.Add(i);
                     }
                 }
             }
