@@ -15,6 +15,7 @@ namespace CuttingStock.Core.Domain
         private float _beta = 500.0f;
         private int _gamma = 100;
         private int _delta = 100;
+        private int _kerf = 0;
 
         /// <summary>
         /// Cost per 1mm of waste/leftover. Must be non-negative.
@@ -50,6 +51,17 @@ namespace CuttingStock.Core.Domain
         {
             get => _delta;
             set => _delta = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(Delta), "Delta must be greater than 0.");
+        }
+
+        /// <summary>
+        /// Kerf (blade width) per cut in mm. Must be non-negative.
+        /// Each cut consumes an additional kerf of material except the last one.
+        /// Total consumed = sum(cut_lengths) + (num_cuts - 1) * kerf.
+        /// </summary>
+        public int Kerf
+        {
+            get => _kerf;
+            set => _kerf = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(Kerf), "Kerf must be non-negative.");
         }
 
         /// <summary>

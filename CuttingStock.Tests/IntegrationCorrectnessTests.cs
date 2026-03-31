@@ -20,7 +20,8 @@ namespace CuttingStock.Tests
         private static readonly ICuttingSolver[] AllSolvers =
         {
             new GreedyKnapsackSolver(),
-            new ColumnGenerationSolver()
+            new ColumnGenerationSolver(),
+            new ArcFlowSolver()
         };
 
         private SolverOptions DefaultOptions => new()
@@ -365,17 +366,20 @@ namespace CuttingStock.Tests
 
             var greedyResult = new GreedyKnapsackSolver().Solve(stock, orders.Select(o => new Order(o.Length, o.Quantity)).ToList(), DefaultOptions);
             var cgResult = new ColumnGenerationSolver().Solve(stock, orders.Select(o => new Order(o.Length, o.Quantity)).ToList(), DefaultOptions);
+            var afResult = new ArcFlowSolver().Solve(stock, orders.Select(o => new Order(o.Length, o.Quantity)).ToList(), DefaultOptions);
 
             greedyResult.Success.Should().BeTrue("Greedy should succeed");
             cgResult.Success.Should().BeTrue("ColumnGeneration should succeed");
+            afResult.Success.Should().BeTrue("ArcFlow should succeed");
 
-            // Both should fulfill all orders
             VerifyCutsSumMatchesOrders(greedyResult, orders);
             VerifyCutsSumMatchesOrders(cgResult, orders);
+            VerifyCutsSumMatchesOrders(afResult, orders);
 
-            // Both should have reasonable efficiency (>70%)
+            // All should have reasonable efficiency (>70%)
             greedyResult.MaterialEfficiency.Should().BeGreaterThan(70);
             cgResult.MaterialEfficiency.Should().BeGreaterThan(70);
+            afResult.MaterialEfficiency.Should().BeGreaterThan(70);
         }
 
         #endregion

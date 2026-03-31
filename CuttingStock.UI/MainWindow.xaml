@@ -98,7 +98,8 @@
                     <TextBlock Text="알고리즘 선택:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="5"/>
                     <ComboBox x:Name="algorithmComboBox" Grid.Row="0" Grid.Column="1" Margin="5" SelectedIndex="0" SelectionChanged="AlgorithmComboBox_SelectionChanged">
                         <ComboBoxItem Content="Greedy Knapsack DP (근최적, 빠름)"/>
-                        <ComboBoxItem Content="Column Generation (전역 최적화, 실험적)"/>
+                        <ComboBoxItem Content="Column Generation LP (전역 최적화)"/>
+                        <ComboBoxItem Content="Arc Flow MIP (정확 최적, OR-Tools)"/>
                     </ComboBox>
 
                     <!-- 파라미터 설정 -->
@@ -112,6 +113,7 @@
                                 <ColumnDefinition Width="100"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -133,9 +135,13 @@
                             <TextBlock Text="Delta (용접 최소):" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"/>
                             <TextBox x:Name="deltaTextBox" Grid.Row="1" Grid.Column="3" Text="100" Margin="5" PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
 
+                            <!-- Kerf -->
+                            <TextBlock Text="Kerf (톱날 두께):" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"/>
+                            <TextBox x:Name="kerfTextBox" Grid.Row="2" Grid.Column="1" Text="0" Margin="5" PreviewTextInput="IntegerTextBox_PreviewTextInput" ToolTip="톱날 두께 (mm). 0 = 무시"/>
+
                             <!-- UsageOrder -->
-                            <TextBlock Text="재고 사용 순서:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"/>
-                            <ComboBox x:Name="usageOrderComboBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Margin="5" SelectedIndex="0">
+                            <TextBlock Text="재고 사용 순서:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"/>
+                            <ComboBox x:Name="usageOrderComboBox" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Margin="5" SelectedIndex="0">
                                 <ComboBoxItem Content="작은 것부터 (Small to Large)"/>
                                 <ComboBoxItem Content="큰 것부터 (Large to Small)"/>
                             </ComboBox>

@@ -108,6 +108,30 @@ namespace CuttingStock.Core.Algorithms.Utilities
 
         #endregion
 
+        #region Kerf Helpers
+
+        /// <summary>
+        /// Calculates total material consumed by cuts including kerf losses.
+        /// For N cuts, there are (N-1) kerf gaps between them.
+        /// </summary>
+        public static int CutsConsumed(List<int> cutLengths, int kerf)
+        {
+            if (cutLengths.Count == 0) return 0;
+            return cutLengths.Sum() + Math.Max(0, cutLengths.Count - 1) * kerf;
+        }
+
+        /// <summary>
+        /// Calculates leftover for a plan considering kerf.
+        /// </summary>
+        public static int ComputeLeftover(int stockLength, List<Cut> cuts, int kerf)
+        {
+            if (cuts.Count == 0) return stockLength;
+            int consumed = cuts.Sum(c => c.Length) + Math.Max(0, cuts.Count - 1) * kerf;
+            return Math.Max(0, stockLength - consumed);
+        }
+
+        #endregion
+
         #region Result Calculation
 
         /// <summary>
@@ -246,13 +270,23 @@ namespace CuttingStock.Core.Algorithms.Utilities
                             planB.Cuts.Any(c => c.WeldGroupId.HasValue))
                             continue;
 
-                        // Try swapping each cut from A with each cut from B
+                        // Try swapping cuts between plans
                         if (TrySwapCuts(planA, planB, options))
+                        {
+                            improved = true;
+                            continue;
+                        }
+
+                        // Try relocating a cut from A to B or B to A
+                        if (TryRelocateCut(planA, planB, options) || TryRelocateCut(planB, planA, options))
                         {
                             improved = true;
                         }
                     }
                 }
+
+                // Remove plans that became empty after relocations
+                result.CuttingPlans.RemoveAll(p => p.Cuts.Count == 0);
             }
         }
 
@@ -316,6 +350,59 @@ namespace CuttingStock.Core.Algorithms.Utilities
 
                         return true;
                     }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Tries to move a cut from source plan to target plan to reduce waste or eliminate a bar.
+        /// </summary>
+        private static bool TryRelocateCut(CuttingPlan source, CuttingPlan target, SolverOptions options)
+        {
+            if (source.Cuts.Count == 0) return false;
+
+            int currentWaste = CalculateWaste(source, options) + CalculateWaste(target, options);
+            int totalUsedTarget = target.Cuts.Sum(c => c.Length) + Math.Max(0, target.Cuts.Count - 1) * options.Kerf;
+
+            foreach (var cut in source.Cuts.ToList())
+            {
+                if (cut.WeldGroupId.HasValue) continue; // don't relocate welded cuts
+
+                // Check if target can fit this cut (including kerf for the new joint)
+                int additionalKerf = target.Cuts.Count > 0 ? options.Kerf : 0;
+                int newTargetUsed = totalUsedTarget + cut.Length + additionalKerf;
+                if (newTargetUsed > target.StockLength) continue;
+
+                int newTargetLeftover = target.StockLength - newTargetUsed;
+
+                // Compute source leftover after removing cut
+                var remainingSourceCuts = source.Cuts.Where(c => c != cut).ToList();
+                int newSourceLeftover = ComputeLeftover(source.StockLength, remainingSourceCuts, options.Kerf);
+
+                int newWasteSource = newSourceLeftover < options.Gamma ? newSourceLeftover : 0;
+                int newWasteTarget = newTargetLeftover < options.Gamma ? newTargetLeftover : 0;
+
+                // Eliminating a bar (source becomes empty) is always valuable
+                bool eliminatesBar = remainingSourceCuts.Count == 0;
+                int newWaste = eliminatesBar ? newWasteTarget : newWasteSource + newWasteTarget;
+
+                if (newWaste < currentWaste || (eliminatesBar && newWaste <= currentWaste))
+                {
+                    source.Cuts.Remove(cut);
+                    source.Leftover = newSourceLeftover;
+
+                    target.Cuts.Add(new Cut
+                    {
+                        Length = cut.Length,
+                        OrderIndex = cut.OrderIndex,
+                        RequiresWelding = cut.RequiresWelding,
+                        WeldGroupId = cut.WeldGroupId
+                    });
+                    target.Leftover = newTargetLeftover;
+
+                    return true;
                 }
             }
 

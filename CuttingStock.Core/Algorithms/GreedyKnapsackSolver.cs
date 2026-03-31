@@ -154,7 +154,7 @@ namespace CuttingStock.Core.Algorithms
                     if (!sortedOrders.Any())
                         break;
 
-                    var candidates = FindTopKCutsSparse(stockItem.Length, sortedOrders, totalStockCount, maxPerOrder, k: 3);
+                    var candidates = FindTopKCutsSparse(stockItem.Length, sortedOrders, totalStockCount, maxPerOrder, options.Kerf, k: 3);
 
                     List<int> bestCuts = new List<int>();
 
@@ -204,11 +204,12 @@ namespace CuttingStock.Core.Algorithms
 
                     if (bestCuts != null && bestCuts.Any())
                     {
+                        var cuts = bestCuts.Select(len => new Cut { Length = len }).ToList();
                         var plan = new CuttingPlan
                         {
                             StockLength = stockItem.Length,
-                            Cuts = bestCuts.Select(len => new Cut { Length = len }).ToList(),
-                            Leftover = stockItem.Length - bestCuts.Sum()
+                            Cuts = cuts,
+                            Leftover = SolverUtils.ComputeLeftover(stockItem.Length, cuts, options.Kerf)
                         };
 
                         result.CuttingPlans.Add(plan);
@@ -230,11 +231,12 @@ namespace CuttingStock.Core.Algorithms
                         if (smallestFittingOrder != null)
                         {
                             var singleCut = new List<int> { smallestFittingOrder.Length };
+                            var singleCuts = singleCut.Select(len => new Cut { Length = len }).ToList();
                             var plan = new CuttingPlan
                             {
                                 StockLength = stockItem.Length,
-                                Cuts = singleCut.Select(len => new Cut { Length = len }).ToList(),
-                                Leftover = stockItem.Length - singleCut.Sum()
+                                Cuts = singleCuts,
+                                Leftover = SolverUtils.ComputeLeftover(stockItem.Length, singleCuts, options.Kerf)
                             };
 
                             result.CuttingPlans.Add(plan);
@@ -273,13 +275,13 @@ namespace CuttingStock.Core.Algorithms
             public int CutCount { get; set; }
         }
 
-        private List<int> FindBestCutsSparse(int stockLength, List<Order> orders, int totalStockCount, int maxPerOrder)
+        private List<int> FindBestCutsSparse(int stockLength, List<Order> orders, int totalStockCount, int maxPerOrder, int kerf = 0)
         {
-            var candidates = FindTopKCutsSparse(stockLength, orders, totalStockCount, maxPerOrder, k: 1);
+            var candidates = FindTopKCutsSparse(stockLength, orders, totalStockCount, maxPerOrder, kerf, k: 1);
             return candidates.FirstOrDefault()?.Cuts ?? new List<int>();
         }
 
-        private List<CandidateCut> FindTopKCutsSparse(int stockLength, List<Order> orders, int totalStockCount, int maxPerOrder, int k)
+        private List<CandidateCut> FindTopKCutsSparse(int stockLength, List<Order> orders, int totalStockCount, int maxPerOrder, int kerf, int k)
         {
             var dp = new Dictionary<int, List<int>>
             {
@@ -348,13 +350,17 @@ namespace CuttingStock.Core.Algorithms
                 }
             }
 
-            return dp.Select(kvp => new CandidateCut
+            return dp.Select(kvp =>
             {
-                Cuts = kvp.Value,
-                Waste = stockLength - kvp.Key,
-                CutCount = kvp.Value.Count
+                int kerfLoss = Math.Max(0, kvp.Value.Count - 1) * kerf;
+                return new CandidateCut
+                {
+                    Cuts = kvp.Value,
+                    Waste = stockLength - kvp.Key - kerfLoss,
+                    CutCount = kvp.Value.Count
+                };
             })
-                .Where(c => c.Cuts.Any())
+                .Where(c => c.Cuts.Any() && c.Waste >= 0) // kerf may make some combos infeasible
                 .OrderBy(c => c.Waste)
                 .ThenBy(c => c.CutCount)
                 .Take(k)
@@ -384,15 +390,16 @@ namespace CuttingStock.Core.Algorithms
                     break;
 
                 var leftover = leftovers[i];
-                var bestCuts = FindBestCutsSparse(leftover, remainingOrders, 1, int.MaxValue);
+                var bestCuts = FindBestCutsSparse(leftover, remainingOrders, 1, int.MaxValue, options.Kerf);
 
                 if (bestCuts.Any())
                 {
+                    var cuts = bestCuts.Select(len => new Cut { Length = len }).ToList();
                     var plan = new CuttingPlan
                     {
                         StockLength = leftover,
-                        Cuts = bestCuts.Select(len => new Cut { Length = len }).ToList(),
-                        Leftover = leftover - bestCuts.Sum()
+                        Cuts = cuts,
+                        Leftover = SolverUtils.ComputeLeftover(leftover, cuts, options.Kerf)
                     };
 
                     result.CuttingPlans.Add(plan);

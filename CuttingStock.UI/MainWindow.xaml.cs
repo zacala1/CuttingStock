@@ -329,6 +329,11 @@ namespace CuttingStock
                 MessageBox.Show("Delta 값을 올바르게 입력해주세요. (1 이상의 정수)", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return null;
             }
+            if (!int.TryParse(kerfTextBox.Text, out int kerf) || kerf < 0)
+            {
+                MessageBox.Show("Kerf 값을 올바르게 입력해주세요. (0 이상의 정수)", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return null;
+            }
 
             return new SolverOptions
             {
@@ -336,6 +341,7 @@ namespace CuttingStock
                 Beta = beta,
                 Gamma = gamma,
                 Delta = delta,
+                Kerf = kerf,
                 UsageOrder = usageOrderComboBox.SelectedIndex == 0
                     ? StockUsageOrder.SmallToLarge
                     : StockUsageOrder.LargeToSmall,
@@ -351,6 +357,7 @@ namespace CuttingStock
             {
                 0 => new GreedyKnapsackSolver(),
                 1 => new ColumnGenerationSolver(),
+                2 => new ArcFlowSolver(),
                 _ => new GreedyKnapsackSolver()
             };
         }
@@ -388,7 +395,16 @@ namespace CuttingStock
                 case 1: // Column Generation
                     advancedOptionsPanel.Children.Add(new TextBlock
                     {
-                        Text = "• Linear Programming 기반 전역 최적화\n• 이론적으로 가장 최적에 가까움\n• 대규모 입력 시 느릴 수 있음",
+                        Text = "• Linear Programming 기반 전역 최적화\n• Floor-then-Residual 정수 라운딩\n• 대규모 입력 시 느릴 수 있음",
+                        FontStyle = FontStyles.Italic,
+                        Foreground = System.Windows.Media.Brushes.DarkGray
+                    });
+                    break;
+
+                case 2: // Arc Flow MIP
+                    advancedOptionsPanel.Children.Add(new TextBlock
+                    {
+                        Text = "• Arc Flow 네트워크 모델 + MIP 솔버\n• 수학적으로 증명된 최적해\n• Kerf 자연 지원\n• 30초 시간 제한",
                         FontStyle = FontStyles.Italic,
                         Foreground = System.Windows.Media.Brushes.DarkGray
                     });
@@ -711,7 +727,8 @@ namespace CuttingStock
                 var optimizers = new List<ICuttingSolver>
                 {
                     new GreedyKnapsackSolver(),
-                    new ColumnGenerationSolver()
+                    new ColumnGenerationSolver(),
+                    new ArcFlowSolver()
                 };
 
                 // Run comparison on background thread
