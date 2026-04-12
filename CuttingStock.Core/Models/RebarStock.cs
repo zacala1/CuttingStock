@@ -1,93 +1,27 @@
 namespace CuttingStock.Core.Models
 {
-    /// <summary>
-    /// Represents a rebar stock item
-    /// </summary>
-    public class RebarStock : IEquatable<RebarStock>
+    /// <summary>Available rebar stock. All lengths in mm.</summary>
+    public sealed class RebarStock : IEquatable<RebarStock>
     {
-        /// <summary>
-        /// Rebar length (mm)
-        /// </summary>
         public int Length { get; set; }
-
-        /// <summary>
-        /// Stock quantity (pieces)
-        /// </summary>
         public int Quantity { get; set; }
 
-        /// <summary>
-        /// Default constructor
-        /// </summary>
-        public RebarStock()
-        {
-        }
+        public RebarStock() { }
 
-        /// <summary>
-        /// Constructor to set stock information
-        /// </summary>
-        /// <param name="length">Rebar length (mm). Must be greater than 0.</param>
-        /// <param name="quantity">Stock quantity (pieces). Must be greater than 0.</param>
-        /// <exception cref="ArgumentOutOfRangeException">When length or quantity is less than or equal to 0</exception>
         public RebarStock(int length, int quantity)
         {
-            if (length <= 0)
-                throw new ArgumentOutOfRangeException(nameof(length), length, "Length must be greater than 0.");
-            if (quantity <= 0)
-                throw new ArgumentOutOfRangeException(nameof(quantity), quantity, "Quantity must be greater than 0.");
-
+            if (length <= 0) throw new ArgumentOutOfRangeException(nameof(length));
+            if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity));
             Length = length;
             Quantity = quantity;
         }
 
-        /// <summary>
-        /// Compares two stocks for equality (based on length and quantity)
-        /// </summary>
-        public bool Equals(RebarStock? other)
-        {
-            if (other is null) return false;
-            if (ReferenceEquals(this, other)) return true;
-            return Length == other.Length && Quantity == other.Quantity;
-        }
-
-        /// <summary>
-        /// Compares objects for equality
-        /// </summary>
-        public override bool Equals(object? obj)
-        {
-            return Equals(obj as RebarStock);
-        }
-
-        /// <summary>
-        /// Returns the hash code
-        /// </summary>
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Length, Quantity);
-        }
-
-        /// <summary>
-        /// Returns stock information as a string
-        /// </summary>
-        public override string ToString()
-        {
-            return $"RebarStock({Length}mm x {Quantity}개)";
-        }
-
-        /// <summary>
-        /// Equality operator for comparing two stocks
-        /// </summary>
-        public static bool operator ==(RebarStock? left, RebarStock? right)
-        {
-            if (left is null) return right is null;
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Inequality operator for comparing two stocks
-        /// </summary>
-        public static bool operator !=(RebarStock? left, RebarStock? right)
-        {
-            return !(left == right);
-        }
+        public bool Equals(RebarStock? other) =>
+            other is not null && Length == other.Length && Quantity == other.Quantity;
+        public override bool Equals(object? obj) => obj is RebarStock s && Equals(s);
+        public override int GetHashCode() => HashCode.Combine(Length, Quantity);
+        public override string ToString() => $"RebarStock({Length}mm x{Quantity})";
+        public static bool operator ==(RebarStock? a, RebarStock? b) => a is null ? b is null : a.Equals(b);
+        public static bool operator !=(RebarStock? a, RebarStock? b) => !(a == b);
     }
 }

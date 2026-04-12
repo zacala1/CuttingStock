@@ -14,44 +14,26 @@ using CuttingStock.Core.TwoD.Models;
 
 namespace CuttingStock.UI.TwoD
 {
-    /// <summary>
-    /// 2D guillotine cutting stock UI panel.
-    /// Self-contained: maintains its own bindable input collections,
-    /// invokes the 2D solver suite, renders patterns to a Canvas, and
-    /// runs algorithm comparisons.
-    /// </summary>
     public partial class TwoDTab : UserControl
     {
-        // ----- view-model row types (mutable for DataGrid editing) -----
-
-        /// <summary>Row in the sheets DataGrid.</summary>
         public sealed class SheetRow
         {
-            /// <summary>Sheet width in mm.</summary>
             public int Width { get; set; } = 2440;
-            /// <summary>Sheet height in mm.</summary>
             public int Height { get; set; } = 1220;
-            /// <summary>Available quantity.</summary>
             public int Quantity { get; set; } = 5;
         }
 
-        /// <summary>Row in the orders DataGrid.</summary>
         public sealed class RectOrderRow
         {
-            /// <summary>Item width in mm.</summary>
             public int Width { get; set; } = 600;
-            /// <summary>Item height in mm.</summary>
             public int Height { get; set; } = 400;
-            /// <summary>Required quantity.</summary>
             public int Quantity { get; set; } = 4;
-            /// <summary>Whether 90° rotation is allowed for this item.</summary>
             public bool AllowRotation { get; set; } = true;
         }
 
         private readonly ObservableCollection<SheetRow> _sheets = new();
         private readonly ObservableCollection<RectOrderRow> _orders = new();
 
-        // Stable per-order color palette for visualization.
         private static readonly Brush[] Palette = new Brush[]
         {
             new SolidColorBrush(Color.FromRgb(108, 174, 222)),
@@ -64,15 +46,12 @@ namespace CuttingStock.UI.TwoD
             new SolidColorBrush(Color.FromRgb(216, 198, 232)),
         };
 
-        /// <summary>Constructor.</summary>
         public TwoDTab()
         {
             InitializeComponent();
             sheetGrid.ItemsSource = _sheets;
             rectOrderGrid.ItemsSource = _orders;
         }
-
-        // ----- input editing -----
 
         private void AddSheet_Click(object sender, RoutedEventArgs e) => _sheets.Add(new SheetRow());
 
@@ -109,8 +88,6 @@ namespace CuttingStock.UI.TwoD
             compare2DBox.Text = "";
             compare2DGrid.ItemsSource = null;
         }
-
-        // ----- input → domain conversion -----
 
         private List<Sheet> BuildSheets()
         {
@@ -161,8 +138,6 @@ namespace CuttingStock.UI.TwoD
             2 => new StagedMipGuillotineSolver(),
             _ => new ShelfGuillotineSolver(),
         };
-
-        // ----- run -----
 
         private async void Calculate2D_Click(object sender, RoutedEventArgs e)
         {
@@ -267,8 +242,6 @@ namespace CuttingStock.UI.TwoD
                 btnComp2D.IsEnabled = true;
             }
         }
-
-        // ----- visualization -----
 
         private void RenderPatterns(SolverResult2D result, SolverOptions2D options)
         {

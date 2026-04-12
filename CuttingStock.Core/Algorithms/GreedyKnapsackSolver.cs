@@ -9,38 +9,17 @@ using CuttingStock.Core.Domain;
 namespace CuttingStock.Core.Algorithms
 {
     /// <summary>
-    /// Greedy Knapsack Dynamic Programming Solver (Enhanced Version)
-    ///
-    /// Algorithm Classification: Greedy + Dynamic Programming (Bounded Knapsack)
-    /// Strategy: Multi-pass optimization for near-global optimal results
-    ///
-    /// Enhancements (v2.0):
-    /// 1. Sparse DP: 90% memory reduction
-    /// 2. Global Quantity Awareness: Balanced distribution across stock
-    /// 3. Multi-Pass Optimization: Pass1(balanced) → Pass2(residual) → Pass3(fill gaps)
-    /// 4. Scarcity-Based Sorting: Prioritize low-quantity orders
-    /// 5. Empty Result Handling: Minimize stock waste
-    /// 6. Post-Processing: Redistribute orders across stock
-    ///
-    /// Advantages:
-    /// - Fast execution O(S × L × N)
-    /// - Near-global optimal (30-40% improvement over basic greedy)
-    /// - Memory efficient (sparse DP)
-    /// - Welding support (optional)
-    ///
-    /// Disadvantages:
-    /// - Not perfect global optimization (NP-Hard limitation)
-    /// - Slightly lower efficiency than Column Generation
+    /// Multi-pass greedy knapsack DP. Pass1 balanced, Pass2 residual, Pass3 fill,
+    /// then 2-opt/relocate post-processing. Sparse DP for memory efficiency.
     /// </summary>
     public class GreedyKnapsackSolver : ICuttingSolver
     {
-        /// <inheritdoc/>
+        // Multi-pass limits: Pass1 = balanced (2 cuts/order max), Pass2 = residual (5), Pass3 = fill all.
+        private const int Pass1MaxPerOrder = 2;
+        private const int Pass2MaxPerOrder = 5;
+
         public string Name => "Greedy Knapsack DP";
-
-        /// <inheritdoc/>
-        public string Description => "Dynamic programming algorithm that minimizes leftover in each stock using greedy strategy (Enhanced Version)";
-
-        /// <inheritdoc/>
+        public string Description => "Multi-pass sparse DP with post-processing.";
         public string TimeComplexity => "O(N * L * Passes)";
 
         /// <inheritdoc/>
@@ -116,12 +95,12 @@ namespace CuttingStock.Core.Algorithms
             var usedStockCounts = new int[sortedStock.Count];
 
             ProcessPass(sortedStock, sortedOrders, options, result, allLeftovers,
-                        totalStockCount, 2, "Pass1", progress, initialTotalOrderQuantity, usedStockCounts);
+                        totalStockCount, Pass1MaxPerOrder, "Pass1", progress, initialTotalOrderQuantity, usedStockCounts);
 
             if (sortedOrders.Any())
             {
                 ProcessPass(sortedStock, sortedOrders, options, result, allLeftovers,
-                            totalStockCount, 5, "Pass2", progress, initialTotalOrderQuantity, usedStockCounts);
+                            totalStockCount, Pass2MaxPerOrder, "Pass2", progress, initialTotalOrderQuantity, usedStockCounts);
             }
 
             if (sortedOrders.Any())

@@ -5,16 +5,11 @@ using CuttingStock.Core.TwoD.Domain;
 namespace CuttingStock.Core.TwoD.Algorithms.Utilities
 {
     /// <summary>
-    /// Constructs a <see cref="GuillotineNode"/> tree from a flat placement list,
-    /// using recursive sweep splitting (Beasley 1985 separator test).
-    /// Returns <c>null</c> if the placements do not admit a guillotine decomposition.
+    /// Builds a <see cref="GuillotineNode"/> tree from flat placements via recursive splitting.
+    /// Returns null if the layout is not guillotine-decomposable.
     /// </summary>
     public static class PatternBuilder
     {
-        /// <summary>
-        /// Build a guillotine cut tree for a sheet with placements (rotation already
-        /// resolved into <see cref="Placement.Width"/>/<see cref="Placement.Height"/>).
-        /// </summary>
         public static GuillotineNode? BuildTree(int sheetWidth, int sheetHeight, List<Placement> placements)
         {
             // We pass placements as records carrying the original index for leaf reconstruction.

@@ -6,9 +6,7 @@ using CuttingStock.Core.Models;
 
 namespace CuttingStock.Core.Domain
 {
-    /// <summary>
-    /// Solver Configuration Options
-    /// </summary>
+    /// <summary>Configuration for 1D cutting solvers.</summary>
     public class SolverOptions
     {
         private float _alpha = 1.0f;
@@ -17,139 +15,65 @@ namespace CuttingStock.Core.Domain
         private int _delta = 100;
         private int _kerf = 0;
 
-        /// <summary>
-        /// Cost per 1mm of waste/leftover. Must be non-negative.
-        /// </summary>
+        /// <summary>Cost per mm of waste.</summary>
         public float Alpha
         {
             get => _alpha;
-            set => _alpha = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(Alpha), "Alpha must be non-negative.");
+            set => _alpha = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(Alpha));
         }
 
-        /// <summary>
-        /// Cost per weld operation. Must be non-negative.
-        /// </summary>
+        /// <summary>Cost per weld operation.</summary>
         public float Beta
         {
             get => _beta;
-            set => _beta = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(Beta), "Beta must be non-negative.");
+            set => _beta = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(Beta));
         }
 
-        /// <summary>
-        /// Minimum reusable leftover length (mm). Must be non-negative.
-        /// </summary>
+        /// <summary>Minimum reusable leftover length (mm).</summary>
         public int Gamma
         {
             get => _gamma;
-            set => _gamma = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(Gamma), "Gamma must be non-negative.");
+            set => _gamma = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(Gamma));
         }
 
-        /// <summary>
-        /// Minimum weldable piece length (mm). Must be greater than 0.
-        /// </summary>
+        /// <summary>Minimum weldable piece length (mm).</summary>
         public int Delta
         {
             get => _delta;
-            set => _delta = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(Delta), "Delta must be greater than 0.");
+            set => _delta = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(Delta));
         }
 
-        /// <summary>
-        /// Kerf (blade width) per cut in mm. Must be non-negative.
-        /// Each cut consumes an additional kerf of material except the last one.
-        /// Total consumed = sum(cut_lengths) + (num_cuts - 1) * kerf.
-        /// </summary>
+        /// <summary>Blade kerf (mm). Consumed between adjacent cuts: total = sum(cuts) + (n-1)*kerf.</summary>
         public int Kerf
         {
             get => _kerf;
-            set => _kerf = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(Kerf), "Kerf must be non-negative.");
+            set => _kerf = value >= 0 ? value : throw new ArgumentOutOfRangeException(nameof(Kerf));
         }
 
-        /// <summary>
-        /// Order in which stock lengths are used.
-        /// </summary>
         public StockUsageOrder UsageOrder { get; set; } = StockUsageOrder.SmallToLarge;
-
-        /// <summary>
-        /// Enable welding logic.
-        /// </summary>
         public bool EnableWelding { get; set; } = false;
-
     }
 
-    /// <summary>
-    /// Order in which stock lengths are used.
-    /// </summary>
     public enum StockUsageOrder
     {
-        /// <summary>
-        /// Use smaller stock lengths first.
-        /// </summary>
         SmallToLarge,
-
-        /// <summary>
-        /// Use larger stock lengths first.
-        /// </summary>
         LargeToSmall
     }
 
-    /// <summary>
-    /// Result of the cutting optimization process.
-    /// </summary>
+    /// <summary>Result of a 1D cutting optimization.</summary>
     public class SolverResult
     {
-        /// <summary>
-        /// Name of the algorithm used.
-        /// </summary>
         public string AlgorithmName { get; set; } = "";
-
-        /// <summary>
-        /// List of generated cutting plans.
-        /// </summary>
         public List<CuttingPlan> CuttingPlans { get; set; } = new();
-
-        /// <summary>
-        /// List of reusable leftovers (mm).
-        /// </summary>
         public List<int> ReusableLeftovers { get; set; } = new();
-
-        /// <summary>
-        /// Total length of waste (non-reusable leftovers) (mm).
-        /// </summary>
         public int WasteLength { get; set; }
-
-        /// <summary>
-        /// Number of welds performed.
-        /// </summary>
         public int WeldCount { get; set; }
-
-        /// <summary>
-        /// Total cost (currency).
-        /// </summary>
         public int TotalCost { get; set; }
-
-        /// <summary>
-        /// Execution time in milliseconds.
-        /// </summary>
         public double ExecutionTimeMs { get; set; }
-
-        /// <summary>
-        /// Indicates if the optimization was successful.
-        /// </summary>
         public bool Success { get; set; } = true;
-
-        /// <summary>
-        /// Error message if optimization failed.
-        /// </summary>
         public string? ErrorMessage { get; set; }
-
-        /// <summary>
-        /// Number of stock items used.
-        /// </summary>
         public int StockUsed => CuttingPlans.Count;
 
-        /// <summary>
-        /// Material Efficiency (%).
-        /// </summary>
         public double MaterialEfficiency
         {
             get
@@ -161,18 +85,12 @@ namespace CuttingStock.Core.Domain
             }
         }
 
-        /// <summary>
-        /// Generates a detailed text report.
-        /// </summary>
         public string GetDetailedReport(SolverOptions options)
         {
             var sb = new StringBuilder();
 
-            // Algorithm Info
             if (!string.IsNullOrEmpty(AlgorithmName))
-            {
                 sb.AppendLine($"=== Algorithm: {AlgorithmName} ===").AppendLine();
-            }
 
             sb.AppendLine("=== Cutting Results ===");
             var planNumber = 1;
@@ -180,14 +98,12 @@ namespace CuttingStock.Core.Domain
             {
                 var cutsDisplay = plan.Cuts.Select(c =>
                     c.WeldGroupId.HasValue
-                        ? $"{c.Length}mm★G{c.WeldGroupId.Value}"
+                        ? $"{c.Length}mm*G{c.WeldGroupId.Value}"
                         : $"{c.Length}mm");
-                var cuts = string.Join(", ", cutsDisplay);
-                sb.AppendLine($"#{planNumber}: Stock {plan.StockLength}mm -> [{cuts}] (Rem: {plan.Leftover}mm)");
+                sb.AppendLine($"#{planNumber}: Stock {plan.StockLength}mm -> [{string.Join(", ", cutsDisplay)}] (Rem: {plan.Leftover}mm)");
                 planNumber++;
             }
 
-            // Weld Groups
             var weldGroups = CuttingPlans
                 .SelectMany(p => p.Cuts)
                 .Where(c => c.WeldGroupId.HasValue)
@@ -208,7 +124,7 @@ namespace CuttingStock.Core.Domain
             }
 
             sb.AppendLine()
-              .AppendLine("=== Performance Metrics ===")
+              .AppendLine("=== Metrics ===")
               .AppendLine($"Stock Used: {StockUsed}")
               .AppendLine($"Reusable Leftovers: [{string.Join(", ", ReusableLeftovers)}] (Total {ReusableLeftovers.Sum()}mm)")
               .AppendLine($"Waste: {WasteLength}mm")
@@ -222,56 +138,26 @@ namespace CuttingStock.Core.Domain
               .AppendLine($"Waste Cost: {WasteLength}mm x {options.Alpha}/mm = {wasteCost}")
               .AppendLine($"Weld Cost: {WeldCount} x {options.Beta}/weld = {weldCost}")
               .AppendLine($"Total Cost: {TotalCost}")
-              .Append($"Execution Time: {ExecutionTimeMs:F2}ms");
+              .Append($"Time: {ExecutionTimeMs:F2}ms");
 
             return sb.ToString();
         }
     }
 
-    /// <summary>
-    /// Represents a single cutting plan for one stock item.
-    /// </summary>
+    /// <summary>One stock bar and how it's cut.</summary>
     public class CuttingPlan
     {
-        /// <summary>
-        /// Length of the stock item (mm).
-        /// </summary>
         public int StockLength { get; set; }
-
-        /// <summary>
-        /// List of cuts made from this stock.
-        /// </summary>
         public List<Cut> Cuts { get; set; } = new();
-
-        /// <summary>
-        /// Remaining leftover length (mm).
-        /// </summary>
         public int Leftover { get; set; }
     }
 
-    /// <summary>
-    /// Represents a single cut piece.
-    /// </summary>
+    /// <summary>A single cut piece from a stock bar.</summary>
     public class Cut
     {
-        /// <summary>
-        /// Length of the cut piece (mm).
-        /// </summary>
         public int Length { get; set; }
-
-        /// <summary>
-        /// Index of the order this cut belongs to.
-        /// </summary>
         public int OrderIndex { get; set; }
-
-        /// <summary>
-        /// Indicates if this piece requires welding.
-        /// </summary>
         public bool RequiresWelding { get; set; }
-
-        /// <summary>
-        /// ID of the weld group this cut belongs to (if welded).
-        /// </summary>
         public int? WeldGroupId { get; set; }
     }
 }

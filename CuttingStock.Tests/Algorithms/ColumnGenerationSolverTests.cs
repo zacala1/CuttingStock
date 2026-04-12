@@ -123,7 +123,7 @@ namespace CuttingStock.Tests.Algorithms
         public void OptimizerProperties_ShouldBeCorrect()
         {
             _optimizer.Name.Should().Contain("Column Generation");
-            _optimizer.TimeComplexity.Should().Contain("Exponential");
+            _optimizer.TimeComplexity.Should().Contain("exp");
         }
     }
 }

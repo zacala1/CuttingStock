@@ -10,32 +10,16 @@ using Google.OrTools.LinearSolver;
 namespace CuttingStock.Core.TwoD.Algorithms
 {
     /// <summary>
-    /// Exact / near-optimal solver for 2D guillotine cutting via pattern enumeration plus
-    /// an integer master MIP. The pattern pool is bootstrapped with the shelf heuristic and
-    /// then enriched by repeatedly solving the LP master and the 2D guillotine knapsack
-    /// pricing sub-problem (Beasley DP) with diversified dual perturbations. The final
-    /// integer master is solved with OR-Tools' CBC mixed-integer solver under a hard
-    /// time limit.
-    ///
-    /// This is a pragmatic "branch-and-price-light" implementation in the spirit of:
-    ///   - Vance, Barnhart, Johnson, Nemhauser, "Solving binary cutting stock problems by
-    ///     column generation and branch-and-bound", Comp. Optim. Appl. 3, 1994.
-    ///   - Belov &amp; Scheithauer, "A branch-and-cut-and-price algorithm for one-dimensional
-    ///     stock cutting and two-dimensional two-stage cutting", EJOR 171, 2006.
-    ///   - Furini, Malaguti, Thomopulos, "Modeling Two-Dimensional Guillotine Cutting Problems
-    ///     via Integer Programming", INFORMS J. on Computing 28(4), 2016.
-    ///
-    /// Shared CG plumbing lives in <see cref="PatternPool"/>.
+    /// Pattern-pool + integer master MIP for 2D guillotine cutting.
+    /// Pool bootstrapped by shelf heuristic, enriched via CG + diversified pricing,
+    /// then solved as an integer program by CBC under a hard time limit.
+    /// Ref: Vance et al. 1994; Belov &amp; Scheithauer 2006; Furini et al. 2016.
     /// </summary>
     public sealed class StagedMipGuillotineSolver : ICuttingSolver2D
     {
-        /// <inheritdoc />
-        public string Name => "Staged Guillotine MIP (Pattern Pool + CBC)";
-        /// <inheritdoc />
-        public string Description =>
-            "Generates a diversified pattern pool via column generation, then solves the integer master MIP (CBC) with a hard time limit.";
-        /// <inheritdoc />
-        public string TimeComplexity => "NP-hard; bounded by TimeLimitMs";
+        public string Name => "Staged Guillotine MIP (CBC)";
+        public string Description => "CG-enriched pattern pool + CBC integer master.";
+        public string TimeComplexity => "NP-hard, bounded by TimeLimitMs";
 
         private const int MaxCgIterations = 200;
         private const int DiversificationRounds = 6;
@@ -165,7 +149,9 @@ namespace CuttingStock.Core.TwoD.Algorithms
             {
                 if (sw.ElapsedMilliseconds > deadline - 1000) break;
 
-                // Profit weighting: demand × area, jittered to break ties between columns.
+                // Synthetic duals: demand * area gives a base priority proportional to
+                // how much total material the order needs; jitter (0.7..1.3x) produces
+                // different pricing optima per round to diversify the column pool.
                 for (int i = 0; i < n; i++)
                 {
                     double baseP = demand[i] * (double)orders[i].Area;

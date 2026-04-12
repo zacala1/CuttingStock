@@ -9,31 +9,15 @@ using CuttingStock.Core.TwoD.Models;
 namespace CuttingStock.Core.TwoD.Algorithms
 {
     /// <summary>
-    /// Fast shelf-based heuristic solver for 2D guillotine cutting stock with optional rotation.
-    /// Runs several level-oriented heuristics — NFDH, FFDH, BFDH and a hybrid first-fit
-    /// variant — across multiple item-orderings (decreasing height / width / area / perimeter)
-    /// and chooses the best result by total waste area.
-    ///
-    /// Shelf placement is naturally guillotine compliant: each sheet is sliced with horizontal
-    /// cuts into shelves; each shelf is sliced with vertical cuts into items. This corresponds
-    /// to a 2-stage guillotine pattern (Lodi, Martello, Vigo, "Recent advances on two-dimensional
-    /// bin packing problems", DAM 123, 2002).
-    ///
-    /// References:
-    ///   - Coffman, Garey, Johnson, Tarjan, "Performance bounds for level-oriented two-dimensional
-    ///     packing algorithms", SIAM J. Computing 9(4), 1980.
-    ///   - Berkey, P. E., &amp; Wang, P. Y., "Two-dimensional finite bin-packing algorithms",
-    ///     JORS 38(5), 1987.
+    /// Shelf-based heuristic: NFDH/FFDH/BFDH x 5 sort orders, best-of-15 by waste.
+    /// Naturally 2-stage guillotine (horizontal shelf cuts, vertical item cuts).
+    /// Ref: Coffman et al. 1980; Berkey &amp; Wang 1987.
     /// </summary>
     public sealed class ShelfGuillotineSolver : ICuttingSolver2D
     {
-        /// <inheritdoc />
         public string Name => "Shelf Guillotine (NFDH/FFDH/BFDH)";
-        /// <inheritdoc />
-        public string Description =>
-            "Level-oriented shelf heuristics (NFDH/FFDH/BFDH) with multiple item orderings and rotation; selects the lowest-waste run.";
-        /// <inheritdoc />
-        public string TimeComplexity => "O(K · N log N) for K heuristic combinations";
+        public string Description => "Best-of-15 shelf heuristic with rotation.";
+        public string TimeComplexity => "O(K * N log N)";
 
         /// <inheritdoc />
         public SolverResult2D Solve(
@@ -137,8 +121,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
         private static List<Item> NormalizeOrientation(
             List<(int OrderIndex, int W, int H, bool Rot)> raw)
         {
-            // Pre-rotate items so the longer side is the height, which makes shelf
-            // packing more space-efficient. Items with rotation disabled keep their orientation.
+            // Orient tall-side-up: shorter shelves → more shelves per sheet → less wasted height.
             var list = new List<Item>(raw.Count);
             foreach (var t in raw)
             {
@@ -157,8 +140,6 @@ namespace CuttingStock.Core.TwoD.Algorithms
         {
             var remaining = new LinkedList<Item>(items);
             var patterns = new List<CuttingPattern2D>();
-            // Greedy: open the next sheet of the largest available type that still has stock.
-            // We respect Sheet.Quantity by tracking remaining stock per sheet definition.
             var stockLeft = orderedSheets.ToDictionary(s => s, s => s.Quantity);
 
             while (remaining.Count > 0)
@@ -269,6 +250,8 @@ namespace CuttingStock.Core.TwoD.Algorithms
             int bestLeftover = int.MaxValue;
             int chosenW = it.W, chosenH = it.H; bool chosenRot = it.Rotated;
 
+            // Score = wasted vertical gap + wasted horizontal gap.
+            // Minimizing this combined metric prefers tight-fitting shelves.
             void Consider(int shelfIdx, int w, int h, bool rotApplied)
             {
                 var sh = shelves[shelfIdx];

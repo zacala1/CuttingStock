@@ -8,33 +8,19 @@ using Google.OrTools.LinearSolver;
 namespace CuttingStock.Core.TwoD.Algorithms.Utilities
 {
     /// <summary>
-    /// Shared infrastructure for column-generation-based 2D solvers.
-    /// Provides:
-    ///  - the <see cref="Column"/> data type (one feasible cutting pattern),
-    ///  - converters from heuristic patterns and from <see cref="GuillotineKnapsackDp"/> output,
-    ///  - the OR-Tools GLOP-based LP master solver,
-    ///  - the dual-price → DP item list builder.
-    /// Used by both <see cref="ColumnGeneration2DSolver"/> and
-    /// <see cref="StagedMipGuillotineSolver"/> to eliminate code duplication.
+    /// Shared CG infrastructure: column type, LP master, pricing, dedup.
+    /// Used by both CG2D and StagedMip solvers.
     /// </summary>
     internal static class PatternPool
     {
-        // ---- Column type ----
-
-        /// <summary>A generated column = a single feasible cutting pattern for one sheet.</summary>
         public sealed class Column
         {
-            /// <summary>Sheet this pattern is built on.</summary>
             public Sheet Sheet = null!;
-            /// <summary>Item count per original order index.</summary>
-            public int[] Counts = null!;
-            /// <summary>Placement coordinates inside the sheet (post-trim absolute).</summary>
+            public int[] Counts = null!;   // items per order index
             public List<Placement> Placements = new();
         }
 
-        // ---- Conversions ----
-
-        /// <summary>Build a column from a pattern produced by a heuristic.</summary>
+        /// <summary>Build a column from a heuristic pattern.</summary>
         public static Column FromPattern(CuttingPattern2D p, int orderCount)
         {
             var col = new Column { Sheet = p.Sheet, Counts = new int[orderCount] };
@@ -46,7 +32,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             return col;
         }
 
-        /// <summary>Build a column from a guillotine-knapsack DP solve, applying trim offset.</summary>
+        /// <summary>Build a column from a DP solve, offsetting placements by trim.</summary>
         public static Column FromDpResult(Sheet sheet, GuillotineKnapsackDp.Result dp, int orderCount, int trim)
         {
             var col = new Column { Sheet = sheet, Counts = new int[orderCount] };
@@ -66,7 +52,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             return col;
         }
 
-        /// <summary>Deep-clone a placement (placements are init-only so this is safe).</summary>
+        /// <summary>Clone a placement.</summary>
         public static Placement ClonePlacement(Placement p) => new Placement
         {
             OrderIndex = p.OrderIndex,
@@ -77,12 +63,9 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             Rotated = p.Rotated,
         };
 
-        // ---- DP item construction from duals ----
-
         /// <summary>
-        /// Build the per-orientation item list for the pricing DP, weighted by dual prices.
-        /// Items with non-positive duals are excluded; rotated orientation is only emitted
-        /// when the global option, the per-item flag, and a non-square shape all permit it.
+        /// Build DP items from duals. Skips zero-profit orders; emits rotated variant
+        /// only when both global and per-item rotation flags allow it.
         /// </summary>
         public static List<GuillotineKnapsackDp.Item> BuildDpItems(
             List<RectOrder> orders, double[] pi, SolverOptions2D options, double eps = 1e-6)
@@ -107,13 +90,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             return list;
         }
 
-        // ---- LP master ----
-
-        /// <summary>
-        /// Solve the continuous master LP via OR-Tools GLOP and return the primal solution
-        /// together with the dual prices on the demand constraints.
-        /// </summary>
-        /// <returns>True on optimal/feasible, false otherwise.</returns>
+        /// <summary>Solve the continuous master LP (GLOP). Returns primal x and dual pi.</summary>
         public static bool SolveLpMaster(List<Column> columns, int[] demand, out double[] x, out double[] pi)
         {
             x = Array.Empty<double>();
@@ -151,13 +128,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             return true;
         }
 
-        // ---- One-shot pricing on every sheet ----
-
-        /// <summary>
-        /// Run pricing once: for each sheet type, solve the 2D guillotine knapsack DP under
-        /// the supplied dual prices and return the column with the most negative reduced
-        /// cost (or null if none improves).
-        /// </summary>
+        /// <summary>Price best single column across all sheet types (most negative reduced cost).</summary>
         public static Column? PriceBestColumn(
             List<Sheet> sheets,
             List<RectOrder> orders,
@@ -182,11 +153,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             return best;
         }
 
-        /// <summary>
-        /// Multi-pricing variant: yields an improving column for EVERY sheet type that admits
-        /// one (reduced cost &lt; −eps). Adding all of them in a single CG iteration accelerates
-        /// convergence and enriches the pool for downstream integer rounding.
-        /// </summary>
+        /// <summary>Yields one improving column per sheet type (multi-pricing).</summary>
         public static IEnumerable<Column> PriceImprovingColumns(
             List<Sheet> sheets,
             List<RectOrder> orders,
@@ -219,14 +186,8 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             }
         }
 
-        // ---- Column signature / dedup ----
-
-        /// <summary>
-        /// Stable hashable fingerprint of a column: the sheet dimensions plus the
-        /// sorted item-count vector. Two columns with the same signature are
-        /// interchangeable in the LP/IP master (placements may differ but the master
-        /// never sees placements), so we can safely dedup on this key.
-        /// </summary>
+        /// <summary>FNV-1a fingerprint of (sheet dims, counts). Master LP only sees counts, so
+        /// columns with the same signature are interchangeable — safe to dedup.</summary>
         public static long Signature(Column c)
         {
             unchecked
@@ -241,10 +202,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             }
         }
 
-        /// <summary>
-        /// Add a column to <paramref name="columns"/> if no existing column has the same
-        /// signature. Returns true when the column was actually added.
-        /// </summary>
+        /// <summary>Add column if its signature is new. Returns true if added.</summary>
         public static bool AddIfNew(List<Column> columns, HashSet<long> signatures, Column newCol)
         {
             long sig = Signature(newCol);

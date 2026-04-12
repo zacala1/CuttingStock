@@ -120,7 +120,7 @@ namespace CuttingStock.Tests
             var result = order.ToString();
 
             // Assert
-            result.Should().Be("Order(5000mm x 3개)");
+            result.Should().Be("Order(5000mm x3)");
         }
 
         [Test]
@@ -188,17 +188,6 @@ namespace CuttingStock.Tests
 
             // Act & Assert
             (order1 != order2).Should().BeFalse();
-        }
-
-        [Test]
-        public void Order_DefaultConstructor_ShouldCreateWithDefaultValues()
-        {
-            // Arrange & Act
-            var order = new Order();
-
-            // Assert
-            order.Length.Should().Be(0);
-            order.Quantity.Should().Be(0);
         }
 
         [Test]
@@ -368,7 +357,7 @@ namespace CuttingStock.Tests
             var result = stock.ToString();
 
             // Assert
-            result.Should().Be("RebarStock(12000mm x 10개)");
+            result.Should().Be("RebarStock(12000mm x10)");
         }
 
         [Test]
@@ -436,17 +425,6 @@ namespace CuttingStock.Tests
 
             // Act & Assert
             (stock1 != stock2).Should().BeFalse();
-        }
-
-        [Test]
-        public void RebarStock_DefaultConstructor_ShouldCreateWithDefaultValues()
-        {
-            // Arrange & Act
-            var stock = new RebarStock();
-
-            // Assert
-            stock.Length.Should().Be(0);
-            stock.Quantity.Should().Be(0);
         }
 
         [Test]

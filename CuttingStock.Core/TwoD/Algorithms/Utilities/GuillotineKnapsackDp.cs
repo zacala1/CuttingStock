@@ -5,67 +5,36 @@ using CuttingStock.Core.TwoD.Domain;
 namespace CuttingStock.Core.TwoD.Algorithms.Utilities
 {
     /// <summary>
-    /// Unbounded 2D guillotine knapsack via dynamic programming on a "normal" cut grid.
-    /// This is the pricing sub-problem in Gilmore–Gomory column generation for 2D
-    /// cutting stock (Cintra, Miyazawa, Wakabayashi, Xavier, EJOR 191, 2008), implemented
-    /// with the canonical recurrence of Beasley (1985), JORS 36(4):
-    ///
-    ///   F(W, H) = max {
-    ///       v_i  for any item i that fits (orientation-aware),
-    ///       F(x, H) + F(W − x, H)        ∀ x ∈ X \ {0, W},   // vertical cut
-    ///       F(W, y) + F(W, H − y)        ∀ y ∈ Y \ {0, H},   // horizontal cut
-    ///   }
-    ///
-    /// where X and Y are the "normal" cut sets — i.e. all 0 / w_i / Σ w_i  combinations
-    /// not exceeding W (resp. H). Reduces from continuous (W·H) to discrete (|X|·|Y|).
-    /// Memoized; reconstructs the actual placement set for the optimal pattern.
+    /// Unbounded 2D guillotine knapsack on a normal-cut grid (Beasley 1985).
+    /// Used as the CG pricing sub-problem. DP on |X| x |Y| normal sets with
+    /// NaN-sentinel memoization and full placement reconstruction.
     /// </summary>
     public sealed class GuillotineKnapsackDp
     {
-        /// <summary>One row of input: an oriented item that may be placed any number of times.</summary>
         public sealed class Item
         {
-            /// <summary>Original order index in the user input list.</summary>
             public int OrderIndex;
-            /// <summary>Effective width (post-rotation, if rotated).</summary>
-            public int W;
-            /// <summary>Effective height.</summary>
-            public int H;
-            /// <summary>True if this row represents the rotated orientation of its order.</summary>
+            public int W, H;
             public bool Rotated;
-            /// <summary>Profit per copy (typically the dual price π for the order).</summary>
+            /// <summary>Dual price (CG) or synthetic weight (diversification).</summary>
             public double Profit;
         }
 
-        /// <summary>Result of a knapsack solve.</summary>
         public sealed class Result
         {
-            /// <summary>Maximum total profit attainable in the (W, H) rectangle.</summary>
             public double Profit;
-            /// <summary>Placements that realize <see cref="Profit"/> (top-left absolute coords).</summary>
             public List<Placement> Placements = new();
         }
 
-        private readonly int _W;
-        private readonly int _H;
+        private readonly int _W, _H;
         private readonly List<Item> _items;
         private readonly int _kerf;
 
-        // Normal sets sorted ascending; index lookup via dictionary.
-        private readonly int[] _xs;
-        private readonly int[] _ys;
-        private readonly Dictionary<int, int> _xi = new();
-        private readonly Dictionary<int, int> _yi = new();
+        private readonly int[] _xs, _ys;
+        private readonly Dictionary<int, int> _xi = new(), _yi = new();
 
-        // Memo on (xi, yi). We use NaN as a "not yet computed" sentinel — this halves
-        // memo memory vs keeping a separate bool[,] and improves cache locality.
+        // NaN = not yet computed. Tag: 0=base, 1=item, 2=vcut, 3=hcut. Data: item idx or cut pos.
         private readonly double[,] _memo;
-        // Reconstruction tag at each cell.
-        // tag encoding:
-        //   0 = empty (either base case or uncomputed — disambiguated by _memo NaN)
-        //   1 = single item (data: itemIndex)
-        //   2 = vertical cut at x value (data: x)
-        //   3 = horizontal cut at y value (data: y)
         private readonly byte[,] _tag;
         private readonly int[,] _data;
 
@@ -129,15 +98,13 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                 }
             }
 
-            // (b) Vertical cut x ∈ X, 0 < x < W. Symmetry: x ≤ W/2.
-            // Each vertical cut consumes kerf from one side.
+            // Vertical cuts. Only x <= W/2 — F(a,H)+F(b,H) == F(b,H)+F(a,H).
             for (int k = 1; k < xi; k++)
             {
                 int x = _xs[k];
                 if (x > W / 2) break;
                 int rest = W - x - _kerf;
                 if (rest <= 0) continue;
-                // Map "rest" down to the largest normal x ≤ rest.
                 int restIdx = LowerBoundIndex(_xs, rest);
                 if (restIdx < 0) continue;
                 double val = F(k, yi) + F(restIdx, yi);
@@ -149,7 +116,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                 }
             }
 
-            // (c) Horizontal cut y ∈ Y, 0 < y < H. Symmetry: y ≤ H/2.
+            // Horizontal cuts. Same symmetry.
             for (int k = 1; k < yi; k++)
             {
                 int y = _ys[k];

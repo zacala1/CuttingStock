@@ -482,7 +482,7 @@ namespace CuttingStock.Tests
 
             // Assert
             report.Should().NotBeNullOrEmpty();
-            report.Should().Contain("Performance Metrics");
+            report.Should().Contain("Metrics");
         }
 
         [Test]

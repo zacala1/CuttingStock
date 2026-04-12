@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>CS1591</NoWarn>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Authors>CuttingStock Team</Authors>
     <Description>Core library for cutting stock optimization algorithms. Contains Greedy Knapsack DP, Column Generation LP, and Arc Flow MIP (OR-Tools) solvers with kerf and welding support.</Description>
@@ -14,7 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Google.OrTools" Version="9.11.4210" />
+    <PackageReference Include="Google.OrTools" Version="9.15.6755" />
   </ItemGroup>
 
 </Project>

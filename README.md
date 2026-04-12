@@ -1,12 +1,12 @@
 # Cutting Stock Optimization
 
-1D(철근/봉재) **및** 2D(시트/플레이트) Cutting Stock 문제를 해결하는 .NET 8 WPF 데스크톱 애플리케이션. 1D 와 2D 각각 3종 솔버(휴리스틱 / 칼럼 생성 / MIP)를 제공한다.
+1D(철근/봉재) **및** 2D(시트/플레이트) Cutting Stock 문제를 해결하는 .NET 10 WPF 데스크톱 애플리케이션. 1D 와 2D 각각 3종 솔버(휴리스틱 / 칼럼 생성 / MIP)를 제공한다.
 
 ## 프로젝트 구조
 
 - **CuttingStock.Core**: 알고리즘, 도메인 모델, 유틸리티 (OR-Tools 포함)
 - **CuttingStock.UI**: WPF 기반 사용자 인터페이스
-- **CuttingStock.Tests**: 단위 테스트 및 통합 테스트 (500개, 1D 254 + 2D 246)
+- **CuttingStock.Tests**: 단위 테스트, 통합 테스트, 퍼징 불변식 검증
 - **CuttingStock.Benchmarks**: BenchmarkDotNet 성능 벤치마크
 
 ## 구현된 알고리즘
@@ -51,7 +51,7 @@ Arc Flow 네트워크 모델 + SCIP MIP 솔버.
 
 자세한 내용은 `docs/2D_PROBLEM_DEFINITION.md`, `docs/2D_ALGORITHMS.md`, `docs/2D_API_REFERENCE.md` 참조.
 
-### 2D 벤치마크 (i5-14600KF, .NET 8.0)
+### 2D 벤치마크 (i5-14600KF)
 
 | 규모 (~아이템 수) | Shelf | CG2D | MIP (CBC) |
 |---|---:|---:|---:|
@@ -83,8 +83,8 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭을 노출하며, 2D 탭은
 
 ## 의존성
 
-- .NET 8.0
-- [Google.OrTools](https://developers.google.com/optimization) 9.11 (Arc Flow MIP 솔버)
+- .NET 10.0
+- [Google.OrTools](https://developers.google.com/optimization) 9.15 (Arc Flow MIP + 2D GLOP/CBC 솔버)
 - LiveChartsCore.SkiaSharpView.WPF (차트)
 - ClosedXML (Excel 내보내기)
 - NUnit + FluentAssertions (테스트)
@@ -92,8 +92,8 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭을 노출하며, 2D 탭은
 ## 빌드 및 실행
 
 ```bash
-dotnet build
-dotnet test
+dotnet build CuttingStock.slnx
+dotnet test CuttingStock.slnx
 dotnet run --project CuttingStock.UI
 ```
 
