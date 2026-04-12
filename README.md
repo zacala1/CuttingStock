@@ -1,12 +1,12 @@
 # Cutting Stock Optimization
 
-철근 절단 최적화 문제(Cutting Stock Problem)를 해결하는 3가지 알고리즘을 구현한 .NET 8 WPF 데스크톱 애플리케이션입니다.
+1D(철근/봉재) **및** 2D(시트/플레이트) Cutting Stock 문제를 해결하는 .NET 8 WPF 데스크톱 애플리케이션. 1D 와 2D 각각 3종 솔버(휴리스틱 / 칼럼 생성 / MIP)를 제공한다.
 
 ## 프로젝트 구조
 
 - **CuttingStock.Core**: 알고리즘, 도메인 모델, 유틸리티 (OR-Tools 포함)
 - **CuttingStock.UI**: WPF 기반 사용자 인터페이스
-- **CuttingStock.Tests**: 단위 테스트 및 통합 테스트 (254개)
+- **CuttingStock.Tests**: 단위 테스트 및 통합 테스트 (500개, 1D 254 + 2D 246)
 - **CuttingStock.Benchmarks**: BenchmarkDotNet 성능 벤치마크
 
 ## 구현된 알고리즘
@@ -37,6 +37,29 @@ Arc Flow 네트워크 모델 + SCIP MIP 솔버.
 - **복잡도**: MIP (30초 시간 제한)
 - **장점**: 수학적으로 증명된 최적해, kerf 자연 지원, 다중 재고 지원
 - **단점**: OR-Tools 의존성, 대규모 문제에서 느릴 수 있음
+
+## 2D Guillotine Cutting Stock
+
+`CuttingStock.Core.TwoD` 네임스페이스에 1D 와 거울 구조의 2D 솔버 3종 제공.
+산업용 패널 톱(panel saw)이 요구하는 **길로틴(guillotine)** 절단 제약, 90° 회전 옵션, kerf, 트림을 모두 지원한다.
+
+| 솔버 | 핵심 알고리즘 | 출처 |
+|---|---|---|
+| `ShelfGuillotineSolver` | NFDH/FFDH/BFDH × 5 정렬 휴리스틱 | Coffman et al. 1980; Berkey & Wang 1987 |
+| `ColumnGeneration2DSolver` | Master LP(GLOP) + 2D guillotine knapsack DP | Gilmore & Gomory 1965; Beasley 1985; Cintra et al. 2008 |
+| `StagedMipGuillotineSolver` | Pattern pool + 정수 마스터 (CBC) | Vance et al. 1994; Belov & Scheithauer 2006; Furini et al. 2016 |
+
+자세한 내용은 `docs/2D_PROBLEM_DEFINITION.md`, `docs/2D_ALGORITHMS.md`, `docs/2D_API_REFERENCE.md` 참조.
+
+### 2D 벤치마크 (i5-14600KF, .NET 8.0)
+
+| 규모 (~아이템 수) | Shelf | CG2D | MIP (CBC) |
+|---|---:|---:|---:|
+| Small (~10) | **11 us** | 373 us | 2.3 ms |
+| Medium (~28) | **35 us** | 1.4 ms | 4.6 ms |
+| Large (~74) | **110 us** | 18 ms | 35 ms |
+
+WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭을 노출하며, 2D 탭은 시트/주문 입력, 알고리즘 선택, Canvas 기반 패턴 미리보기, 알고리즘 비교를 모두 제공한다.
 
 ## 파라미터
 

@@ -26,10 +26,14 @@ namespace CuttingStock.Core.Algorithms
     /// </summary>
     public class ArcFlowSolver : ICuttingSolver
     {
+        /// <inheritdoc />
         public string Name => "Arc Flow MIP (OR-Tools)";
+        /// <inheritdoc />
         public string Description => "Exact optimization using arc flow network model with MIP solver (OR-Tools SCIP)";
+        /// <inheritdoc />
         public string TimeComplexity => "Exact (MIP)";
 
+        /// <inheritdoc />
         public SolverResult Solve(List<RebarStock> stock, List<Order> orders, SolverOptions options, IProgress<double>? progress = null)
         {
             var result = new SolverResult { AlgorithmName = this.Name };

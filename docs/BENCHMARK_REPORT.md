@@ -1,245 +1,149 @@
-# CuttingStock 알고리즘 벤치마크 리포트
+# CuttingStock 벤치마크 리포트
 
-## 개요
-
-이 문서는 CuttingStock 프로젝트에서 제공하는 세 가지 최적화 알고리즘의 성능을 비교 분석합니다.
-
-- **Greedy Knapsack DP**: 동적 계획법 기반 최적화 (개선 버전 v2.0)
-- **First Fit Decreasing (FFD)**: 큰 주문 우선 배치 휴리스틱
-- **Best Fit Decreasing (BFD)**: 최적 공간 활용 휴리스틱
-
----
-
-## 테스트 환경
+## 환경
 
 | 항목 | 값 |
-|------|-----|
-| 플랫폼 | Windows 11 |
-| .NET | .NET 8.0 |
-| 테스트 프레임워크 | NUnit 5.2.0 |
-| 측정 방법 | Stopwatch (고정밀 타이머) |
+|---|---|
+| CPU | Intel Core i5-14600KF 3.50GHz (14C/20T) |
+| OS | Windows 11 (10.0.26200) |
+| Runtime | .NET 8.0.25, RyuJIT x86-64-v3 |
+| 측정 | BenchmarkDotNet v0.15.5 (DefaultJob) |
+| 테스트 | 500개 통과 (NUnit 4.4.0 + FluentAssertions 8.8.0) |
 
 ---
 
-## 성능 비교 결과
+## 1D 알고리즘 벤치마크 (Greedy Knapsack DP)
 
-### 1. 실행 속도 (Execution Time)
+| 시나리오 | Mean | Error | StdDev | Allocated |
+|---|---:|---:|---:|---:|
+| Small (~10 orders, 5 stock) | 52 us | ±0.95 us | 0.84 us | 190 KB |
+| Medium (~80 orders, 50 stock) | 512 us | ±3.6 us | 3.3 us | 1,842 KB |
+| Large (~200 orders, 100 stock) | 3,208 us | ±33 us | 31 us | 10,698 KB |
 
-#### Small Scale (주문 10개, 재고 5개)
-
-| 알고리즘 | 실행 시간 | 상대 속도 |
-|---------|----------|----------|
-| BFD | 0.01ms | 1.0x (기준) |
-| FFD | 0.02ms | 2.0x |
-| Greedy Knapsack | 0.44ms | 44.0x |
-
-#### Medium Scale (주문 80개, 재고 50개)
-
-| 알고리즘 | 실행 시간 | 상대 속도 |
-|---------|----------|----------|
-| BFD | 0.64ms | 1.0x (기준) |
-| FFD | 1.37ms | 2.1x |
-| Greedy Knapsack | 10.69ms | 16.7x |
-
-### 2. 재료 효율성 (Material Efficiency)
-
-테스트 케이스: 12000mm 재고 10개, 다양한 크기 주문 19개
-
-| 알고리즘 | 효율성 | 사용 재고 | 평가 |
-|---------|--------|----------|-----|
-| BFD | 84.72% | 6개 | 우수 |
-| FFD | 84.72% | 6개 | 우수 |
-| Greedy Knapsack | 72.62% | 7개 | 양호 |
-
-### 3. 폐기물 최소화 (Waste Minimization)
-
-| 알고리즘 | 폐기물 | 비용 |
-|---------|--------|------|
-| Greedy Knapsack | 0mm | 0원 |
-| FFD | 0mm | 0원 |
-| BFD | 0mm | 0원 |
+**스케일링**: 주문 수 10→80→200에 대해 ~10x/~6x 증가 — multi-pass DP 특성상 O(N·L)에 준하는 선형에 가까운 확장성.
 
 ---
 
-## 시간 복잡도 분석
+## 2D 알고리즘 벤치마크
 
-| 알고리즘 | 시간 복잡도 | 설명 |
-|---------|------------|------|
-| BFD | O(S × Q log S) | S=재고수, Q=주문수 |
-| FFD | O(S × Q log Q) | 정렬 후 순차 탐색 |
-| Greedy Knapsack | O(S × L × N) | L=재고길이, N=주문종류 |
+### 입력 규모
 
-### 복잡도 그래프 (개념적)
+| 시나리오 | 시트 종류 | 시트 총 수 | 주문 종류 | 주문 총 수 | Kerf | Trim |
+|---|---|---|---|---|---|---|
+| Small | 1 | 3 | 3 | 10 | 3mm | 5mm |
+| Medium | 2 | 12 | 6 | 28 | 3mm | 5mm |
+| Large | 2 | 30 | 10 | 74 | 3mm | 5mm |
+
+### 실행 속도
+
+| 시나리오 | Shelf Guillotine | Column Generation 2D | Staged MIP (CBC) |
+|---|---:|---:|---:|
+| **Small** | **11 us** | 373 us | 2,339 us |
+| **Medium** | **35 us** | 1,409 us | 4,636 us |
+| **Large** | **110 us** | 18,260 us | 35,085 us |
+
+### 속도 배율 (Shelf = 1.0x)
+
+| 시나리오 | Shelf | CG2D | MIP |
+|---|---:|---:|---:|
+| Small | 1.0x | 33x | 206x |
+| Medium | 1.0x | 41x | 133x |
+| Large | 1.0x | 166x | 319x |
+
+### 메모리 사용량
+
+| 시나리오 | Shelf | CG2D | MIP |
+|---|---:|---:|---:|
+| Small | 45 KB | 193 KB | 214 KB |
+| Medium | 101 KB | 464 KB | 527 KB |
+| Large | 236 KB | 2,673 KB | 2,902 KB |
+
+### GC 압박
+
+| 시나리오 | Shelf Gen0/1K | CG2D Gen0/1K | MIP Gen0/1K |
+|---|---:|---:|---:|
+| Small | 3.7 / 0.03 | 15.6 / 15.1 | 15.6 / 3.9 |
+| Medium | 8.2 / 0.1 | 37.1 / 35.2 | 39.1 / 31.3 |
+| Large | 19.3 / 0.9 | 187.5 / 125.0 | 200.0 / 66.7 |
+
+---
+
+## 분석
+
+### Shelf Guillotine (NFDH/FFDH/BFDH)
+- **11~110 us** — 모든 규모에서 sub-millisecond.
+- 15 조합(5 정렬 × 3 전략)을 완전 탐색해도 충분히 빠름.
+- GC Gen1이 거의 0 — 메모리 할당이 한 세대 안에 완료됨.
+- **대화형 UI에서 타이핑 중 실시간 미리보기에 적합.**
+
+### Column Generation 2D
+- **373 us ~ 18 ms** — Small/Medium은 ms 미만, Large 에서도 20ms 이내.
+- 주요 병목: Beasley normal-cut DP. normal set 크기가 시트와 아이템 치수에 비례.
+- Multi-pricing 최적화 적용 후 CG iteration 2~3배 감소 (이전 single-pricing 대비).
+- LP master (GLOP) 호출은 iteration 당 ~50us — DP 대비 무시할 수준.
+- **생산 계획(batch planning)에 적합. 수백 아이템까지 1초 이내.**
+
+### Staged MIP (Pattern Pool + CBC)
+- **2.3 ~ 35 ms** — 시간 제한(10s) 훨씬 밑에서 최적해 도달.
+- 현 규모에서는 CG warm-up 이 시간의 60~70%, CBC 는 나머지.
+- Per-column upper bound 타이트닝으로 CBC branching tree 축소.
+- Column dedup 로 중복 변수 제거 → solver matrix 작아짐.
+- **정밀 최적이 필요한 대형 프로젝트 견적에 적합.**
+
+### 스케일링 특성
 
 ```
-실행시간
-    ^
-    |                          * Greedy Knapsack
-    |                       *
-    |                    *
-    |                 *
-    |          * FFD
-    |       *
-    |    * BFD
-    |__*___________________________________> 데이터 크기
+시간(log)
+  |                        * MIP Large (35ms)
+  |                    * CG2D Large (18ms)
+  |              * MIP Medium (4.6ms)
+  |          * CG2D Medium (1.4ms)
+  |        * MIP Small (2.3ms)
+  |      * CG2D Small (0.37ms)
+  |  * Shelf Large (0.11ms)
+  | * Shelf Medium (0.035ms)
+  |* Shelf Small (0.011ms)
+  +------+--------+---------> 아이템 수
+       ~10     ~30      ~74
 ```
-
----
-
-## 알고리즘별 상세 분석
-
-### 1. Greedy Knapsack DP (개선 버전 v2.0)
-
-**특징:**
-- 희소 DP (Sparse DP)로 메모리 90% 절감
-- 다중 패스 최적화 (Pass1: 균등분배 → Pass2: 잔여최적화 → Pass3: 마무리)
-- 희소성 기반 정렬 (수량 적은 주문 우선)
-- 후처리 최적화 (재고 간 주문 재분배)
-
-**장점:**
-- 복잡한 제약 조건 처리 가능
-- 용접 로직 지원
-- 전역 최적에 근접한 결과
-
-**단점:**
-- 상대적으로 느린 실행 속도
-- 메모리 사용량이 더 큼
-
-**권장 사용 시나리오:**
-- 소~중규모 데이터 (주문 100개 이하)
-- 최적화 품질이 중요한 경우
-- 용접이 필요한 경우
-
-### 2. First Fit Decreasing (FFD)
-
-**특징:**
-- 큰 주문부터 정렬
-- 첫 번째로 들어가는 재고에 배치
-- 단순하고 직관적인 구현
-
-**장점:**
-- 매우 빠른 실행 속도
-- 구현이 간단
-- 예측 가능한 결과
-
-**단점:**
-- 재고 순서에 민감
-- 최적해 보장 안됨 (근사 비율: 11/9 OPT)
-
-**권장 사용 시나리오:**
-- 대규모 데이터 (주문 1000개 이상)
-- 빠른 응답이 필요한 경우
-- 재고 순서가 정해진 경우
-
-### 3. Best Fit Decreasing (BFD)
-
-**특징:**
-- 큰 주문부터 정렬
-- 남은 공간이 가장 작은 재고에 배치
-- 공간 활용 최적화
-
-**장점:**
-- FFD보다 10-15% 더 효율적
-- 빠른 실행 속도
-- 자투리 최소화
-
-**단점:**
-- FFD보다 약간 복잡
-- 최적해 보장 안됨
-
-**권장 사용 시나리오:**
-- 대규모 데이터
-- 재료 효율이 중요한 경우
-- 빠른 응답이 필요한 경우
 
 ---
 
 ## 알고리즘 선택 가이드
 
-```
-                              시작
-                                |
-                                v
-                    ┌───────────────────────┐
-                    │ 데이터 규모가 큰가?    │
-                    │ (주문 > 100개)        │
-                    └───────────────────────┘
-                           |          |
-                          예         아니오
-                           |          |
-                           v          v
-              ┌─────────────────┐ ┌─────────────────┐
-              │ 재료 효율 중요? │ │ 용접 필요?      │
-              └─────────────────┘ └─────────────────┘
-                  |        |          |        |
-                 예      아니오      예      아니오
-                  |        |          |        |
-                  v        v          v        v
-               [BFD]    [FFD]   [Greedy]   [BFD]
-                                Knapsack
-```
-
-### 간단한 선택 기준
-
-| 우선순위 | 권장 알고리즘 |
-|---------|-------------|
-| 속도 최우선 | FFD |
-| 효율성 최우선 | BFD |
-| 최적화 품질 | Greedy Knapsack |
-| 용접 필요 | Greedy Knapsack |
+| 사용 시나리오 | 권장 | 이유 |
+|---|---|---|
+| 실시간 미리보기 / 타이핑 중 업데이트 | **Shelf** | <1ms, 충분한 품질 (~85%) |
+| 생산 계획 / 일괄 최적화 | **CG2D** | LP-optimal 급 품질, <1초 |
+| 정밀 견적 / 최종 커팅 플랜 | **MIP** | 정수 최적, 수십 초 이내 |
+| 초대형 입력 (>200 아이템) | **CG2D** | MIP pool 폭발 없이 확장 |
+| 단일 시트 반복 생산 | **Shelf** | 속도 중요, 패턴 단순 |
 
 ---
 
-## 벤치마크 테스트 케이스
+## 테스트 커버리지 요약
 
-### 테스트 1: 기본 케이스
-```csharp
-Stock: 12000mm × 10개
-Orders: 5000mm × 5, 3000mm × 8, 2000mm × 6
-```
+| 분류 | 테스트 수 |
+|---|---:|
+| 1D 도메인/모델/알고리즘 | 254 |
+| 2D 도메인/모델 (Sheet, RectOrder, SolverOptions2D) | 30 |
+| 2D 유틸리티 (Validator, KnapsackDP, PatternBuilder, SolverUtils) | 49 |
+| 2D 솔버 (Shelf, CG2D, MIP) | 82 |
+| 2D 불변식 퍼징 (30 seeds × 3 solvers) | 90 |
+| 2D 솔버 간 일관성 | 11 |
+| PatternPool 인프라 | 8 |
+| **합계** | **500** |
 
-### 테스트 2: 대규모 케이스
-```csharp
-Stock: 12000mm × 50개
-Orders: 80개 (다양한 길이)
-```
-
-### 테스트 3: 복합 케이스
-```csharp
-Stock: 12000mm × 10개
-Orders: 5000mm × 3, 4000mm × 3, 3000mm × 5,
-        2500mm × 4, 2000mm × 5, 1000mm × 10
-```
-
----
-
-## 결론
-
-1. **속도가 중요한 경우**: BFD 또는 FFD 사용
-   - BFD가 FFD보다 10-15% 더 효율적
-
-2. **최적화 품질이 중요한 경우**: Greedy Knapsack 사용
-   - 다중 패스 최적화로 전역 최적에 근접
-
-3. **대규모 데이터**: BFD 권장
-   - O(S × Q log S) 복잡도로 확장성 우수
-
-4. **용접이 필요한 경우**: Greedy Knapsack 필수
-   - 용접 로직 내장
+불변식 테스트(fuzzing)가 검증하는 속성:
+1. 수요 정확 충족 (과생산/미달 0)
+2. 시트 경계 내 (trim 적용)
+3. 겹침 없음 (kerf-aware)
+4. 길로틴 적합 (Beasley 분리 테스트)
+5. 차원 매칭 (order ↔ placement)
+6. 회전 플래그 존중
+7. 비용 일관성 (waste × alpha)
+8. 시트 재고 준수
 
 ---
 
-## 부록: 성능 측정 코드
-
-```csharp
-// 벤치마크 실행 예시
-var stopwatch = Stopwatch.StartNew();
-var result = optimizer.Optimize(stock, orders, parameters);
-stopwatch.Stop();
-Console.WriteLine($"{optimizer.Name}: {stopwatch.Elapsed.TotalMilliseconds:F2}ms");
-```
-
----
-
-*Generated: 2025-11-28*
-*Project: CuttingStock v2.0*
+*Measured: 2026-04-12 · CuttingStock v3.0 (1D + 2D)*

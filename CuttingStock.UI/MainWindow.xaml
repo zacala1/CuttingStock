@@ -5,9 +5,12 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CuttingStock"
         xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+        xmlns:twod="clr-namespace:CuttingStock.UI.TwoD"
         mc:Ignorable="d"
-        Title="철근 절단 최적화 프로그램" Height="800" Width="1400"
+        Title="Cutting Stock 최적화 (1D + 2D)" Height="820" Width="1400"
         MinHeight="600" MinWidth="900">
+    <TabControl>
+    <TabItem Header="1D 절단 (Rebar)">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="400" MinWidth="250"/>
@@ -369,4 +372,9 @@
             </TabControl>
         </Grid>
     </Grid>
+    </TabItem>
+    <TabItem Header="2D 절단 (Sheet)">
+        <twod:TwoDTab/>
+    </TabItem>
+    </TabControl>
 </Window>
