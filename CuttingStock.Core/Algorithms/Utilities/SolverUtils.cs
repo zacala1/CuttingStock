@@ -9,6 +9,8 @@ namespace CuttingStock.Core.Algorithms.Utilities
     /// <summary>Shared helpers for 1D solvers.</summary>
     public static class SolverUtils
     {
+        private const int MaxLocalSearchIterations = 100;
+
         public static void HandleException(SolverResult result, Exception ex)
         {
             result.Success = false;
@@ -115,7 +117,7 @@ namespace CuttingStock.Core.Algorithms.Utilities
             RedistributeCuts(result, options);
 
             // Phase 2: Local Search (2-opt style swap)
-            LocalSearchOptimize(result, options, maxIterations: 100);
+            LocalSearchOptimize(result, options, maxIterations: MaxLocalSearchIterations);
         }
         private static void RedistributeCuts(SolverResult result, SolverOptions options)
         {
