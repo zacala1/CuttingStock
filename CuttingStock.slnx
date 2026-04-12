@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="CuttingStock.Benchmarks/CuttingStock.Benchmarks.csproj" />
+  <Project Path="CuttingStock.Core/CuttingStock.Core.csproj" />
+  <Project Path="CuttingStock.Tests/CuttingStock.Tests.csproj" />
+  <Project Path="CuttingStock.UI/CuttingStock.csproj" />
+</Solution>
