@@ -9,31 +9,15 @@ using CuttingStock.Core.Algorithms.Utilities;
 namespace CuttingStock.Core.Algorithms
 {
     /// <summary>
-    /// Column Generation Optimizer (Enhanced with Multi-Stock Support)
-    ///
-    /// Solves the Cutting Stock Problem using the Column Generation technique.
-    /// Uses a custom Simplex solver for the Restricted Master Problem (RMP).
-    /// Uses the Knapsack DP for the Pricing Problem (Sub-problem).
-    ///
-    /// Enhancements (v2.0):
-    /// - Multiple stock length support
-    /// - Per-stock pricing problem
-    /// - Improved integer solution generation
-    ///
-    /// References:
-    /// - Gilmore and Gomory (1961): "A Linear Programming Approach to the Cutting-Stock Problem"
-    /// - https://jump.dev/JuMP.jl/stable/tutorials/algorithms/cutting_stock_column_generation/
+    /// Gilmore-Gomory column generation with custom Simplex + knapsack DP pricing.
+    /// Multi-stock support. Floor-then-residual integer rounding.
+    /// Ref: Gilmore &amp; Gomory 1961.
     /// </summary>
     public class ColumnGenerationSolver : ICuttingSolver
     {
-        /// <inheritdoc/>
         public string Name => "Column Generation (LP)";
-
-        /// <inheritdoc/>
-        public string Description => "Global Optimization using Linear Programming and Column Generation with Multi-Stock Support";
-
-        /// <inheritdoc/>
-        public string TimeComplexity => "Exponential (NP-Hard)";
+        public string Description => "CG with Simplex master + knapsack DP pricing.";
+        public string TimeComplexity => "Poly/iter, exp worst-case";
 
         /// <inheritdoc/>
         public SolverResult Solve(List<RebarStock> stock, List<Order> orders, SolverOptions options, IProgress<double>? progress = null)

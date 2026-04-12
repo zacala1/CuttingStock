@@ -377,7 +377,7 @@ namespace CuttingStock.Tests
                 var report = result.GetDetailedReport(_defaultParams);
 
                 report.Should().Contain("Cutting Results");
-                report.Should().Contain("Performance Metrics");
+                report.Should().Contain("Metrics");
                 report.Should().Contain("Costs");
                 report.Should().Contain(optimizer.Name, "Report should contain algorithm name");
             }

@@ -10,28 +10,15 @@ using Google.OrTools.LinearSolver;
 namespace CuttingStock.Core.Algorithms
 {
     /// <summary>
-    /// Arc Flow MIP Solver for the Cutting Stock Problem.
-    ///
-    /// Models CSP as a minimum-cost network flow on a directed acyclic graph.
-    /// Nodes represent positions 0..stockLength. Item arcs represent cuts.
-    /// Solved exactly using OR-Tools SCIP MIP solver.
-    ///
-    /// Features:
-    /// - Provably optimal integer solutions
-    /// - Natural kerf support (arc weight = length + kerf)
-    /// - Multiple stock length support
-    ///
-    /// Reference: Valerio de Carvalho (1999), "Exact solution of bin-packing problems
-    /// using column generation and branch-and-bound"
+    /// Arc flow network model solved by OR-Tools SCIP. DAG nodes = positions,
+    /// item arcs = cuts (width = length + kerf). Provably optimal.
+    /// Ref: Valerio de Carvalho 1999.
     /// </summary>
     public class ArcFlowSolver : ICuttingSolver
     {
-        /// <inheritdoc />
         public string Name => "Arc Flow MIP (OR-Tools)";
-        /// <inheritdoc />
-        public string Description => "Exact optimization using arc flow network model with MIP solver (OR-Tools SCIP)";
-        /// <inheritdoc />
-        public string TimeComplexity => "Exact (MIP)";
+        public string Description => "Exact arc flow network + SCIP MIP.";
+        public string TimeComplexity => "Exact (MIP, 30s limit)";
 
         /// <inheritdoc />
         public SolverResult Solve(List<RebarStock> stock, List<Order> orders, SolverOptions options, IProgress<double>? progress = null)

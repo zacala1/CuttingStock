@@ -9,38 +9,13 @@ using CuttingStock.Core.Domain;
 namespace CuttingStock.Core.Algorithms
 {
     /// <summary>
-    /// Greedy Knapsack Dynamic Programming Solver (Enhanced Version)
-    ///
-    /// Algorithm Classification: Greedy + Dynamic Programming (Bounded Knapsack)
-    /// Strategy: Multi-pass optimization for near-global optimal results
-    ///
-    /// Enhancements (v2.0):
-    /// 1. Sparse DP: 90% memory reduction
-    /// 2. Global Quantity Awareness: Balanced distribution across stock
-    /// 3. Multi-Pass Optimization: Pass1(balanced) → Pass2(residual) → Pass3(fill gaps)
-    /// 4. Scarcity-Based Sorting: Prioritize low-quantity orders
-    /// 5. Empty Result Handling: Minimize stock waste
-    /// 6. Post-Processing: Redistribute orders across stock
-    ///
-    /// Advantages:
-    /// - Fast execution O(S × L × N)
-    /// - Near-global optimal (30-40% improvement over basic greedy)
-    /// - Memory efficient (sparse DP)
-    /// - Welding support (optional)
-    ///
-    /// Disadvantages:
-    /// - Not perfect global optimization (NP-Hard limitation)
-    /// - Slightly lower efficiency than Column Generation
+    /// Multi-pass greedy knapsack DP. Pass1 balanced, Pass2 residual, Pass3 fill,
+    /// then 2-opt/relocate post-processing. Sparse DP for memory efficiency.
     /// </summary>
     public class GreedyKnapsackSolver : ICuttingSolver
     {
-        /// <inheritdoc/>
         public string Name => "Greedy Knapsack DP";
-
-        /// <inheritdoc/>
-        public string Description => "Dynamic programming algorithm that minimizes leftover in each stock using greedy strategy (Enhanced Version)";
-
-        /// <inheritdoc/>
+        public string Description => "Multi-pass sparse DP with post-processing.";
         public string TimeComplexity => "O(N * L * Passes)";
 
         /// <inheritdoc/>

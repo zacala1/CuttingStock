@@ -6,38 +6,19 @@ using System.Linq;
 
 namespace CuttingStock.Core.Algorithms.Utilities
 {
-    /// <summary>
-    /// Utility methods commonly used across solver algorithms.
-    /// </summary>
+    /// <summary>Shared helpers for 1D solvers.</summary>
     public static class SolverUtils
     {
-        #region Exception Handling
-
-        /// <summary>
-        /// Handles exceptions and sets error information in the result object.
-        /// </summary>
         public static void HandleException(SolverResult result, Exception ex)
         {
             result.Success = false;
             result.ErrorMessage = $"Error during optimization: {ex.Message}";
         }
-
-        /// <summary>
-        /// Sets error message when there are remaining orders.
-        /// </summary>
         public static void SetRemainingOrdersError(SolverResult result, int remainingCount)
         {
             result.Success = false;
             result.ErrorMessage = $"Failed to process {remainingCount} order(s).";
         }
-
-        #endregion
-
-        #region Validation
-
-        /// <summary>
-        /// Validates input data.
-        /// </summary>
         public static (bool isValid, string? errorMessage) ValidateInputs(
             List<RebarStock>? stock,
             List<Order>? orders)
@@ -78,14 +59,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
 
             return (true, null);
         }
-
-        #endregion
-
-        #region Sorting
-
-        /// <summary>
-        /// Sorts stock according to usage order.
-        /// </summary>
         public static List<RebarStock> SortStock(
             List<RebarStock> stock,
             StockUsageOrder usageOrder)
@@ -94,10 +67,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 ? stock.OrderBy(s => s.Length).ToList()
                 : stock.OrderByDescending(s => s.Length).ToList();
         }
-
-        /// <summary>
-        /// Sorts orders by scarcity (low quantity first).
-        /// </summary>
         public static List<Order> SortOrdersByScarcity(List<Order> orders)
         {
             return orders
@@ -105,28 +74,12 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 .ThenByDescending(o => o.Length)
                 .ToList();
         }
-
-        #endregion
-
-        #region Kerf Helpers
-
-        /// <summary>
-        /// Calculates leftover for a plan considering kerf.
-        /// </summary>
         public static int ComputeLeftover(int stockLength, List<Cut> cuts, int kerf)
         {
             if (cuts.Count == 0) return stockLength;
             int consumed = cuts.Sum(c => c.Length) + Math.Max(0, cuts.Count - 1) * kerf;
             return Math.Max(0, stockLength - consumed);
         }
-
-        #endregion
-
-        #region Result Calculation
-
-        /// <summary>
-        /// Calculates optimization result metrics.
-        /// </summary>
         public static void CalculateResults(
             SolverResult result,
             SolverOptions options)
@@ -151,15 +104,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 result.WasteLength * (double)options.Alpha +
                 result.WeldCount * (double)options.Beta);
         }
-
-        #endregion
-
-        #region Post-Processing
-
-        /// <summary>
-        /// Performs post-processing optimization.
-        /// Redistributes orders from high-leftover stock to improve efficiency.
-        /// </summary>
         public static void OptimizePostProcess(
             SolverResult result,
             SolverOptions options)
@@ -173,10 +117,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
             // Phase 2: Local Search (2-opt style swap)
             LocalSearchOptimize(result, options, maxIterations: 100);
         }
-
-        /// <summary>
-        /// Original redistribution logic - moves cuts from high-leftover plans to low-leftover plans.
-        /// </summary>
         private static void RedistributeCuts(SolverResult result, SolverOptions options)
         {
             var sortedPlans = result.CuttingPlans
@@ -401,23 +341,10 @@ namespace CuttingStock.Core.Algorithms.Utilities
 
             return false;
         }
-
-        /// <summary>
-        /// Calculates waste for a single plan.
-        /// </summary>
         private static int CalculateWaste(CuttingPlan plan, SolverOptions options)
         {
             return plan.Leftover < options.Gamma ? plan.Leftover : 0;
         }
-
-        #endregion
-
-        #region Order Management
-
-        /// <summary>
-        /// Updates order quantities after cuts are made.
-        /// Performance optimized: O(1) lookup using index-based single pass.
-        /// </summary>
         public static void UpdateOrders(List<Order> orders, List<int> cuts)
         {
             var cutCounts = cuts.GroupBy(c => c).ToDictionary(g => g.Key, g => g.Count());
@@ -456,6 +383,5 @@ namespace CuttingStock.Core.Algorithms.Utilities
             }
         }
 
-        #endregion
     }
 }

@@ -120,7 +120,7 @@ namespace CuttingStock.Tests
             var result = order.ToString();
 
             // Assert
-            result.Should().Be("Order(5000mm x 3개)");
+            result.Should().Be("Order(5000mm x3)");
         }
 
         [Test]
@@ -368,7 +368,7 @@ namespace CuttingStock.Tests
             var result = stock.ToString();
 
             // Assert
-            result.Should().Be("RebarStock(12000mm x 10개)");
+            result.Should().Be("RebarStock(12000mm x10)");
         }
 
         [Test]

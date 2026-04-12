@@ -457,7 +457,7 @@ namespace CuttingStock.Tests.Algorithms
 
             // Assert
             report.Should().Contain("Cutting Results");
-            report.Should().Contain("Performance Metrics");
+            report.Should().Contain("Metrics");
             report.Should().Contain("Costs");
             report.Should().Contain("Stock Used");
             report.Should().Contain("Efficiency");

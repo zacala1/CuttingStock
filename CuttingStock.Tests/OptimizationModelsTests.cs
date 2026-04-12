@@ -185,15 +185,15 @@ namespace CuttingStock.Tests
 
             // Assert
             report.Should().Contain("=== Cutting Results ===");
-            report.Should().Contain("=== Performance Metrics ===");
-            report.Should().Contain("=== Costs ===");
+            report.Should().Contain("=== Metrics ===");
+            report.Should().Contain("Cost:");
             report.Should().Contain("Stock 10000mm");
             report.Should().Contain("5000mm, 3000mm");
             report.Should().Contain("Rem: 2000mm");
             report.Should().Contain("Stock Used: 1");
             report.Should().Contain("Reusable Leftovers: [2000]");
             report.Should().Contain("Efficiency: 80.0%");
-            report.Should().Contain("Execution Time: 12.34ms");
+            report.Should().Contain("Time: 12.34ms");
         }
 
         [Test]
