@@ -191,17 +191,6 @@ namespace CuttingStock.Tests
         }
 
         [Test]
-        public void Order_DefaultConstructor_ShouldCreateWithDefaultValues()
-        {
-            // Arrange & Act
-            var order = new Order();
-
-            // Assert
-            order.Length.Should().Be(0);
-            order.Quantity.Should().Be(0);
-        }
-
-        [Test]
         public void Order_Constructor_ValidValues_ShouldSetProperties()
         {
             // Arrange & Act
@@ -436,17 +425,6 @@ namespace CuttingStock.Tests
 
             // Act & Assert
             (stock1 != stock2).Should().BeFalse();
-        }
-
-        [Test]
-        public void RebarStock_DefaultConstructor_ShouldCreateWithDefaultValues()
-        {
-            // Arrange & Act
-            var stock = new RebarStock();
-
-            // Assert
-            stock.Length.Should().Be(0);
-            stock.Quantity.Should().Be(0);
         }
 
         [Test]

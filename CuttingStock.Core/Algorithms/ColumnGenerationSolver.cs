@@ -15,6 +15,9 @@ namespace CuttingStock.Core.Algorithms
     /// </summary>
     public class ColumnGenerationSolver : ICuttingSolver
     {
+        // Column is profitable if its reduced cost exceeds this threshold.
+        private const double ReducedCostThreshold = 1.00001;
+
         public string Name => "Column Generation (LP)";
         public string Description => "CG with Simplex master + knapsack DP pricing.";
         public string TimeComplexity => "Poly/iter, exp worst-case";
@@ -252,7 +255,7 @@ namespace CuttingStock.Core.Algorithms
                 var newPattern = SolveKnapsack(knapsackItems, stockLength, kerf);
 
                 // Check if new column improves the solution
-                if (newPattern.TotalValue > 1.00001)
+                if (newPattern.TotalValue > ReducedCostThreshold)
                 {
                     var col = new CuttingPatternColumn(numConstraints);
                     foreach (var item in newPattern.Items)

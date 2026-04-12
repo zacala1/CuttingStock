@@ -1,7 +1,7 @@
 namespace CuttingStock.Core.Models
 {
     /// <summary>Available rebar stock. All lengths in mm.</summary>
-    public class RebarStock : IEquatable<RebarStock>
+    public sealed class RebarStock : IEquatable<RebarStock>
     {
         public int Length { get; set; }
         public int Quantity { get; set; }
@@ -16,22 +16,12 @@ namespace CuttingStock.Core.Models
             Quantity = quantity;
         }
 
-        public bool Equals(RebarStock? other)
-        {
-            if (other is null) return false;
-            if (ReferenceEquals(this, other)) return true;
-            return Length == other.Length && Quantity == other.Quantity;
-        }
-
-        public override bool Equals(object? obj) => Equals(obj as RebarStock);
+        public bool Equals(RebarStock? other) =>
+            other is not null && Length == other.Length && Quantity == other.Quantity;
+        public override bool Equals(object? obj) => obj is RebarStock s && Equals(s);
         public override int GetHashCode() => HashCode.Combine(Length, Quantity);
         public override string ToString() => $"RebarStock({Length}mm x{Quantity})";
-
-        public static bool operator ==(RebarStock? left, RebarStock? right)
-        {
-            if (left is null) return right is null;
-            return left.Equals(right);
-        }
-        public static bool operator !=(RebarStock? left, RebarStock? right) => !(left == right);
+        public static bool operator ==(RebarStock? a, RebarStock? b) => a is null ? b is null : a.Equals(b);
+        public static bool operator !=(RebarStock? a, RebarStock? b) => !(a == b);
     }
 }

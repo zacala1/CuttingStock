@@ -14,6 +14,10 @@ namespace CuttingStock.Core.Algorithms
     /// </summary>
     public class GreedyKnapsackSolver : ICuttingSolver
     {
+        // Multi-pass limits: Pass1 = balanced (2 cuts/order max), Pass2 = residual (5), Pass3 = fill all.
+        private const int Pass1MaxPerOrder = 2;
+        private const int Pass2MaxPerOrder = 5;
+
         public string Name => "Greedy Knapsack DP";
         public string Description => "Multi-pass sparse DP with post-processing.";
         public string TimeComplexity => "O(N * L * Passes)";
@@ -91,12 +95,12 @@ namespace CuttingStock.Core.Algorithms
             var usedStockCounts = new int[sortedStock.Count];
 
             ProcessPass(sortedStock, sortedOrders, options, result, allLeftovers,
-                        totalStockCount, 2, "Pass1", progress, initialTotalOrderQuantity, usedStockCounts);
+                        totalStockCount, Pass1MaxPerOrder, "Pass1", progress, initialTotalOrderQuantity, usedStockCounts);
 
             if (sortedOrders.Any())
             {
                 ProcessPass(sortedStock, sortedOrders, options, result, allLeftovers,
-                            totalStockCount, 5, "Pass2", progress, initialTotalOrderQuantity, usedStockCounts);
+                            totalStockCount, Pass2MaxPerOrder, "Pass2", progress, initialTotalOrderQuantity, usedStockCounts);
             }
 
             if (sortedOrders.Any())

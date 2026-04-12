@@ -16,6 +16,8 @@ namespace CuttingStock.Core.Algorithms
     /// </summary>
     public class ArcFlowSolver : ICuttingSolver
     {
+        private const int MipTimeLimitMs = 30000;
+
         public string Name => "Arc Flow MIP (OR-Tools)";
         public string Description => "Exact arc flow network + SCIP MIP.";
         public string TimeComplexity => "Exact (MIP, 30s limit)";
@@ -115,7 +117,7 @@ namespace CuttingStock.Core.Algorithms
             }
 
             // Set time limit (30 seconds)
-            solver.SetTimeLimit(30000);
+            solver.SetTimeLimit(MipTimeLimitMs);
 
             // For each stock length, build an arc flow sub-graph
             // z[s] = number of bars of stock length s used
