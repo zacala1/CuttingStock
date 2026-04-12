@@ -480,14 +480,6 @@ namespace CuttingStock.Core.Algorithms
                     {
                         // Always create a new plan for welded pieces to avoid
                         // corrupting existing plans' leftover calculations
-                        var plan = new CuttingPlan
-                        {
-                            StockLength = stockLength,
-                            Cuts = new List<Cut>(),
-                            Leftover = stockLength
-                        };
-                        result.CuttingPlans.Add(plan);
-
                         var cut = new Cut
                         {
                             Length = pieceLength,
@@ -496,8 +488,14 @@ namespace CuttingStock.Core.Algorithms
                             WeldGroupId = requiresWelding ? weldGroupId : null
                         };
 
-                        plan.Cuts.Add(cut);
-                        plan.Leftover -= pieceLength;
+                        var weldCuts = new List<Cut> { cut };
+                        var plan = new CuttingPlan
+                        {
+                            StockLength = stockLength,
+                            Cuts = weldCuts,
+                            Leftover = SolverUtils.ComputeLeftover(stockLength, weldCuts, options.Kerf)
+                        };
+                        result.CuttingPlans.Add(plan);
                     }
 
                     if (requiresWelding)

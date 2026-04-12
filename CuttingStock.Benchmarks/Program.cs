@@ -15,11 +15,14 @@ namespace CuttingStock.Benchmarks
             Console.WriteLine();
 
             // BenchmarkDotNet 실행
-            var summary = BenchmarkRunner.Run<AlgorithmBenchmarks>();
+            var summary1D = BenchmarkRunner.Run<AlgorithmBenchmarks>();
+            Console.WriteLine($"1D 결과: {summary1D.ResultsDirectoryPath}");
+            Console.WriteLine();
 
+            var summary2D = BenchmarkRunner.Run<TwoDBenchmarks>();
+            Console.WriteLine($"2D 결과: {summary2D.ResultsDirectoryPath}");
             Console.WriteLine();
             Console.WriteLine("벤치마크가 완료되었습니다.");
-            Console.WriteLine($"결과는 {summary.ResultsDirectoryPath} 폴더에 저장되었습니다.");
         }
     }
 }

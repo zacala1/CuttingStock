@@ -31,9 +31,9 @@ namespace CuttingStock.Core.Models
         public Order(int length, int quantity)
         {
             if (length <= 0)
-                throw new ArgumentOutOfRangeException(nameof(length), length, "길이는 0보다 커야 합니다.");
+                throw new ArgumentOutOfRangeException(nameof(length), length, "Length must be greater than 0.");
             if (quantity <= 0)
-                throw new ArgumentOutOfRangeException(nameof(quantity), quantity, "수량은 0보다 커야 합니다.");
+                throw new ArgumentOutOfRangeException(nameof(quantity), quantity, "Quantity must be greater than 0.");
 
             Length = length;
             Quantity = quantity;

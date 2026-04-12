@@ -9,7 +9,7 @@ namespace CuttingStock.Core.Models
     {
         /// <summary>
         /// Algorithm name
-        /// Example: "Greedy Knapsack DP", "First Fit Decreasing (FFD)", "Best Fit Decreasing (BFD)"
+        /// Example: "Greedy Knapsack DP", "Column Generation (LP)", "Arc Flow MIP (OR-Tools)"
         /// </summary>
         public string AlgorithmName { get; set; } = string.Empty;
 
