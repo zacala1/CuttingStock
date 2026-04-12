@@ -4,18 +4,12 @@ using CuttingStock.Core.TwoD.Domain;
 namespace CuttingStock.Core.TwoD.Algorithms.Utilities
 {
     /// <summary>
-    /// Validates that a placement set or a guillotine tree obeys the guillotine property:
-    /// every internal cut goes edge-to-edge through its parent rectangle, recursively
-    /// partitioning it. Implements the standard recursive separator test from
-    /// Beasley (1985), JORS 36(4).
+    /// Guillotine compliance checker (Beasley 1985 recursive separator test).
     /// </summary>
     public static class GuillotineValidator
     {
         /// <summary>
-        /// Tests whether a flat list of axis-aligned rectangles (placements) admits a
-        /// guillotine cut decomposition inside the given outer rectangle.
-        /// Uses the classical recursive sweep: at each step, look for a horizontal or
-        /// vertical line that does not cross any rectangle interior; if found, split.
+        /// True if the rectangles can be recursively separated by edge-to-edge cuts.
         /// </summary>
         public static bool IsGuillotineCompliant(
             int outerX, int outerY, int outerW, int outerH,
@@ -25,9 +19,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             return TrySplit(outerX, outerY, outerW, outerH, rects);
         }
 
-        /// <summary>
-        /// Convenience overload: validates the placements of a single pattern against its sheet.
-        /// </summary>
+        /// <summary>Convenience: validates a pattern against its sheet dimensions.</summary>
         public static bool IsGuillotineCompliant(CuttingPattern2D pattern, int trim = 0)
         {
             var rects = new List<(int, int, int, int)>(pattern.Placements.Count);
@@ -41,9 +33,8 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
         }
 
         /// <summary>
-        /// Validates an explicit cut tree by structural recursion.
-        /// Each internal node's children must exactly tile the node's rectangle along
-        /// a single axis with no overlap and no gap (waste leaves are allowed).
+        /// Validates a cut tree structurally: children must exactly tile the parent
+        /// along the split axis with no overlap or gap.
         /// </summary>
         public static bool IsValidTree(GuillotineNode node)
         {
@@ -86,8 +77,6 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                 return sumW == node.Width;
             }
         }
-
-        // ----- internals -----
 
         private static bool TrySplit(
             int x0, int y0, int w, int h,

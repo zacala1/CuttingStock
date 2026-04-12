@@ -9,37 +9,16 @@ using CuttingStock.Core.TwoD.Models;
 namespace CuttingStock.Core.TwoD.Algorithms
 {
     /// <summary>
-    /// Gilmore–Gomory style column-generation solver for 2D guillotine cutting stock.
-    ///
-    /// Master LP   :   min Σ_p s_p · x_p
-    ///                  s.t. Σ_p a_pi · x_p ≥ d_i      ∀ i
-    ///                       x_p ≥ 0
-    /// Pricing     :   max Σ_i π_i · a_i  on each sheet type, with guillotine packing.
-    ///                 Solved by <see cref="GuillotineKnapsackDp"/> (Beasley 1985 normal-cut DP).
-    /// Rounding    :   round down the LP solution, then resolve the residual demand with the
-    ///                 shelf heuristic (consistent with the 1-D <c>ColumnGenerationSolver</c>).
-    ///
-    /// Master LP is solved with Google OR-Tools' GLOP (open-source revised simplex).
-    /// All shared CG plumbing — column type, LP master, pricing helpers — lives in
-    /// <see cref="PatternPool"/> and is reused by <see cref="StagedMipGuillotineSolver"/>.
-    ///
-    /// References:
-    ///   - Gilmore &amp; Gomory, "Multistage cutting stock problems of two and more dimensions",
-    ///     Operations Research 13(1), 1965.
-    ///   - Cintra, Miyazawa, Wakabayashi, Xavier, "Algorithms for two-dimensional cutting stock
-    ///     and strip packing problems using DP and column generation", EJOR 191, 2008.
-    ///   - Beasley, "Algorithms for unconstrained two-dimensional guillotine cutting",
-    ///     JORS 36(4), 1985.
+    /// Gilmore-Gomory column generation for 2D guillotine cutting stock.
+    /// Master LP (GLOP) + Beasley 1985 guillotine knapsack DP pricing.
+    /// LP solution is floored, residual covered by shelf heuristic.
+    /// Ref: Gilmore &amp; Gomory 1965; Cintra et al. 2008; Beasley 1985.
     /// </summary>
     public sealed class ColumnGeneration2DSolver : ICuttingSolver2D
     {
-        /// <inheritdoc />
-        public string Name => "Column Generation 2D (Gilmore–Gomory)";
-        /// <inheritdoc />
-        public string Description =>
-            "Master LP via OR-Tools GLOP; pricing by 2D guillotine knapsack DP (Beasley); LP-rounded with shelf residual.";
-        /// <inheritdoc />
-        public string TimeComplexity => "Exponential worst-case; polynomial per iteration";
+        public string Name => "Column Generation 2D (Gilmore-Gomory)";
+        public string Description => "CG with GLOP master + Beasley DP pricing, LP-rounded.";
+        public string TimeComplexity => "Poly/iter, exp worst-case";
 
         private const int MaxCgIterations = 200;
 
