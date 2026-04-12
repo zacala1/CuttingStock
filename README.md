@@ -6,7 +6,7 @@
 
 - **CuttingStock.Core**: 알고리즘, 도메인 모델, 유틸리티 (OR-Tools 포함)
 - **CuttingStock.UI**: WPF 기반 사용자 인터페이스
-- **CuttingStock.Tests**: 단위 테스트 및 통합 테스트 (500개, 1D 254 + 2D 246)
+- **CuttingStock.Tests**: 단위 테스트, 통합 테스트, 퍼징 불변식 검증
 - **CuttingStock.Benchmarks**: BenchmarkDotNet 성능 벤치마크
 
 ## 구현된 알고리즘
@@ -51,7 +51,7 @@ Arc Flow 네트워크 모델 + SCIP MIP 솔버.
 
 자세한 내용은 `docs/2D_PROBLEM_DEFINITION.md`, `docs/2D_ALGORITHMS.md`, `docs/2D_API_REFERENCE.md` 참조.
 
-### 2D 벤치마크 (i5-14600KF, .NET 8.0)
+### 2D 벤치마크 (i5-14600KF)
 
 | 규모 (~아이템 수) | Shelf | CG2D | MIP (CBC) |
 |---|---:|---:|---:|
