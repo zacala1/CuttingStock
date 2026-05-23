@@ -141,6 +141,28 @@ namespace CuttingStock.Tests.TwoD
             r.Patterns.Should().BeEmpty();
         }
 
+        // ----- F5-B1 회귀: 같은 dim 시트가 여러 행에 분산되어도 인벤토리 합산됨 -----
+
+        [TestCaseSource(nameof(AllSolvers))]
+        public void Solver_DuplicateSheetDims_AggregatesQuantity(ICuttingSolver2D solver)
+        {
+            // 같은 1000×1000 시트가 두 행으로 입력 (qty 1 + qty 1 = 합계 2).
+            // 1000×1000 시트에 600×600 + 400×400 까지만 들어가므로 한 시트당 최대 2개 배치.
+            // 600×600 4개를 배치하려면 시트 2개가 필요 → 합산이 되어야 성공.
+            var sheets = new List<Sheet>
+            {
+                new(1000, 1000, 1),
+                new(1000, 1000, 1),
+            };
+            var orders = new List<RectOrder> { new(600, 600, 2) };
+            var options = new SolverOptions2D { TimeLimitMs = 6000, AllowRotation = false };
+
+            var r = solver.Solve(sheets, orders, options);
+            r.Success.Should().BeTrue($"{solver.Name} should aggregate same-dim sheet inventories");
+            CountPlaced(r, 0).Should().Be(2, $"{solver.Name} must cover full demand using both bars");
+            r.SheetsUsed.Should().BeLessThanOrEqualTo(2);
+        }
+
         // ----- helpers -----
 
         private static int CountPlaced(SolverResult2D r, int orderIdx)

@@ -43,6 +43,10 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 int n = orders!.Count;
                 int[] demand = orders.Select(o => o.Quantity).ToArray();
 
+                // Sheet equality is structural — duplicate-dim rows must be merged
+                // before any downstream Dictionary<Sheet,_> usage.
+                sheets = SolverUtils2D.AggregateByDims(sheets!);
+
                 // 1) Warm start with the shelf heuristic.
                 var warm = new ShelfGuillotineSolver().Solve(sheets, orders, options);
                 if (!warm.Success || warm.Patterns.Count == 0)

@@ -73,7 +73,10 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             var list = new List<GuillotineKnapsackDp.Item>(capacity: orders.Count * 2);
             for (int i = 0; i < orders.Count; i++)
             {
-                if (pi[i] <= eps) continue;
+                // Guard against NaN/±Infinity in dual prices — a NaN compared with any
+                // threshold returns false, so without this check NaN-profit items would
+                // sneak into the DP and silently degrade pricing.
+                if (!double.IsFinite(pi[i]) || pi[i] <= eps) continue;
                 var o = orders[i];
                 list.Add(new GuillotineKnapsackDp.Item
                 {
