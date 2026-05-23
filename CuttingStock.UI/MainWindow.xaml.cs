@@ -1,6 +1,7 @@
 ﻿using CuttingStock.Core.Domain;
 using CuttingStock.Core.Algorithms;
 using CuttingStock.Core.Models;
+using CuttingStock.Core.Persistence;
 using CuttingStock.UI.Services;
 using CuttingStock.UI.ViewModels;
 using System.Collections.ObjectModel;
@@ -1001,6 +1002,89 @@ namespace CuttingStock
                     Name = "시간 (ms)"
                 }
             };
+        }
+
+        #endregion
+
+        #region 시나리오 저장/불러오기
+
+        /// <summary>
+        /// Serializes the current 1D inputs (stocks, orders, parameters) to JSON so the
+        /// user can pick the scenario back up later. Parameter parsing reuses the same
+        /// validation as Calculate_Click so we never persist an invalid configuration.
+        /// </summary>
+        private void SaveScenario_Click(object sender, RoutedEventArgs e)
+        {
+            var parameters = GetParameters();
+            if (parameters == null) return; // GetParameters already showed the MessageBox
+
+            var dlg = new SaveFileDialog
+            {
+                Filter = "1D 시나리오 (*.cstock1d.json)|*.cstock1d.json|JSON (*.json)|*.json",
+                FileName = $"1D시나리오_{DateTime.Now:yyyyMMdd_HHmmss}.cstock1d.json",
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                var scenario = new ScenarioService.Scenario1D
+                {
+                    Stocks = Stocks.Select(s => new ScenarioService.Stock1DDto { Length = s.Length, Quantity = s.Quantity }).ToList(),
+                    Orders = Orders.Select(o => new ScenarioService.Order1DDto { Length = o.Length, Quantity = o.Quantity }).ToList(),
+                    Parameters = new ScenarioService.Options1DDto
+                    {
+                        Alpha = parameters.Alpha,
+                        Beta = parameters.Beta,
+                        Gamma = parameters.Gamma,
+                        Delta = parameters.Delta,
+                        Kerf = parameters.Kerf,
+                        UsageOrder = parameters.UsageOrder,
+                        EnableWelding = parameters.EnableWelding,
+                    },
+                };
+                ScenarioService.Save1D(dlg.FileName, scenario);
+                MessageBox.Show($"시나리오를 저장했습니다.\n{dlg.FileName}", "저장 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"시나리오 저장 오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void LoadScenario_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Filter = "1D 시나리오 (*.cstock1d.json)|*.cstock1d.json|JSON (*.json)|*.json|모든 파일 (*.*)|*.*",
+                Title = "시나리오 불러오기",
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                var scenario = ScenarioService.Load1D(dlg.FileName);
+
+                Stocks.Clear();
+                foreach (var s in scenario.Stocks)
+                    Stocks.Add(new StockRow { Length = s.Length, Quantity = s.Quantity });
+
+                Orders.Clear();
+                foreach (var o in scenario.Orders)
+                    Orders.Add(new OrderRow { Length = o.Length, Quantity = o.Quantity });
+
+                var p = scenario.Parameters;
+                alphaTextBox.Text = p.Alpha.ToString(CultureInfo.InvariantCulture);
+                betaTextBox.Text = p.Beta.ToString(CultureInfo.InvariantCulture);
+                gammaTextBox.Text = p.Gamma.ToString(CultureInfo.InvariantCulture);
+                deltaTextBox.Text = p.Delta.ToString(CultureInfo.InvariantCulture);
+                kerfTextBox.Text = p.Kerf.ToString(CultureInfo.InvariantCulture);
+                usageOrderComboBox.SelectedIndex = p.UsageOrder == StockUsageOrder.SmallToLarge ? 0 : 1;
+                enableWeldingCheckBox.IsChecked = p.EnableWelding;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"시나리오 불러오기 오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         #endregion

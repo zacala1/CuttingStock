@@ -11,11 +11,16 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using CuttingStock.Core.Domain;
+using CuttingStock.Core.Persistence;
 using CuttingStock.Core.TwoD.Algorithms;
 using CuttingStock.Core.TwoD.Domain;
 using CuttingStock.Core.TwoD.Models;
 using CuttingStock.UI.Services;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
 using Microsoft.Win32;
+using SkiaSharp;
 
 namespace CuttingStock.UI.TwoD
 {
@@ -98,6 +103,88 @@ namespace CuttingStock.UI.TwoD
             _orders.Add(new RectOrderRow { Width = 800,  Height = 300, Quantity = 4 });
             _orders.Add(new RectOrderRow { Width = 300,  Height = 300, Quantity = 8 });
             _orders.Add(new RectOrderRow { Width = 1200, Height = 500, Quantity = 2 });
+        }
+
+        // ─── Scenario save/load ─────────────────────────────────────
+
+        private void SaveScenario_Click(object sender, RoutedEventArgs e)
+        {
+            var options = TryBuildOptions();
+            if (options == null) return; // TryBuildOptions already messaged
+
+            var dlg = new SaveFileDialog
+            {
+                Filter = "2D 시나리오 (*.cstock2d.json)|*.cstock2d.json|JSON (*.json)|*.json",
+                FileName = $"2D시나리오_{DateTime.Now:yyyyMMdd_HHmmss}.cstock2d.json",
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                var scenario = new ScenarioService.Scenario2D
+                {
+                    Sheets = _sheets.Select(s => new ScenarioService.Sheet2DDto
+                    {
+                        Width = s.Width, Height = s.Height, Quantity = s.Quantity,
+                    }).ToList(),
+                    Orders = _orders.Select(o => new ScenarioService.Order2DDto
+                    {
+                        Width = o.Width, Height = o.Height, Quantity = o.Quantity, AllowRotation = o.AllowRotation,
+                    }).ToList(),
+                    Options = new ScenarioService.Options2DDto
+                    {
+                        Kerf = options.Kerf,
+                        Trim = options.Trim,
+                        AlphaArea = options.AlphaArea,
+                        AllowRotation = options.AllowRotation,
+                        Stage = options.Stage,
+                        TimeLimitMs = options.TimeLimitMs,
+                        UsageOrder = options.UsageOrder,
+                    },
+                };
+                ScenarioService.Save2D(dlg.FileName, scenario);
+                MessageBox.Show($"시나리오를 저장했습니다.\n{dlg.FileName}", "저장 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"시나리오 저장 오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void LoadScenario_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Filter = "2D 시나리오 (*.cstock2d.json)|*.cstock2d.json|JSON (*.json)|*.json|모든 파일 (*.*)|*.*",
+                Title = "시나리오 불러오기",
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                var scenario = ScenarioService.Load2D(dlg.FileName);
+
+                _sheets.Clear();
+                foreach (var s in scenario.Sheets)
+                    _sheets.Add(new SheetRow { Width = s.Width, Height = s.Height, Quantity = s.Quantity });
+
+                _orders.Clear();
+                foreach (var o in scenario.Orders)
+                    _orders.Add(new RectOrderRow { Width = o.Width, Height = o.Height, Quantity = o.Quantity, AllowRotation = o.AllowRotation });
+
+                var o2 = scenario.Options;
+                kerf2D.Text = o2.Kerf.ToString(CultureInfo.InvariantCulture);
+                trim2D.Text = o2.Trim.ToString(CultureInfo.InvariantCulture);
+                alphaArea2D.Text = o2.AlphaArea.ToString(CultureInfo.InvariantCulture);
+                timeLimit2D.Text = o2.TimeLimitMs.ToString(CultureInfo.InvariantCulture);
+                rotation2D.IsChecked = o2.AllowRotation;
+                stage2D.SelectedIndex = o2.Stage == 3 ? 1 : 0;
+                usageOrder2D.SelectedIndex = o2.UsageOrder == StockUsageOrder.SmallToLarge ? 0 : 1;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"시나리오 불러오기 오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void ClearAll_Click(object sender, RoutedEventArgs e)
@@ -294,7 +381,17 @@ namespace CuttingStock.UI.TwoD
             {
                 SetRunningState(true);
                 report2DBox.Text = "계산 중...";
-                var result = await Task.Run(() => solver.Solve(sheets, orders, options));
+                // 2D solvers report progress on 0-1 scale; map to 0-100 for the bar.
+                // Some solvers may report 0-100 already, so accept both conventions.
+                var progress = new Progress<double>(pct =>
+                {
+                    loadingBar2D.IsIndeterminate = false;
+                    double v = pct <= 1.0 ? pct * 100.0 : pct;
+                    v = Math.Clamp(v, 0, 100);
+                    loadingBar2D.Value = v;
+                    loadingText2D.Text = $"계산 중... {v:F0}%";
+                });
+                var result = await Task.Run(() => solver.Solve(sheets, orders, options, progress));
 
                 if (!result.Success)
                 {
@@ -347,9 +444,19 @@ namespace CuttingStock.UI.TwoD
                 for (int i = 0; i < 3; i++)
                 {
                     var s = BuildSolver(i);
+                    int solverIdx = i;
                     loadingText2D.Text = $"비교 중... ({i + 1}/3 — {s.Name})";
+                    loadingBar2D.IsIndeterminate = false;
 
-                    var r = await Task.Run(() => s.Solve(sheets, orders, options));
+                    // Map per-solver 0-1 progress into the overall 0-100 bar, slotted
+                    // between solverIdx/3 and (solverIdx+1)/3.
+                    var sliceProgress = new Progress<double>(pct =>
+                    {
+                        double frac = pct <= 1.0 ? pct : pct / 100.0;
+                        double overall = (solverIdx + Math.Clamp(frac, 0, 1)) / 3.0 * 100.0;
+                        loadingBar2D.Value = Math.Clamp(overall, 0, 100);
+                    });
+                    var r = await Task.Run(() => s.Solve(sheets, orders, options, sliceProgress));
                     rows.Add(new ComparisonResult2D
                     {
                         AlgorithmName = s.Name,
@@ -387,6 +494,7 @@ namespace CuttingStock.UI.TwoD
                 compare2DContent.Visibility = Visibility.Visible;
                 btnExportComp2DCsv.IsEnabled = true;
                 btnExportComp2DExcel.IsEnabled = true;
+                UpdateCompareCharts(rows);
 
                 // Render best solver's patterns so the user has a visualization to inspect.
                 if (bestResult != null && bestSolver != null)
@@ -507,6 +615,74 @@ namespace CuttingStock.UI.TwoD
             {
                 MessageBox.Show($"내보내기 오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        // ─── Comparison charts ─────────────────────────────────────
+
+        private void UpdateCompareCharts(List<ComparisonResult2D> rows)
+        {
+            var ok = rows.Where(r => r.Success).ToList();
+            if (ok.Count == 0)
+            {
+                sheetsChart2D.Series = Array.Empty<ISeries>();
+                effChart2D.Series = Array.Empty<ISeries>();
+                timeChart2D.Series = Array.Empty<ISeries>();
+                return;
+            }
+
+            string[] labels = ok.Select(r => AbbreviateName(r.AlgorithmName)).ToArray();
+            sheetsChart2D.Series = new ISeries[]
+            {
+                new ColumnSeries<double>
+                {
+                    Values = ok.Select(r => (double)r.SheetsUsed).ToArray(),
+                    Fill = new SolidColorPaint(SKColors.CornflowerBlue),
+                    DataLabelsPaint = new SolidColorPaint(SKColors.Black),
+                    DataLabelsSize = 12,
+                    DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                }
+            };
+            sheetsChart2D.XAxes = new[] { new Axis { Labels = labels, LabelsRotation = -15 } };
+            sheetsChart2D.YAxes = new[] { new Axis { Name = "시트 사용 (개)" } };
+
+            effChart2D.Series = new ISeries[]
+            {
+                new ColumnSeries<double>
+                {
+                    Values = ok.Select(r => r.MaterialEfficiency).ToArray(),
+                    Fill = new SolidColorPaint(SKColors.MediumSeaGreen),
+                    DataLabelsPaint = new SolidColorPaint(SKColors.Black),
+                    DataLabelsSize = 12,
+                    DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                    DataLabelsFormatter = pt => $"{pt.Coordinate.PrimaryValue:F1}%",
+                }
+            };
+            effChart2D.XAxes = new[] { new Axis { Labels = labels, LabelsRotation = -15 } };
+            effChart2D.YAxes = new[] { new Axis { Name = "효율 (%)", MinLimit = 0, MaxLimit = 100 } };
+
+            timeChart2D.Series = new ISeries[]
+            {
+                new ColumnSeries<double>
+                {
+                    Values = ok.Select(r => r.ExecutionTimeMs).ToArray(),
+                    Fill = new SolidColorPaint(SKColors.Coral),
+                    DataLabelsPaint = new SolidColorPaint(SKColors.Black),
+                    DataLabelsSize = 12,
+                    DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                    DataLabelsFormatter = pt => $"{pt.Coordinate.PrimaryValue:F1}ms",
+                }
+            };
+            timeChart2D.XAxes = new[] { new Axis { Labels = labels, LabelsRotation = -15 } };
+            timeChart2D.YAxes = new[] { new Axis { Name = "시간 (ms)" } };
+        }
+
+        /// <summary>Trim long solver names so they fit chart X-axis ticks.</summary>
+        private static string AbbreviateName(string name)
+        {
+            int paren = name.IndexOf('(');
+            if (paren > 0 && paren < name.Length - 1)
+                return name.Substring(0, paren).TrimEnd() + Environment.NewLine + name.Substring(paren);
+            return name;
         }
 
         // ─── Render ────────────────────────────────────────────────

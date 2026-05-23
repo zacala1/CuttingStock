@@ -1,0 +1,145 @@
+# CLAUDE.md — Cutting Stock Optimization
+
+Project-specific notes for Claude Code agents working in this repository.
+Authoritative: this file overrides general advice when there's a conflict.
+
+## What this project is
+
+A .NET 10 WPF desktop app that solves 1D (rebar/bar) and 2D (sheet/plate)
+Cutting Stock problems. Each dimension has three solvers — a fast
+heuristic, a Column Generation LP, and an exact MIP via OR-Tools.
+
+Layout:
+- `CuttingStock.Core/` — pure algorithms + domain models. No WPF.
+- `CuttingStock.UI/` — WPF (net10.0-windows). MainWindow has 1D tab,
+  TwoDTab.xaml has 2D tab. Services/ holds Export, Scenario, etc.
+- `CuttingStock.Tests/` — NUnit + FluentAssertions. Lives in `net10.0`,
+  so it cannot reference UI types (.NET-Windows). Put any logic that
+  needs testing in Core.
+- `CuttingStock.Benchmarks/` — BenchmarkDotNet.
+
+## Build / test commands
+
+```bash
+# Build everything
+dotnet build CuttingStock.slnx -c Release
+
+# Full test suite (skips [Explicit] LargeScale benchmark)
+dotnet test CuttingStock.slnx -c Release --nologo --no-build
+
+# Run the LargeScale 1000-orders benchmark explicitly
+dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
+
+# Run a focused category
+dotnet test CuttingStock.slnx --filter "Category=Welding"
+
+# Launch the WPF app
+dotnet run --project CuttingStock.UI
+```
+
+Tests currently pass 525+ in ~1m 10s. Don't merge anything that drops
+the count.
+
+## Domain conventions
+
+**Models are immutable.** `Order`, `RebarStock`, `Sheet`, `RectOrder`
+have no parameterless constructor and no setters — construct with the
+validating constructor. `Cut` and `CuttingPlan.StockLength` / `.Cuts`
+are `init`-only. Only `CuttingPlan.Leftover` is mutable because
+post-processing recomputes it. Don't add public setters back.
+
+**Kerf is between adjacent cuts.** Total consumed length on a bar is
+`sum(cut lengths) + (cuts.Count - 1) * kerf`. The first cut does not
+consume kerf at the edge. Use `SolverUtils.ComputeLeftover` everywhere
+instead of inlining the formula.
+
+**Welded plans are structural.** A plan is "welded" iff any of its
+cuts carries a `WeldGroupId`. LocalSearchOptimize, RedistributeCuts
+and FindHostPlanForWeld all check this invariant — keep it intact when
+adding new post-processing.
+
+**Sheets aggregate by (Width, Height).** All 2D solvers call
+`SolverUtils2D.AggregateByDims` at entry. `Sheet.Equals` is structural,
+so unaggregated duplicate-dim rows collide as the same key in
+`Dictionary<Sheet, _>` and silently hide half the inventory. Never
+remove the aggregation call.
+
+**TimeLimitMs is an absolute wall-clock deadline** from solver start,
+not "time remaining after warm-start". 2D solvers compare against
+`sw.ElapsedMilliseconds` directly; the warm-start / bootstrap time
+counts toward the budget.
+
+**Stage option is advisory.** `SolverOptions2D.Stage` accepts 2 or 3
+but no solver currently enforces 3-stage cuts. The UI shows it as
+"2-stage" / "3-stage" but the patterns produced are unrestricted
+guillotine. Reserved for future enforcement.
+
+## Things that look broken but aren't
+
+- `GenerateSolutionHybrid` in `ColumnGenerationSolver` is **not** the
+  main entry point. The post-LP rounding goes through
+  `GenerateSolutionFloorResidual`, which falls back to
+  `ApplyGreedyResidual` (renamed from `GenerateSolutionHybrid` in a
+  prior pass — the rename intentionally signals "fallback").
+- `EstimateFutureWasteMFFDFromDict` runs MFFD+BFD, not pure FFD — the
+  function is named after the entry point, not the helper inside.
+- 1D `loadingOverlay` only covers the algorithm-settings GroupBox,
+  not the result tabs. This is intentional so the user can read the
+  previous result while the next one runs.
+
+## Skill compatibility notes (Anthropic / community)
+
+This repo has been audited against the `anthropics/skills` repo and
+`Aaronontheweb/dotnet-skills`. We've applied the recommendations that
+fit the project's scale:
+
+- `modern-csharp-coding-standards` (sealed, records, init-only, value
+  semantics) — applied to domain models.
+- `type-design-performance` (sealed classes, structural equality) —
+  applied; see Sheet/RectOrder/Order/RebarStock.
+- `dotnet-slopwatch` (anti-pattern detection) — manual audit pass done
+  in `git log`. Concrete instances: removed dead exception path,
+  consolidated input validation in `SolverUtils2D.ValidateInputs`,
+  killed duplicate sheet-inventory constraints in StagedMip.
+
+**Skills NOT adopted on purpose:** full MVVM Toolkit conversion. The
+WPF code-behind has god-class properties (MainWindow ~1100 lines)
+which a Skill would recommend rewriting as MVVM with
+`[ObservableProperty]` / `[RelayCommand]`. We deferred this because:
+1. The existing code works and is tested via the UI path.
+2. A speculative MVVM rewrite risks breaking the data-binding, export,
+   and chart flows that are not unit-testable.
+3. The user explicitly cautioned against over-modification.
+
+If/when this rewrite happens, do it in a separate branch with a
+working baseline you can compare against.
+
+## When you find a bug
+
+1. Add a regression test that fails on the unfixed code (NUnit).
+2. Fix it minimally — don't refactor unrelated code in the same pass.
+3. Run `dotnet test` and confirm the new test passes plus no
+   pre-existing test regressed.
+4. Commit with a message that names the bug and quotes the
+   file:line where it was introduced.
+
+## When you add a feature
+
+1. Add it to `Core` if it has no WPF dependency, so it's testable.
+2. Wire UI in MainWindow.xaml or TwoDTab.xaml as appropriate.
+3. Mirror 1D ↔ 2D feature parity if it's user-facing (we worked hard
+   to align the two tabs; don't let one drift again).
+4. Add ToolTips on any new control that isn't self-explanatory.
+
+## Don't do these
+
+- Don't reintroduce `Math.Round((int)(...))` for cost calculations.
+  `TotalCost` is `long` for overflow safety.
+- Don't aggregate sheets only inside the IP — every solver entry must
+  aggregate.
+- Don't pass `IProgress<double>` from a worker thread without
+  wrapping in `Progress<double>` first — `Progress<T>` marshals back
+  to the UI thread.
+- Don't store algorithm state on the UserControl (e.g. a static
+  cache). Pass it through the solver or compute fresh.
+- Don't add `async void` methods outside event handlers.

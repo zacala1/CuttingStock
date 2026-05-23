@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1300">
     <Grid>
@@ -60,8 +61,12 @@
             </GroupBox>
 
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
-                <Button Content="예제 로드" Click="LoadExample_Click" Width="100" Margin="0,0,10,0"/>
-                <Button Content="전체 초기화" Click="ClearAll_Click" Width="100"/>
+                <Button Content="예제 로드" Click="LoadExample_Click" Width="80" Margin="0,0,5,0"/>
+                <Button Content="시나리오 저장" Click="SaveScenario_Click" Width="100" Margin="0,0,5,0"
+                        ToolTip="현재 시트/주문/옵션을 .json 파일로 저장"/>
+                <Button Content="시나리오 열기" Click="LoadScenario_Click" Width="100" Margin="0,0,5,0"
+                        ToolTip="저장된 .json 시나리오를 불러오기"/>
+                <Button Content="전체 초기화" Click="ClearAll_Click" Width="80"/>
             </StackPanel>
         </Grid>
 
@@ -209,12 +214,13 @@
                         <Grid x:Name="compare2DContent" Visibility="Collapsed">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="260"/>
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <DataGrid x:Name="compare2DGrid" Grid.Row="0"
                                       AutoGenerateColumns="False" IsReadOnly="True"
-                                      Height="180" Margin="10">
+                                      Height="160" Margin="10">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="알고리즘" Binding="{Binding AlgorithmName}" Width="240"/>
                                     <DataGridTextColumn Header="시트 사용" Binding="{Binding SheetsUsed}" Width="100"/>
@@ -224,10 +230,33 @@
                                     <DataGridTextColumn Header="순위" Binding="{Binding Rank}" Width="60"/>
                                 </DataGrid.Columns>
                             </DataGrid>
-                            <TextBox x:Name="compare2DBox" Grid.Row="1" IsReadOnly="True"
+
+                            <GroupBox Header="비교 차트" Grid.Row="1" Margin="10,0,10,10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="시트 사용" HorizontalAlignment="Center" FontWeight="Bold" Margin="5"/>
+                                        <lvc:CartesianChart x:Name="sheetsChart2D" Height="180"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="재료 효율 (%)" HorizontalAlignment="Center" FontWeight="Bold" Margin="5"/>
+                                        <lvc:CartesianChart x:Name="effChart2D" Height="180"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="실행 시간 (ms)" HorizontalAlignment="Center" FontWeight="Bold" Margin="5"/>
+                                        <lvc:CartesianChart x:Name="timeChart2D" Height="180"/>
+                                    </StackPanel>
+                                </Grid>
+                            </GroupBox>
+
+                            <TextBox x:Name="compare2DBox" Grid.Row="2" IsReadOnly="True"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                                      FontFamily="Consolas" Padding="10" Margin="10,0,10,10"/>
-                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10,0,10,10">
+                            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10,0,10,10">
                                 <Button x:Name="btnExportComp2DCsv"   Content="비교 결과 CSV로 저장"   Click="ExportComp2DToCsv_Click"   Width="150" Margin="0,0,5,0" IsEnabled="False"/>
                                 <Button x:Name="btnExportComp2DExcel" Content="비교 결과 Excel로 저장" Click="ExportComp2DToExcel_Click" Width="150" IsEnabled="False"/>
                             </StackPanel>

@@ -67,10 +67,14 @@
                 </StackPanel>
             </GroupBox>
 
-            <!-- 공통 버튼: 예제 로드 / 초기화 -->
+            <!-- 공통 버튼: 예제 로드 / 시나리오 저장-불러오기 / 초기화 -->
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
-                <Button Content="예제 로드" Click="LoadExample_Click" Width="100" Margin="0,0,10,0"/>
-                <Button Content="전체 초기화" Click="ClearAll_Click" Width="100"/>
+                <Button Content="예제 로드" Click="LoadExample_Click" Width="80" Margin="0,0,5,0"/>
+                <Button Content="시나리오 저장" Click="SaveScenario_Click" Width="100" Margin="0,0,5,0"
+                        ToolTip="현재 재고/주문/파라미터를 .json 파일로 저장"/>
+                <Button Content="시나리오 열기" Click="LoadScenario_Click" Width="100" Margin="0,0,5,0"
+                        ToolTip="저장된 .json 시나리오를 불러오기"/>
+                <Button Content="전체 초기화" Click="ClearAll_Click" Width="80"/>
             </StackPanel>
         </Grid>
 
