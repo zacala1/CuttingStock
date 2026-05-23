@@ -8,7 +8,8 @@
         xmlns:twod="clr-namespace:CuttingStock.UI.TwoD"
         mc:Ignorable="d"
         Title="Cutting Stock 최적화 (1D + 2D)" Height="820" Width="1400"
-        MinHeight="600" MinWidth="900">
+        MinHeight="600" MinWidth="900"
+        PreviewKeyDown="MainWindow_PreviewKeyDown">
     <TabControl>
     <TabItem Header="1D 절단 (Rebar)">
     <Grid>
@@ -30,10 +31,11 @@
             <GroupBox Header="재고" Grid.Row="0" Margin="0,0,0,5">
                 <StackPanel>
                     <DataGrid x:Name="stockGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
-                              KeyDown="DataGrid_KeyDown" CellEditEnding="DataGrid_CellEditEnding" CanUserDeleteRows="True">
+                              KeyDown="DataGrid_KeyDown" CellEditEnding="DataGrid_CellEditEnding"
+                              CanUserAddRows="True" CanUserDeleteRows="True">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="길이 (mm)" Binding="{Binding Length}" Width="*"/>
-                            <DataGridTextColumn Header="수량" Binding="{Binding Quantity}" Width="*"/>
+                            <DataGridTextColumn Header="수량 (개)" Binding="{Binding Quantity}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -49,10 +51,11 @@
             <GroupBox Header="주문" Grid.Row="1" Margin="0,5,0,0">
                 <StackPanel>
                     <DataGrid x:Name="orderGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
-                              KeyDown="DataGrid_KeyDown" CellEditEnding="DataGrid_CellEditEnding" CanUserDeleteRows="True">
+                              KeyDown="DataGrid_KeyDown" CellEditEnding="DataGrid_CellEditEnding"
+                              CanUserAddRows="True" CanUserDeleteRows="True">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="길이 (mm)" Binding="{Binding Length}" Width="*"/>
-                            <DataGridTextColumn Header="수량" Binding="{Binding Quantity}" Width="*"/>
+                            <DataGridTextColumn Header="수량 (개)" Binding="{Binding Quantity}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -123,23 +126,32 @@
                             </Grid.RowDefinitions>
 
                             <!-- Alpha -->
-                            <TextBlock Text="Alpha (자투리 비용):" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"/>
-                            <TextBox x:Name="alphaTextBox" Grid.Row="0" Grid.Column="1" Text="1.0" Margin="5" PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
+                            <TextBlock Text="Alpha (자투리 비용):" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"
+                                       ToolTip="자투리 1mm 당 비용 (원/mm). 총 비용 = Alpha × 낭비 길이 + Beta × 용접 횟수"/>
+                            <TextBox x:Name="alphaTextBox" Grid.Row="0" Grid.Column="1" Text="1.0" Margin="5" PreviewTextInput="DecimalTextBox_PreviewTextInput"
+                                     ToolTip="자투리 단가 (원/mm). 0 이상의 실수"/>
 
                             <!-- Beta -->
-                            <TextBlock Text="Beta (용접 비용):" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"/>
-                            <TextBox x:Name="betaTextBox" Grid.Row="0" Grid.Column="3" Text="500" Margin="5" PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
+                            <TextBlock Text="Beta (용접 비용):" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"
+                                       ToolTip="용접 1회당 비용 (원). 긴 주문을 분할/용접할 때 비용 계산에 사용"/>
+                            <TextBox x:Name="betaTextBox" Grid.Row="0" Grid.Column="3" Text="500" Margin="5" PreviewTextInput="DecimalTextBox_PreviewTextInput"
+                                     ToolTip="용접 단가 (원/회). 0 이상의 실수"/>
 
                             <!-- Gamma -->
-                            <TextBlock Text="Gamma (재사용 최소):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"/>
-                            <TextBox x:Name="gammaTextBox" Grid.Row="1" Grid.Column="1" Text="100" Margin="5" PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
+                            <TextBlock Text="Gamma (재사용 최소):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"
+                                       ToolTip="재사용 가능한 최소 자투리 길이 (mm). 이 값보다 작은 잔여는 낭비로 분류"/>
+                            <TextBox x:Name="gammaTextBox" Grid.Row="1" Grid.Column="1" Text="100" Margin="5" PreviewTextInput="IntegerTextBox_PreviewTextInput"
+                                     ToolTip="재사용 최소 길이 (mm). 0 이상의 정수"/>
 
                             <!-- Delta -->
-                            <TextBlock Text="Delta (용접 최소):" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"/>
-                            <TextBox x:Name="deltaTextBox" Grid.Row="1" Grid.Column="3" Text="100" Margin="5" PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
+                            <TextBlock Text="Delta (용접 최소):" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"
+                                       ToolTip="용접 가능한 조각 최소 길이 (mm). 너무 짧은 조각은 용접 불가"/>
+                            <TextBox x:Name="deltaTextBox" Grid.Row="1" Grid.Column="3" Text="100" Margin="5" PreviewTextInput="IntegerTextBox_PreviewTextInput"
+                                     ToolTip="용접 가능 최소 길이 (mm). 1 이상의 정수"/>
 
                             <!-- Kerf -->
-                            <TextBlock Text="Kerf (톱날 두께):" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"/>
+                            <TextBlock Text="Kerf (톱날 두께):" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"
+                                       ToolTip="절단 시 사라지는 톱날 폭 (mm). 인접 절단마다 소비. 0 = 무시"/>
                             <TextBox x:Name="kerfTextBox" Grid.Row="2" Grid.Column="1" Text="0" Margin="5" PreviewTextInput="IntegerTextBox_PreviewTextInput" ToolTip="톱날 두께 (mm). 0 = 무시"/>
 
                             <!-- UsageOrder -->
@@ -249,7 +261,8 @@
                                                     </Grid.RowDefinitions>
 
                                                     <!-- 정보 텍스트 -->
-                                                    <TextBlock Grid.Row="0" Text="{Binding InfoText}" Margin="0,0,0,4" FontWeight="SemiBold"/>
+                                                    <TextBlock Grid.Row="0" Text="{Binding InfoText}" Margin="0,0,0,4" FontWeight="SemiBold"
+                                                               TextWrapping="Wrap"/>
 
                                                     <!-- 바 시각화: StackPanel 기반 -->
                                                     <Border Grid.Row="1" BorderBrush="#999" BorderThickness="1" Height="38" Background="#F5F5F5">

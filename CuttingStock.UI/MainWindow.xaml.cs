@@ -40,6 +40,34 @@ namespace CuttingStock
         private SolverOptions? _lastParameters;
         private ICuttingSolver? _lastOptimizer;
 
+        /// <summary>
+        /// Window-wide shortcuts: Ctrl+R runs the selected algorithm, Ctrl+Shift+C runs
+        /// the comparison, F1 loads the example dataset. Routed through the existing
+        /// button handlers so the busy-state plumbing is shared.
+        /// </summary>
+        private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            var mods = System.Windows.Input.Keyboard.Modifiers;
+            bool ctrl  = (mods & System.Windows.Input.ModifierKeys.Control) != 0;
+            bool shift = (mods & System.Windows.Input.ModifierKeys.Shift) != 0;
+
+            if (e.Key == System.Windows.Input.Key.R && ctrl && !shift && btnCalculate.IsEnabled)
+            {
+                Calculate_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            else if (e.Key == System.Windows.Input.Key.C && ctrl && shift && btnCompare.IsEnabled)
+            {
+                CompareAlgorithms_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            else if (e.Key == System.Windows.Input.Key.F1)
+            {
+                LoadExample_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+        }
+
         public MainWindow()
         {
             InitializeComponent();
@@ -112,6 +140,14 @@ namespace CuttingStock
             if (selected.Count == 0)
             {
                 MessageBox.Show("삭제할 항목을 선택해주세요.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            // Multi-row delete is destructive enough to warrant a confirmation,
+            // mirroring how ClearAll prompts the user before wiping the grid.
+            if (selected.Count > 1 &&
+                MessageBox.Show($"{selected.Count}개 항목을 삭제하시겠습니까?", "삭제 확인",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            {
                 return;
             }
             foreach (var item in selected)
@@ -263,8 +299,8 @@ namespace CuttingStock
                                     int.TryParse(row.Cell(2).GetValue<string>(), out int qty) &&
                                     len > 0 && qty > 0)
                                 {
-                                    if (collection is ObservableCollection<RebarStock> s) s.Add(new RebarStock(len, qty));
-                                    else if (collection is ObservableCollection<Order> o) o.Add(new Order(len, qty));
+                                    if (collection is ObservableCollection<StockRow> s) s.Add(new StockRow { Length = len, Quantity = qty });
+                                    else if (collection is ObservableCollection<OrderRow> o) o.Add(new OrderRow { Length = len, Quantity = qty });
                                     addedCount++;
                                 }
                             }
@@ -455,18 +491,19 @@ namespace CuttingStock
             var parameters = GetParameters();
             if (parameters == null) return;
 
+            SolverResult? result = null;
+            ICuttingSolver? optimizer = null;
             try
             {
                 SetRunningState(true);
 
                 var stock = BuildStock();
                 var orders = BuildOrders();
-                var optimizer = GetSelectedOptimizer();
+                optimizer = GetSelectedOptimizer();
 
                 _lastParameters = parameters;
                 _lastOptimizer = optimizer;
 
-                // 진행률 핸들러
                 var progress = new Progress<double>(percent =>
                 {
                     loadingProgressBar.IsIndeterminate = false;
@@ -474,16 +511,11 @@ namespace CuttingStock
                     loadingText.Text = $"최적화 진행 중... {percent:F0}%";
                 });
 
-                // 초기 상태 설정
                 loadingProgressBar.IsIndeterminate = true;
                 loadingProgressBar.Value = 0;
                 loadingText.Text = "최적화 준비 중...";
 
-                // 비동기 실행
-                var result = await Task.Run(() =>
-                {
-                    return optimizer.Solve(stock, orders, parameters, progress);
-                });
+                result = await Task.Run(() => optimizer.Solve(stock, orders, parameters, progress));
 
                 _lastSingleResult = result;
                 mainTabControl.SelectedIndex = 0;
@@ -501,30 +533,33 @@ namespace CuttingStock
                     visualizationScrollViewer.Visibility = Visibility.Visible;
                 }
 
-                // 내보내기는 부분 결과라도 가능하게
                 btnExportCsv.IsEnabled = true;
                 btnExportExcel.IsEnabled = true;
-
-                SetRunningState(false);
-
-                if (!result.Success)
-                {
-                    MessageBox.Show($"최적화 실패: {result.ErrorMessage}\n\n부분 결과는 결과 탭에서 확인 가능합니다.",
-                                   "최적화 실패", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
-                else
-                {
-                    MessageBox.Show($"최적화가 완료되었습니다!\n\n" +
-                                   $"총 비용: {result.TotalCost:N0}원\n" +
-                                   $"재료 효율: {result.MaterialEfficiency:F2}%\n" +
-                                   $"실행 시간: {result.ExecutionTimeMs:F3}ms",
-                                   "최적화 완료", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
             }
             catch (Exception ex)
             {
-                SetRunningState(false);
                 MessageBox.Show($"오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                SetRunningState(false);
+            }
+
+            // Post-completion dialog runs after the running-state is cleared so the
+            // user can interact with the UI immediately after dismissing the prompt.
+            if (result == null) return;
+            if (!result.Success)
+            {
+                MessageBox.Show($"최적화 실패: {result.ErrorMessage}\n\n부분 결과는 결과 탭에서 확인 가능합니다.",
+                               "최적화 실패", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else
+            {
+                MessageBox.Show($"최적화가 완료되었습니다!\n\n" +
+                               $"총 비용: {result.TotalCost:N0}원\n" +
+                               $"재료 효율: {result.MaterialEfficiency:F2}%\n" +
+                               $"실행 시간: {result.ExecutionTimeMs:F3}ms",
+                               "최적화 완료", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -559,8 +594,10 @@ namespace CuttingStock
             var random = new Random(12345);
             var colorCache = new Dictionary<int, System.Windows.Media.Brush>();
 
-            // 바 전체 폭 (px)
-            const double barTotalWidth = 750.0;
+            // Bar width scales to the visible viewport so the visualization stays
+            // legible as the user resizes the window. Clamp at a sane minimum
+            // because the ItemsControl can briefly report ActualWidth=0 during layout.
+            double barTotalWidth = Math.Max(400.0, visualizationScrollViewer.ActualWidth - 60.0);
 
             // 패턴 그룹핑: 동일 절단 패턴끼리 묶기
             var grouped = result.CuttingPlans
@@ -686,6 +723,18 @@ namespace CuttingStock
                 (byte)((b + m) * 255));
         }
 
+        /// <summary>
+        /// Trims solver names into 2-line chart-friendly labels. Splits on parenthesis
+        /// so qualifiers like "(LP)" or "(OR-Tools)" go to a second line.
+        /// </summary>
+        private static string AbbreviateAlgorithmName(string name)
+        {
+            int paren = name.IndexOf('(');
+            if (paren > 0 && paren < name.Length - 1)
+                return name.Substring(0, paren).TrimEnd() + Environment.NewLine + name.Substring(paren);
+            return name;
+        }
+
         private bool IsBright(System.Windows.Media.Brush brush)
         {
             if (brush is System.Windows.Media.SolidColorBrush scb)
@@ -734,15 +783,16 @@ namespace CuttingStock
             var parameters = GetParameters();
             if (parameters == null) return;
 
+            ComparisonResult? bestAlgorithm = null;
             try
             {
                 SetRunningState(true);
-                loadingProgressBar.IsIndeterminate = true;
-                loadingText.Text = "알고리즘 비교 중...";
+                loadingProgressBar.IsIndeterminate = false;
+                loadingProgressBar.Value = 0;
+                loadingText.Text = "알고리즘 비교 준비 중...";
 
                 var stock = BuildStock();
                 var orders = BuildOrders();
-
                 _lastParameters = parameters;
 
                 var optimizers = new List<ICuttingSolver>
@@ -752,98 +802,86 @@ namespace CuttingStock
                     new ArcFlowSolver()
                 };
 
-                // Run comparison on background thread
-                var (comparisonResults, detailedReport) = await Task.Run(() =>
+                var reports = new System.Text.StringBuilder();
+                reports.AppendLine("═══════════════════════════════════════════════════");
+                reports.AppendLine("  알고리즘 상세 비교");
+                reports.AppendLine("═══════════════════════════════════════════════════");
+                reports.AppendLine();
+
+                var collected = new List<ComparisonResult>();
+
+                // Run one solver at a time on the background thread so we can update the
+                // progress bar between each completion — gives the user a sense of pace
+                // across the 3 algorithms instead of an opaque indeterminate spinner.
+                for (int i = 0; i < optimizers.Count; i++)
                 {
-                    var results = new List<ComparisonResult>();
-                    var reports = new System.Text.StringBuilder();
-                    reports.AppendLine("═══════════════════════════════════════════════════");
-                    reports.AppendLine("  알고리즘 상세 비교");
-                    reports.AppendLine("═══════════════════════════════════════════════════");
-                    reports.AppendLine();
+                    var optimizer = optimizers[i];
+                    loadingText.Text = $"알고리즘 비교 중... ({i + 1}/{optimizers.Count}) {optimizer.Name}";
+                    loadingProgressBar.Value = i * 100.0 / optimizers.Count;
 
-                    foreach (var optimizer in optimizers)
+                    var ordersCopy = orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
+                    var result = await Task.Run(() => optimizer.Solve(stock, ordersCopy, parameters));
+
+                    collected.Add(new ComparisonResult
                     {
-                        var ordersCopy = orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
-                        var result = optimizer.Solve(stock, ordersCopy, parameters);
+                        AlgorithmName = optimizer.Name,
+                        TotalCost = result.TotalCost,
+                        WasteLength = result.WasteLength,
+                        StockUsed = result.StockUsed,
+                        MaterialEfficiency = result.MaterialEfficiency,
+                        ExecutionTimeMs = result.ExecutionTimeMs,
+                        Success = result.Success,
+                    });
 
-                        results.Add(new ComparisonResult
-                        {
-                            AlgorithmName = optimizer.Name,
-                            TotalCost = result.TotalCost,
-                            WasteLength = result.WasteLength,
-                            StockUsed = result.StockUsed,
-                            MaterialEfficiency = result.MaterialEfficiency,
-                            ExecutionTimeMs = result.ExecutionTimeMs,
-                            Success = result.Success
-                        });
+                    reports.AppendLine($"┌─────────────────────────────────────────────────");
+                    reports.AppendLine($"│ {optimizer.Name}");
+                    reports.AppendLine($"│ 시간 복잡도: {optimizer.TimeComplexity}");
+                    reports.AppendLine($"└─────────────────────────────────────────────────");
+                    reports.AppendLine(result.Success ? result.GetDetailedReport(parameters) : $"실패: {result.ErrorMessage}");
+                    reports.AppendLine();
+                    reports.AppendLine();
+                }
 
-                        reports.AppendLine($"┌─────────────────────────────────────────────────");
-                        reports.AppendLine($"│ {optimizer.Name}");
-                        reports.AppendLine($"│ 시간 복잡도: {optimizer.TimeComplexity}");
-                        reports.AppendLine($"└─────────────────────────────────────────────────");
-                        if (result.Success)
-                        {
-                            reports.AppendLine(result.GetDetailedReport(parameters));
-                        }
-                        else
-                        {
-                            reports.AppendLine($"실패: {result.ErrorMessage}");
-                        }
-                        reports.AppendLine();
-                        reports.AppendLine();
-                    }
-
-                    return (results, reports.ToString());
-                });
+                loadingProgressBar.Value = 100;
 
                 ComparisonResults.Clear();
-                foreach (var cr in comparisonResults)
-                {
+                foreach (var cr in collected)
                     ComparisonResults.Add(cr);
-                }
 
                 var sortedResults = ComparisonResults
                     .Where(r => r.Success)
                     .OrderBy(r => r.TotalCost)
                     .ToList();
-
                 for (int i = 0; i < sortedResults.Count; i++)
-                {
                     sortedResults[i].Rank = i + 1;
-                }
 
                 UpdateCharts();
-
                 mainTabControl.SelectedIndex = 2;
-
-                comparisonTextBox.Text = detailedReport;
-
-                // 비교 탭: placeholder 숨기고 콘텐츠 표시
+                comparisonTextBox.Text = reports.ToString();
                 comparisonPlaceholder.Visibility = Visibility.Collapsed;
                 comparisonContent.Visibility = Visibility.Visible;
-
-                // 내보내기 버튼 활성화
                 btnExportCompCsv.IsEnabled = true;
                 btnExportCompExcel.IsEnabled = true;
 
-                SetRunningState(false);
-
-                var bestAlgorithm = sortedResults.FirstOrDefault();
-                if (bestAlgorithm != null)
-                {
-                    MessageBox.Show($"알고리즘 비교가 완료되었습니다!\n\n" +
-                                   $"최고 성능: {bestAlgorithm.AlgorithmName}\n" +
-                                   $"   총 비용: {bestAlgorithm.TotalCost:N0}원\n" +
-                                   $"   재료 효율: {bestAlgorithm.MaterialEfficiency:F2}%\n" +
-                                   $"   실행 시간: {bestAlgorithm.ExecutionTimeMs:F3}ms",
-                                   "비교 완료", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
+                bestAlgorithm = sortedResults.FirstOrDefault();
             }
             catch (Exception ex)
             {
-                SetRunningState(false);
                 MessageBox.Show($"오류 발생: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                SetRunningState(false);
+            }
+
+            if (bestAlgorithm != null)
+            {
+                MessageBox.Show($"알고리즘 비교가 완료되었습니다!\n\n" +
+                               $"최고 성능: {bestAlgorithm.AlgorithmName}\n" +
+                               $"   총 비용: {bestAlgorithm.TotalCost:N0}원\n" +
+                               $"   재료 효율: {bestAlgorithm.MaterialEfficiency:F2}%\n" +
+                               $"   실행 시간: {bestAlgorithm.ExecutionTimeMs:F3}ms",
+                               "비교 완료", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -883,8 +921,8 @@ namespace CuttingStock
             {
                 new Axis
                 {
-                    Labels = successResults.Select(r => r.AlgorithmName.Replace(" ", "\n")).ToArray(),
-                    LabelsRotation = 0
+                    Labels = successResults.Select(r => AbbreviateAlgorithmName(r.AlgorithmName)).ToArray(),
+                    LabelsRotation = -15,
                 }
             };
 
@@ -916,8 +954,8 @@ namespace CuttingStock
             {
                 new Axis
                 {
-                    Labels = successResults.Select(r => r.AlgorithmName.Replace(" ", "\n")).ToArray(),
-                    LabelsRotation = 0
+                    Labels = successResults.Select(r => AbbreviateAlgorithmName(r.AlgorithmName)).ToArray(),
+                    LabelsRotation = -15,
                 }
             };
 
@@ -951,8 +989,8 @@ namespace CuttingStock
             {
                 new Axis
                 {
-                    Labels = successResults.Select(r => r.AlgorithmName.Replace(" ", "\n")).ToArray(),
-                    LabelsRotation = 0
+                    Labels = successResults.Select(r => AbbreviateAlgorithmName(r.AlgorithmName)).ToArray(),
+                    LabelsRotation = -15,
                 }
             };
 
