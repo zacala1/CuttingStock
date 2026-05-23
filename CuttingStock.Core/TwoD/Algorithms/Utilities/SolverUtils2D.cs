@@ -24,6 +24,28 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             return list;
         }
 
+        /// <summary>
+        /// Validates sheets and orders for 2D solvers. Returns true if the result has
+        /// been finalized (caller should return) — either due to invalid sheets or an
+        /// empty order list (treated as trivially solved with no patterns).
+        /// </summary>
+        public static bool ValidateInputs(
+            List<Sheet>? sheets, List<RectOrder>? orders, SolverResult2D result)
+        {
+            if (sheets == null || sheets.Count == 0)
+            {
+                result.Success = false;
+                result.ErrorMessage = "At least one sheet must be provided.";
+                return true;
+            }
+            if (orders == null || orders.Count == 0)
+            {
+                // Empty demand is trivially solved with no patterns; success stays true.
+                return true;
+            }
+            return false;
+        }
+
         public static List<Sheet> OrderSheets(List<Sheet> sheets, SolverOptions2D options)
         {
             return options.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge

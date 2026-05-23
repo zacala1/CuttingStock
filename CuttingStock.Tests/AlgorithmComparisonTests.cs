@@ -272,7 +272,7 @@ namespace CuttingStock.Tests
                 new Order(3000, 4)
             };
 
-            var wasteResults = new Dictionary<string, (int Waste, int Cost)>();
+            var wasteResults = new Dictionary<string, (int Waste, long Cost)>();
 
             // Act
             foreach (var optimizer in _allOptimizers)

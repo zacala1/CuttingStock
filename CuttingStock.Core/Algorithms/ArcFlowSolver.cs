@@ -347,8 +347,13 @@ namespace CuttingStock.Core.Algorithms
             {
                 var cuts = new List<int>();
                 int pos = 0;
+                // Guard against degenerate flows where neither an item nor a waste arc
+                // exists from the current position — without a cap the outer for would
+                // never advance past pos == capacity, but an inner infinite loop is
+                // still possible if every step lands on a dead-end node.
+                int safety = capacity + 1;
 
-                while (pos < capacity)
+                while (pos < capacity && safety-- > 0)
                 {
                     bool moved = false;
 

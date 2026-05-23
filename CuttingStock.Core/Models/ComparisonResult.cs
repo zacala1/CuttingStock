@@ -4,7 +4,7 @@ namespace CuttingStock.Core.Models
     public class ComparisonResult
     {
         public string AlgorithmName { get; set; } = string.Empty;
-        public int TotalCost { get; set; }
+        public long TotalCost { get; set; }
         public int WasteLength { get; set; }
         public int StockUsed { get; set; }
         public double MaterialEfficiency { get; set; }

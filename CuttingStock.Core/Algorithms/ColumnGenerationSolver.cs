@@ -327,7 +327,13 @@ namespace CuttingStock.Core.Algorithms
             return res;
         }
 
-        private void GenerateSolutionHybrid(
+        /// <summary>
+        /// Greedy fallback used as Phase 2 of <see cref="GenerateSolutionFloorResidual"/>.
+        /// Picks the pattern with the smallest kerf-adjusted waste each step and applies
+        /// it as many times as the remaining demand allows. Used when LP floor leaves
+        /// uncovered demand.
+        /// </summary>
+        private void ApplyGreedyResidual(
             SolverResult result,
             List<CuttingPatternColumn> patterns,
             Dictionary<int, int> demand,
@@ -538,7 +544,7 @@ namespace CuttingStock.Core.Algorithms
             // Phase 2: Solve residual demand with greedy fallback
             if (currentDemand.Any(kv => kv.Value > 0) && usedStockCount < maxStockCount)
             {
-                GenerateSolutionHybrid(result, patterns, currentDemand, lengths, stockLength, maxStockCount - usedStockCount, kerf);
+                ApplyGreedyResidual(result, patterns, currentDemand, lengths, stockLength, maxStockCount - usedStockCount, kerf);
             }
         }
 

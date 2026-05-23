@@ -31,16 +31,14 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             try
             {
-                if (sheets == null || sheets.Count == 0)
-                    throw new ArgumentException("At least one sheet must be provided.", nameof(sheets));
-                if (orders == null || orders.Count == 0)
+                if (SolverUtils2D.ValidateInputs(sheets, orders, result))
                 {
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;
                 }
 
-                var orderedSheets = SolverUtils2D.OrderSheets(sheets, options);
+                var orderedSheets = SolverUtils2D.OrderSheets(sheets!, options);
                 var items = SolverUtils2D.ExpandOrders(orders, options.AllowRotation);
 
                 // Try every (order rule × shelf strategy) combo and keep the best.

@@ -102,7 +102,7 @@ namespace CuttingStock.Core.Algorithms.Utilities
 
             result.WeldCount = weldGroups.Sum(g => g.Count() - 1);
 
-            result.TotalCost = (int)Math.Round(
+            result.TotalCost = (long)Math.Round(
                 result.WasteLength * (double)options.Alpha +
                 result.WeldCount * (double)options.Beta);
         }
@@ -135,6 +135,11 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 if (largePlan.Leftover < options.Gamma)
                     continue;
 
+                // Welded plans are intentionally one-cut-per-bar; relocating their
+                // cut would break the weld-group invariant and leave an empty plan.
+                if (largePlan.Cuts.Any(c => c.WeldGroupId.HasValue))
+                    continue;
+
                 var smallestCut = largePlan.Cuts.OrderBy(c => c.Length).FirstOrDefault();
                 if (smallestCut == null)
                     continue;
@@ -142,6 +147,10 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 for (int j = sortedPlans.Count - 1; j > i; j--)
                 {
                     var (smallPlan, smallIndex) = sortedPlans[j];
+
+                    // Don't add to a welded plan — its single-cut layout is structural.
+                    if (smallPlan.Cuts.Any(c => c.WeldGroupId.HasValue))
+                        continue;
 
                     int spaceNeeded = smallestCut.Length + (smallPlan.Cuts.Count > 0 ? options.Kerf : 0);
                     if (smallPlan.Leftover >= spaceNeeded)

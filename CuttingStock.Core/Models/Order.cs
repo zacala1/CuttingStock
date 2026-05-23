@@ -1,12 +1,10 @@
 namespace CuttingStock.Core.Models
 {
-    /// <summary>1D rebar order. All lengths in mm.</summary>
+    /// <summary>1D rebar order. All lengths in mm. Immutable value type.</summary>
     public sealed class Order : IEquatable<Order>
     {
-        public int Length { get; set; }
-        public int Quantity { get; set; }
-
-        public Order() { }
+        public int Length { get; }
+        public int Quantity { get; }
 
         public Order(int length, int quantity)
         {

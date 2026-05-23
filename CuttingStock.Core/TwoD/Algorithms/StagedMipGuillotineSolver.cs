@@ -37,16 +37,14 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             try
             {
-                if (sheets == null || sheets.Count == 0)
-                    throw new ArgumentException("At least one sheet must be provided.", nameof(sheets));
-                if (orders == null || orders.Count == 0)
+                if (SolverUtils2D.ValidateInputs(sheets, orders, result))
                 {
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;
                 }
 
-                int n = orders.Count;
+                int n = orders!.Count;
                 int[] demand = orders.Select(o => o.Quantity).ToArray();
 
                 // 1) Bootstrap pool with shelf heuristic.
@@ -68,8 +66,10 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 // 2) Enrich pool with multi-pricing column generation. Half the time budget
                 //    goes to CG, the other half to the integer master. Every iteration adds
                 //    one improving column per sheet type.
-                long deadline = sw.ElapsedMilliseconds + options.TimeLimitMs;
-                long pricingEnd = sw.ElapsedMilliseconds + options.TimeLimitMs / 2;
+                // TimeLimitMs is the total wall-clock budget; bootstrap already consumed
+                // some of it, so the deadlines are from session start.
+                long deadline = options.TimeLimitMs;
+                long pricingEnd = options.TimeLimitMs / 2;
 
                 for (int iter = 0; iter < MaxCgIterations; iter++)
                 {

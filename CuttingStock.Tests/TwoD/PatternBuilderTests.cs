@@ -78,5 +78,37 @@ namespace CuttingStock.Tests.TwoD
             var tree = PatternBuilder.BuildTree(4, 4, pl);
             tree.Should().BeNull();
         }
+
+        [Test]
+        public void SingleItem_TopLeftCorner_DecomposesWithWaste()
+        {
+            // Rect flush with top-left corner: needs 2 cuts (right strip + bottom strip).
+            var pl = new List<Placement> { P(0, 0, 0, 40, 30) };
+            var tree = PatternBuilder.BuildTree(100, 100, pl);
+            tree.Should().NotBeNull();
+            GuillotineValidator.IsValidTree(tree!).Should().BeTrue();
+            CountKind(tree!, NodeKind.Leaf).Should().Be(1);
+            CountKind(tree!, NodeKind.Waste).Should().BeGreaterThan(0);
+        }
+
+        [Test]
+        public void SingleItem_Interior_DecomposesWith4Cuts()
+        {
+            // Rect floating in the middle: previously returned null. Should now decompose
+            // by peeling waste off each side recursively (4 cuts → 4 waste leaves + 1 leaf).
+            var pl = new List<Placement> { P(0, 10, 10, 50, 50) };
+            var tree = PatternBuilder.BuildTree(100, 100, pl);
+            tree.Should().NotBeNull();
+            GuillotineValidator.IsValidTree(tree!).Should().BeTrue();
+            CountKind(tree!, NodeKind.Leaf).Should().Be(1);
+            CountKind(tree!, NodeKind.Waste).Should().Be(4);
+        }
+
+        private static int CountKind(GuillotineNode node, NodeKind kind)
+        {
+            int c = node.Kind == kind ? 1 : 0;
+            foreach (var ch in node.Children) c += CountKind(ch, kind);
+            return c;
+        }
     }
 }
