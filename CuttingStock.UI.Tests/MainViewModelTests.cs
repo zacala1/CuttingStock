@@ -255,5 +255,77 @@ namespace CuttingStock.UI.Tests
         {
             _vm.StatusText.Should().Be("준비됨");
         }
+
+        // ─── StatusText / ScenarioSaved-Loaded wiring ───────────────
+
+        [Test]
+        public async Task Calculate_HappyPath_UpdatesStatusText()
+        {
+            _vm.Stocks.Add(new StockRow { Length = 12000, Quantity = 3 });
+            _vm.Orders.Add(new OrderRow { Length = 4000, Quantity = 2 });
+
+            await _vm.CalculateCommand.ExecuteAsync(null);
+
+            _vm.StatusText.Should().NotBe("준비됨");
+            _vm.StatusText.Should().Contain("완료");
+        }
+
+        [Test]
+        public void LoadExample_UpdatesStatusText()
+        {
+            _vm.LoadExampleCommand.Execute(null);
+            _vm.StatusText.Should().Contain("예제");
+        }
+
+        [Test]
+        public void Cancel_UpdatesStatusText()
+        {
+            _vm.IsRunning = true;
+            _vm.CanCancel = true;
+            _vm.CancelCommand.Execute(null);
+            _vm.StatusText.Should().Be("취소됨");
+        }
+
+        [Test]
+        public void SaveScenario_FiresScenarioSavedEvent()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"vm-evt-{System.Guid.NewGuid():N}.cstock1d.json");
+            string? capturedPath = null;
+            _vm.ScenarioSaved += (_, p) => capturedPath = p;
+            try
+            {
+                _dialog.SavePathResponses.Enqueue(path);
+                _vm.SaveScenarioCommand.Execute(null);
+
+                capturedPath.Should().Be(path);
+            }
+            finally
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void LoadScenario_FiresScenarioLoadedEvent()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"vm-evt-{System.Guid.NewGuid():N}.cstock1d.json");
+            try
+            {
+                _dialog.SavePathResponses.Enqueue(path);
+                _vm.SaveScenarioCommand.Execute(null);
+
+                string? capturedPath = null;
+                _vm.ScenarioLoaded += (_, p) => capturedPath = p;
+
+                _dialog.OpenPathResponses.Enqueue(path);
+                _vm.LoadScenarioCommand.Execute(null);
+
+                capturedPath.Should().Be(path);
+            }
+            finally
+            {
+                if (File.Exists(path)) File.Delete(path);
+            }
+        }
     }
 }

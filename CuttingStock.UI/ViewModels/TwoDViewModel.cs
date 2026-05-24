@@ -86,6 +86,7 @@ namespace CuttingStock.UI.ViewModels
             IsRunning = false;
             CanCancel = false;
             ProgressText = "취소됨";
+            StatusText = "취소됨";
         }
 
         [ObservableProperty] private bool _hasSingleResult;
@@ -146,6 +147,7 @@ namespace CuttingStock.UI.ViewModels
             Orders.Add(new RectOrderRow { Width = 800,  Height = 300, Quantity = 4 });
             Orders.Add(new RectOrderRow { Width = 300,  Height = 300, Quantity = 8 });
             Orders.Add(new RectOrderRow { Width = 1200, Height = 500, Quantity = 2 });
+            StatusText = "2D 예제 데이터 로드됨";
         }
 
         // ─── Scenario save / load ────────────────────────────────────
@@ -180,6 +182,7 @@ namespace CuttingStock.UI.ViewModels
                     },
                 };
                 ScenarioService.Save2D(path, scenario);
+                StatusText = $"저장됨: {System.IO.Path.GetFileName(path)}";
                 _dialog.ShowInfo("저장 완료", $"시나리오를 저장했습니다.\n{path}");
             }
             catch (Exception ex) { _dialog.ShowError("오류", $"시나리오 저장 오류: {ex.Message}"); }
@@ -210,6 +213,7 @@ namespace CuttingStock.UI.ViewModels
                 AllowRotation = o2.AllowRotation;
                 StageIndex = o2.Stage == 3 ? 1 : 0;
                 UsageOrderIndex = o2.UsageOrder == StockUsageOrder.SmallToLarge ? 0 : 1;
+                StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
             }
             catch (Exception ex) { _dialog.ShowError("오류", $"시나리오 불러오기 오류: {ex.Message}"); }
         }
@@ -260,6 +264,10 @@ namespace CuttingStock.UI.ViewModels
                     ? result.GetDetailedReport(options)
                     : $"실패: {result.ErrorMessage}";
                 HasSingleResult = result.Success;
+                if (result.Success)
+                    StatusText = $"완료: {solver.Name} · {result.SheetsUsed} 시트 · 효율 {result.MaterialEfficiency:F1}% · {result.ExecutionTimeMs:F0}ms";
+                else
+                    StatusText = $"실패: {result.ErrorMessage}";
                 SingleResultReady?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
@@ -363,6 +371,11 @@ namespace CuttingStock.UI.ViewModels
                     HasSingleResult = true;
                 }
                 HasComparisonResults = true;
+                var bestRow = CompareRows.FirstOrDefault(r => r.Success);
+                if (bestRow != null)
+                    StatusText = $"비교 완료 · 최고: {bestRow.AlgorithmName} · 효율 {bestRow.MaterialEfficiency:F1}%";
+                else
+                    StatusText = "비교 완료 (모두 실패)";
                 CompareResultReady?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)

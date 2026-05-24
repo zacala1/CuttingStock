@@ -6,7 +6,8 @@
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
              xmlns:svc="clr-namespace:CuttingStock.UI.Services"
              mc:Ignorable="d"
-             d:DesignHeight="700" d:DesignWidth="1300">
+             d:DesignHeight="700" d:DesignWidth="1300"
+             PreviewKeyDown="UserControl_PreviewKeyDown">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <svc:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>

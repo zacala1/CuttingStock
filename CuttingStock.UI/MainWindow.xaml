@@ -26,7 +26,7 @@
         <Separator/>
         <StatusBarItem><TextBlock Text="{Binding StatusTip, FallbackValue=Ctrl+R 실행 · Ctrl+Shift+C 비교 · F1 예제 · Esc 취소}" Foreground="Gray" Margin="6,0"/></StatusBarItem>
     </StatusBar>
-    <TabControl x:Name="topTabControl" SelectedIndex="0">
+    <TabControl x:Name="topTabControl" SelectedIndex="0" SelectionChanged="TopTabControl_SelectionChanged">
     <TabItem Header="1D 절단 (Rebar)">
     <Grid>
         <Grid.ColumnDefinitions>
@@ -96,6 +96,8 @@
                         ToolTip="현재 재고/주문/파라미터를 .json 파일로 저장"/>
                 <Button Content="시나리오 열기" Command="{Binding LoadScenarioCommand}" Width="100" Margin="0,0,5,0"
                         ToolTip="저장된 .json 시나리오를 불러오기"/>
+                <Button x:Name="btnRecent1D" Content="최근 ▾" Click="Recent1D_Click" Width="65" Margin="0,0,5,0"
+                        ToolTip="최근에 사용한 시나리오 (최대 5개)"/>
                 <Button Content="전체 초기화" Command="{Binding ClearAllCommand}" Width="80"/>
             </StackPanel>
         </Grid>

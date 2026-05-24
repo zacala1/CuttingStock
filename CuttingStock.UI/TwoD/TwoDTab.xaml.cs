@@ -128,6 +128,19 @@ namespace CuttingStock.UI.TwoD
             }
         }
 
+        // ─── Keyboard shortcuts ──────────────────────────────────────
+
+        private void UserControl_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            // Esc cancels an in-flight 2D solve. MainWindow's window-level handler
+            // only knows about the 1D ViewModel, so we route Esc locally here.
+            if (e.Key == Key.Escape && _vm.CanCancel)
+            {
+                _vm.CancelCommand.Execute(null);
+                e.Handled = true;
+            }
+        }
+
         // ─── Numeric input filtering ─────────────────────────────────
 
         private void IntegerTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e) =>

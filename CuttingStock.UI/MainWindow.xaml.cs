@@ -38,7 +38,16 @@ namespace CuttingStock
             _vm = new MainViewModel(new DialogService());
             DataContext = _vm;
             _vm.PropertyChanged += Vm_PropertyChanged;
+            _vm.ScenarioSaved  += (_, path) => OnScenarioPathUsed(path);
+            _vm.ScenarioLoaded += (_, path) => OnScenarioPathUsed(path);
             UpdateAdvancedOptions();
+        }
+
+        /// <summary>Push a recently-touched scenario path into the MRU list and persist.</summary>
+        private void OnScenarioPathUsed(string path)
+        {
+            UserPreferencesStore.PushRecent(_prefs.Recent1D, path);
+            UserPreferencesStore.Save(_prefs);
         }
 
         // ─── Preferences: window state, last tab, last algorithm ──────
@@ -81,6 +90,82 @@ namespace CuttingStock
             _prefs.LastTopTabIndex = topTabControl.SelectedIndex;
             _prefs.LastAlgorithm1D = _vm.AlgorithmIndex;
             UserPreferencesStore.Save(_prefs);
+        }
+
+        // ─── Recent scenarios dropdown ────────────────────────────────
+
+        private void Recent1D_Click(object sender, RoutedEventArgs e)
+        {
+            var menu = new ContextMenu { Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, PlacementTarget = btnRecent1D };
+            if (_prefs.Recent1D.Count == 0)
+            {
+                menu.Items.Add(new MenuItem { Header = "(최근 시나리오 없음)", IsEnabled = false });
+            }
+            else
+            {
+                foreach (var path in _prefs.Recent1D)
+                {
+                    var fileName = System.IO.Path.GetFileName(path);
+                    var menuItem = new MenuItem
+                    {
+                        Header = fileName,
+                        ToolTip = path,
+                        IsEnabled = System.IO.File.Exists(path),
+                    };
+                    var capturedPath = path;
+                    menuItem.Click += (_, _) => LoadRecentScenario(capturedPath);
+                    menu.Items.Add(menuItem);
+                }
+                menu.Items.Add(new Separator());
+                var clear = new MenuItem { Header = "목록 지우기" };
+                clear.Click += (_, _) =>
+                {
+                    _prefs.Recent1D.Clear();
+                    UserPreferencesStore.Save(_prefs);
+                };
+                menu.Items.Add(clear);
+            }
+            menu.IsOpen = true;
+        }
+
+        private void LoadRecentScenario(string path)
+        {
+            if (!System.IO.File.Exists(path))
+            {
+                MessageBox.Show($"파일을 찾을 수 없습니다:\n{path}", "오류",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                _prefs.Recent1D.Remove(path);
+                UserPreferencesStore.Save(_prefs);
+                return;
+            }
+            try
+            {
+                var scenario = ScenarioService.Load1D(path);
+                _vm.Stocks.Clear();
+                foreach (var s in scenario.Stocks)
+                    _vm.Stocks.Add(new StockRow { Length = s.Length, Quantity = s.Quantity });
+                _vm.Orders.Clear();
+                foreach (var o in scenario.Orders)
+                    _vm.Orders.Add(new OrderRow { Length = o.Length, Quantity = o.Quantity });
+
+                var p = scenario.Parameters;
+                _vm.AlphaText = p.Alpha.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.BetaText  = p.Beta.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.GammaText = p.Gamma.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.DeltaText = p.Delta.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.KerfText  = p.Kerf.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.UsageOrderIndex = p.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge ? 0 : 1;
+                _vm.EnableWelding = p.EnableWelding;
+
+                UserPreferencesStore.PushRecent(_prefs.Recent1D, path);
+                UserPreferencesStore.Save(_prefs);
+                _vm.StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"시나리오를 불러올 수 없습니다.\n{ex.Message}", "오류",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         // ─── Drag-and-drop scenario load ──────────────────────────────
@@ -370,6 +455,14 @@ namespace CuttingStock
         }
 
         // ─── Search bar (Ctrl+F) ─────────────────────────────────────
+
+        /// <summary>Close the search bar when leaving the 1D tab (it's anchored inside 1D).</summary>
+        private void TopTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(e.OriginalSource, topTabControl)) return;
+            if (topTabControl.SelectedIndex != 0 && searchBar != null && searchBar.Visibility == Visibility.Visible)
+                ToggleSearchBar(false);
+        }
 
         private void ToggleSearchBar(bool show)
         {

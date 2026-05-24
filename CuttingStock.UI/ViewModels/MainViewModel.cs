@@ -95,6 +95,7 @@ namespace CuttingStock.UI.ViewModels
             IsRunning = false;
             CanCancel = false;
             ProgressText = "취소됨";
+            StatusText = "취소됨";
         }
 
         /// <summary>True after Calculate succeeds — gates Export buttons.</summary>
@@ -117,6 +118,10 @@ namespace CuttingStock.UI.ViewModels
         // or the user cancelled.
         private int _currentRunId;
         private System.Threading.CancellationTokenSource? _currentCts;
+
+        /// <summary>Fires after a scenario is saved or loaded. Carries the file path.</summary>
+        public event EventHandler<string>? ScenarioSaved;
+        public event EventHandler<string>? ScenarioLoaded;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
@@ -148,6 +153,7 @@ namespace CuttingStock.UI.ViewModels
             Orders.Add(new OrderRow { Length = 4000, Quantity = 15 });
             Orders.Add(new OrderRow { Length = 3000, Quantity = 12 });
             Orders.Add(new OrderRow { Length = 2000, Quantity = 8 });
+            StatusText = "예제 데이터 로드됨";
             _dialog.ShowInfo("예제 로드",
                 "예제 데이터를 로드했습니다.\n재고: 12000mm × 20개\n주문: 5000mm×10, 4000mm×15, 3000mm×12, 2000mm×8");
         }
@@ -180,6 +186,8 @@ namespace CuttingStock.UI.ViewModels
                     },
                 };
                 ScenarioService.Save1D(path, scenario);
+                StatusText = $"저장됨: {System.IO.Path.GetFileName(path)}";
+                ScenarioSaved?.Invoke(this, path);
                 _dialog.ShowInfo("저장 완료", $"시나리오를 저장했습니다.\n{path}");
             }
             catch (Exception ex)
@@ -214,6 +222,8 @@ namespace CuttingStock.UI.ViewModels
                 KerfText  = p.Kerf.ToString(CultureInfo.InvariantCulture);
                 UsageOrderIndex = p.UsageOrder == StockUsageOrder.SmallToLarge ? 0 : 1;
                 EnableWelding = p.EnableWelding;
+                StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
+                ScenarioLoaded?.Invoke(this, path);
             }
             catch (Exception ex)
             {
@@ -287,6 +297,7 @@ namespace CuttingStock.UI.ViewModels
                 }
                 else
                 {
+                    StatusText = $"완료: {optimizer.Name} · {result.StockUsed}개 사용 · 효율 {result.MaterialEfficiency:F1}% · {result.ExecutionTimeMs:F0}ms";
                     _dialog.ShowInfo("최적화 완료",
                         $"최적화가 완료되었습니다!\n\n" +
                         $"총 비용: {result.TotalCost:N0}원\n" +
@@ -297,7 +308,10 @@ namespace CuttingStock.UI.ViewModels
             catch (Exception ex)
             {
                 if (runId == _currentRunId)
+                {
+                    StatusText = $"오류: {ex.Message}";
                     _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
+                }
             }
             finally
             {
@@ -390,6 +404,7 @@ namespace CuttingStock.UI.ViewModels
                 var best = sorted.FirstOrDefault();
                 if (best != null)
                 {
+                    StatusText = $"비교 완료 · 최고: {best.AlgorithmName} · 효율 {best.MaterialEfficiency:F1}%";
                     _dialog.ShowInfo("비교 완료",
                         "알고리즘 비교가 완료되었습니다!\n\n" +
                         $"최고 성능: {best.AlgorithmName}\n" +
