@@ -6,12 +6,14 @@
         xmlns:local="clr-namespace:CuttingStock"
         xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
         xmlns:twod="clr-namespace:CuttingStock.UI.TwoD"
+        xmlns:svc="clr-namespace:CuttingStock.UI.Services"
         mc:Ignorable="d"
         Title="Cutting Stock 최적화 (1D + 2D)" Height="820" Width="1400"
         MinHeight="600" MinWidth="900"
         PreviewKeyDown="MainWindow_PreviewKeyDown">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <svc:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
     </Window.Resources>
     <TabControl>
     <TabItem Header="1D 절단 (Rebar)">
@@ -254,7 +256,7 @@
                         <TextBlock Text="최적화를 먼저 실행하면 결과가 시각화됩니다."
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                    Foreground="Gray" FontSize="14" FontStyle="Italic"
-                                   Visibility="{Binding HasSingleResult, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
+                                   Visibility="{Binding HasSingleResult, Converter={StaticResource InverseBoolToVis}}"/>
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       Visibility="{Binding HasSingleResult, Converter={StaticResource BoolToVis}}">
@@ -334,7 +336,7 @@
                         <TextBlock Text="'알고리즘 비교' 버튼을 클릭하면 결과가 표시됩니다."
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                    Foreground="Gray" FontSize="14" FontStyle="Italic"
-                                   Visibility="{Binding HasComparisonResults, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
+                                   Visibility="{Binding HasComparisonResults, Converter={StaticResource InverseBoolToVis}}"/>
 
                         <Grid Visibility="{Binding HasComparisonResults, Converter={StaticResource BoolToVis}}">
                             <Grid.RowDefinitions>

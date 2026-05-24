@@ -60,10 +60,19 @@ namespace CuttingStock.UI.ViewModels
 
         [ObservableProperty] private string _resultText = string.Empty;
         [ObservableProperty] private string _comparisonText = string.Empty;
-        [ObservableProperty] private bool _isRunning;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CalculateCommand))]
+        [NotifyCanExecuteChangedFor(nameof(CompareAlgorithmsCommand))]
+        private bool _isRunning;
+
         [ObservableProperty] private double _progressPercent;
         [ObservableProperty] private bool _progressIndeterminate = true;
         [ObservableProperty] private string _progressText = "계산 중...";
+
+        /// <summary>CanExecute gate for Calculate / CompareAlgorithms — prevents
+        /// concurrent solver runs from a re-entrant button click.</summary>
+        private bool CanRunSolver() => !IsRunning;
 
         /// <summary>True after Calculate succeeds — gates Export buttons.</summary>
         [ObservableProperty] private bool _hasSingleResult;
@@ -180,7 +189,7 @@ namespace CuttingStock.UI.ViewModels
 
         // ─── Solve / Compare commands ────────────────────────────────
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanRunSolver))]
         private async Task CalculateAsync()
         {
             if (Stocks.Count == 0 || Orders.Count == 0)
@@ -254,7 +263,7 @@ namespace CuttingStock.UI.ViewModels
             }
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanRunSolver))]
         private async Task CompareAlgorithmsAsync()
         {
             if (Stocks.Count == 0 || Orders.Count == 0)

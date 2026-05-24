@@ -4,10 +4,12 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+             xmlns:svc="clr-namespace:CuttingStock.UI.Services"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1300">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <svc:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
     </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -213,7 +215,7 @@
                         <TextBlock Text="최적화를 먼저 실행하면 패턴이 시각화됩니다."
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                    Foreground="Gray" FontSize="14" FontStyle="Italic"
-                                   Visibility="{Binding HasSingleResult, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
+                                   Visibility="{Binding HasSingleResult, Converter={StaticResource InverseBoolToVis}}"/>
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       Visibility="{Binding HasSingleResult, Converter={StaticResource BoolToVis}}">
                             <StackPanel x:Name="visualization2DPanel" Margin="10"/>
@@ -226,7 +228,7 @@
                         <TextBlock Text="'알고리즘 비교' 버튼을 클릭하면 결과가 표시됩니다."
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                    Foreground="Gray" FontSize="14" FontStyle="Italic"
-                                   Visibility="{Binding HasComparisonResults, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
+                                   Visibility="{Binding HasComparisonResults, Converter={StaticResource InverseBoolToVis}}"/>
                         <Grid Visibility="{Binding HasComparisonResults, Converter={StaticResource BoolToVis}}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
