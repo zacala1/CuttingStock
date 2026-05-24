@@ -102,17 +102,14 @@ fit the project's scale:
   consolidated input validation in `SolverUtils2D.ValidateInputs`,
   killed duplicate sheet-inventory constraints in StagedMip.
 
-**Skills NOT adopted on purpose:** full MVVM Toolkit conversion. The
-WPF code-behind has god-class properties (MainWindow ~1100 lines)
-which a Skill would recommend rewriting as MVVM with
-`[ObservableProperty]` / `[RelayCommand]`. We deferred this because:
-1. The existing code works and is tested via the UI path.
-2. A speculative MVVM rewrite risks breaking the data-binding, export,
-   and chart flows that are not unit-testable.
-3. The user explicitly cautioned against over-modification.
-
-If/when this rewrite happens, do it in a separate branch with a
-working baseline you can compare against.
+**MVVM:** As of `8075cc7` the UI is MVVM (CommunityToolkit.Mvvm).
+MainWindow / TwoDTab code-behind shrank from 2052 to 607 lines (-70%).
+ViewModels live in `CuttingStock.UI/ViewModels/`, dialog/file-IO is
+abstracted via `IDialogService`, and the 1D visualization data is built
+in `VisualizationService`. The Views still own LiveCharts series
+construction and the 2D placement Canvas because those touch WPF
+visual types in ways that don't round-trip through bindings cleanly —
+keep that split intact unless you have a concrete reason to invert it.
 
 ## When you find a bug
 
