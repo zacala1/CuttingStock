@@ -219,5 +219,41 @@ namespace CuttingStock.UI.Tests
         {
             _vm.UsageOrderIndex.Should().Be(0);  // matches StockUsageOrder.SmallToLarge
         }
+
+        // ─── Cancel command + soft-cancel ────────────────────────────
+
+        [Test]
+        public void CancelCommand_CanExecute_FalseWhenIdle()
+        {
+            _vm.CancelCommand.CanExecute(null).Should().BeFalse("cancel only valid mid-run");
+        }
+
+        [Test]
+        public void CancelCommand_CanExecute_TrueWhenCanCancelSet()
+        {
+            _vm.CanCancel = true;
+            _vm.CancelCommand.CanExecute(null).Should().BeTrue();
+        }
+
+        [Test]
+        public void Cancel_WhenRunning_FreesUiAndSetsCancelledText()
+        {
+            _vm.IsRunning = true;
+            _vm.CanCancel = true;
+
+            _vm.CancelCommand.Execute(null);
+
+            _vm.IsRunning.Should().BeFalse();
+            _vm.CanCancel.Should().BeFalse();
+            _vm.ProgressText.Should().Contain("취소");
+        }
+
+        // ─── StatusText default ──────────────────────────────────────
+
+        [Test]
+        public void StatusText_DefaultsToReady()
+        {
+            _vm.StatusText.Should().Be("준비됨");
+        }
     }
 }

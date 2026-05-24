@@ -61,6 +61,10 @@ namespace CuttingStock.UI.ViewModels
         [ObservableProperty] private string _resultText = string.Empty;
         [ObservableProperty] private string _comparisonText = string.Empty;
 
+        /// <summary>Status-bar message — last action / current state.</summary>
+        [ObservableProperty] private string _statusText = "준비됨";
+        [ObservableProperty] private string _statusTip  = "Ctrl+R 실행 · Ctrl+Shift+C 비교 · F1 예제 · Esc 취소";
+
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(CalculateCommand))]
         [NotifyCanExecuteChangedFor(nameof(CompareAlgorithmsCommand))]
@@ -73,6 +77,25 @@ namespace CuttingStock.UI.ViewModels
         /// <summary>CanExecute gate for Calculate / CompareAlgorithms — prevents
         /// concurrent solver runs from a re-entrant button click.</summary>
         private bool CanRunSolver() => !IsRunning;
+
+        /// <summary>CanExecute for the Cancel command — only when a solve is in flight.</summary>
+        private bool CanCancelSolver() => CanCancel;
+
+        /// <summary>
+        /// Soft-cancel: invalidate the current run ID so the awaiting task discards
+        /// its result, signal the CTS for any solver that honours it, and free the UI.
+        /// The background compute itself may continue to completion (OR-Tools MIPs
+        /// can't be interrupted mid-solve), but the user sees an immediate response.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanCancelSolver))]
+        private void Cancel()
+        {
+            _currentRunId++;          // any in-flight task's result is now stale
+            try { _currentCts?.Cancel(); } catch { /* CTS may already be disposed */ }
+            IsRunning = false;
+            CanCancel = false;
+            ProgressText = "취소됨";
+        }
 
         /// <summary>True after Calculate succeeds — gates Export buttons.</summary>
         [ObservableProperty] private bool _hasSingleResult;
@@ -87,6 +110,17 @@ namespace CuttingStock.UI.ViewModels
         private SolverResult? _lastResult;
         private SolverOptions? _lastOptions;
         private ICuttingSolver? _lastSolver;
+
+        // Soft-cancel: each Calculate/Compare run gets a monotonically-increasing
+        // ID and a CTS. The background Task always finishes (we can't interrupt
+        // OR-Tools mid-MIP) but we discard its result if a newer run was started
+        // or the user cancelled.
+        private int _currentRunId;
+        private System.Threading.CancellationTokenSource? _currentCts;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
+        private bool _canCancel;
 
         // ─── Input commands ──────────────────────────────────────────
 
@@ -203,21 +237,28 @@ namespace CuttingStock.UI.ViewModels
             var ordersSnapshot = Orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
             var optimizer = BuildOptimizer();
 
+            int runId = ++_currentRunId;
+            _currentCts = new System.Threading.CancellationTokenSource();
+
             try
             {
                 IsRunning = true;
+                CanCancel = true;
                 ProgressIndeterminate = true;
                 ProgressPercent = 0;
                 ProgressText = "최적화 준비 중...";
 
                 var progress = new Progress<double>(pct =>
                 {
+                    if (runId != _currentRunId) return;  // stale callback
                     ProgressIndeterminate = false;
                     ProgressPercent = pct;
                     ProgressText = $"최적화 진행 중... {pct:F0}%";
                 });
 
                 var result = await Task.Run(() => optimizer.Solve(stockSnapshot, ordersSnapshot, parameters, progress));
+
+                if (runId != _currentRunId) return;  // cancelled or superseded — discard
 
                 _lastResult = result;
                 _lastOptions = parameters;
@@ -255,11 +296,16 @@ namespace CuttingStock.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
+                if (runId == _currentRunId)
+                    _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
             }
             finally
             {
-                IsRunning = false;
+                if (runId == _currentRunId)
+                {
+                    IsRunning = false;
+                    CanCancel = false;
+                }
             }
         }
 
@@ -277,9 +323,13 @@ namespace CuttingStock.UI.ViewModels
             var orders = Orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
             _lastOptions = parameters;
 
+            int runId = ++_currentRunId;
+            _currentCts = new System.Threading.CancellationTokenSource();
+
             try
             {
                 IsRunning = true;
+                CanCancel = true;
                 ProgressIndeterminate = true;
                 ProgressText = "알고리즘 비교 중...";
 
@@ -298,6 +348,7 @@ namespace CuttingStock.UI.ViewModels
 
                 for (int i = 0; i < optimizers.Count; i++)
                 {
+                    if (runId != _currentRunId) return;  // cancelled mid-loop
                     var optimizer = optimizers[i];
                     ProgressText = $"비교 중... ({i + 1}/{optimizers.Count} — {optimizer.Name})";
                     ProgressIndeterminate = false;
@@ -305,6 +356,7 @@ namespace CuttingStock.UI.ViewModels
 
                     var ordersCopy = orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
                     var result = await Task.Run(() => optimizer.Solve(stockSnapshot, ordersCopy, parameters));
+                    if (runId != _currentRunId) return;  // cancelled while this solver was running
 
                     rows.Add(new ComparisonResult
                     {
@@ -348,11 +400,16 @@ namespace CuttingStock.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
+                if (runId == _currentRunId)
+                    _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
             }
             finally
             {
-                IsRunning = false;
+                if (runId == _currentRunId)
+                {
+                    IsRunning = false;
+                    CanCancel = false;
+                }
             }
         }
 

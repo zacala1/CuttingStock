@@ -62,6 +62,8 @@ namespace CuttingStock.UI.ViewModels
         [ObservableProperty] private string _reportText = string.Empty;
         [ObservableProperty] private string _compareText = string.Empty;
 
+        [ObservableProperty] private string _statusText = "준비됨";
+
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(CalculateCommand))]
         [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
@@ -74,12 +76,31 @@ namespace CuttingStock.UI.ViewModels
         /// <summary>CanExecute gate for Calculate / Compare — re-entrancy guard.</summary>
         private bool CanRunSolver() => !IsRunning;
 
+        private bool CanCancelSolver() => CanCancel;
+
+        [RelayCommand(CanExecute = nameof(CanCancelSolver))]
+        private void Cancel()
+        {
+            _currentRunId++;
+            try { _currentCts?.Cancel(); } catch { }
+            IsRunning = false;
+            CanCancel = false;
+            ProgressText = "취소됨";
+        }
+
         [ObservableProperty] private bool _hasSingleResult;
         [ObservableProperty] private bool _hasComparisonResults;
 
         private SolverResult2D? _lastResult;
         private SolverOptions2D? _lastOptions;
         private ICuttingSolver2D? _lastSolver;
+
+        private int _currentRunId;
+        private System.Threading.CancellationTokenSource? _currentCts;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
+        private bool _canCancel;
 
         /// <summary>
         /// Last successful single solve. View reads this to render the placement
@@ -208,9 +229,13 @@ namespace CuttingStock.UI.ViewModels
             { _dialog.ShowWarning("입력 오류", "유효한 시트/주문이 없습니다."); return; }
             var solver = BuildSolver(AlgorithmIndex);
 
+            int runId = ++_currentRunId;
+            _currentCts = new System.Threading.CancellationTokenSource();
+
             try
             {
                 IsRunning = true;
+                CanCancel = true;
                 ProgressIndeterminate = true;
                 ProgressPercent = 0;
                 ProgressText = "계산 중...";
@@ -225,6 +250,8 @@ namespace CuttingStock.UI.ViewModels
                 });
 
                 var result = await Task.Run(() => solver.Solve(sheetSnapshot, orderSnapshot, options, progress));
+                if (runId != _currentRunId) return;
+
                 _lastResult = result;
                 _lastOptions = options;
                 _lastSolver = solver;
@@ -235,8 +262,14 @@ namespace CuttingStock.UI.ViewModels
                 HasSingleResult = result.Success;
                 SingleResultReady?.Invoke(this, EventArgs.Empty);
             }
-            catch (Exception ex) { _dialog.ShowError("오류", $"오류: {ex.Message}"); }
-            finally { IsRunning = false; }
+            catch (Exception ex)
+            {
+                if (runId == _currentRunId) _dialog.ShowError("오류", $"오류: {ex.Message}");
+            }
+            finally
+            {
+                if (runId == _currentRunId) { IsRunning = false; CanCancel = false; }
+            }
         }
 
         [RelayCommand(CanExecute = nameof(CanRunSolver))]
@@ -251,9 +284,13 @@ namespace CuttingStock.UI.ViewModels
             if (sheetSnapshot.Count == 0 || orderSnapshot.Count == 0)
             { _dialog.ShowWarning("입력 오류", "유효한 시트/주문이 없습니다."); return; }
 
+            int runId = ++_currentRunId;
+            _currentCts = new System.Threading.CancellationTokenSource();
+
             try
             {
                 IsRunning = true;
+                CanCancel = true;
                 ProgressIndeterminate = true;
                 ProgressText = "비교 중...";
 
@@ -272,6 +309,7 @@ namespace CuttingStock.UI.ViewModels
 
                 for (int i = 0; i < solvers.Length; i++)
                 {
+                    if (runId != _currentRunId) return;
                     var s = solvers[i];
                     int solverIdx = i;
                     ProgressText = $"비교 중... ({i + 1}/{solvers.Length} — {s.Name})";
@@ -285,6 +323,7 @@ namespace CuttingStock.UI.ViewModels
                     });
 
                     var r = await Task.Run(() => s.Solve(sheetSnapshot, orderSnapshot, options, sliceProgress));
+                    if (runId != _currentRunId) return;
                     rows.Add(new ComparisonResult2D
                     {
                         AlgorithmName = s.Name,
@@ -326,8 +365,14 @@ namespace CuttingStock.UI.ViewModels
                 HasComparisonResults = true;
                 CompareResultReady?.Invoke(this, EventArgs.Empty);
             }
-            catch (Exception ex) { _dialog.ShowError("오류", $"오류: {ex.Message}"); }
-            finally { IsRunning = false; }
+            catch (Exception ex)
+            {
+                if (runId == _currentRunId) _dialog.ShowError("오류", $"오류: {ex.Message}");
+            }
+            finally
+            {
+                if (runId == _currentRunId) { IsRunning = false; CanCancel = false; }
+            }
         }
 
         // ─── Export ──────────────────────────────────────────────────

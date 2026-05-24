@@ -26,7 +26,10 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <GroupBox Header="시트 재고 (Sheets)" Grid.Row="0" Margin="0,0,0,5">
+            <GroupBox Grid.Row="0" Margin="0,0,0,5">
+                <GroupBox.Header>
+                    <TextBlock><Run Text="시트 재고 (Sheets) "/><Run Text="{Binding Sheets.Count, StringFormat='({0}종)', Mode=OneWay}" Foreground="Gray"/></TextBlock>
+                </GroupBox.Header>
                 <StackPanel>
                     <DataGrid x:Name="sheetGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
                               ItemsSource="{Binding Sheets}"
@@ -46,7 +49,10 @@
                 </StackPanel>
             </GroupBox>
 
-            <GroupBox Header="주문 (Items)" Grid.Row="1" Margin="0,5,0,0">
+            <GroupBox Grid.Row="1" Margin="0,5,0,0">
+                <GroupBox.Header>
+                    <TextBlock><Run Text="주문 (Items) "/><Run Text="{Binding Orders.Count, StringFormat='({0}종)', Mode=OneWay}" Foreground="Gray"/></TextBlock>
+                </GroupBox.Header>
                 <StackPanel>
                     <DataGrid x:Name="rectOrderGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
                               ItemsSource="{Binding Orders}"
@@ -185,6 +191,8 @@
                                          Value="{Binding ProgressPercent}"
                                          Minimum="0" Maximum="100"/>
                             <TextBlock Text="{Binding ProgressText}" HorizontalAlignment="Center" Margin="0,5,0,0" FontWeight="Bold"/>
+                            <Button Content="취소" Command="{Binding CancelCommand}" Width="80" Margin="0,8,0,0" HorizontalAlignment="Center"
+                                    ToolTip="Esc 키로도 취소"/>
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -212,10 +220,14 @@
 
                 <TabItem Header="패턴 시각화">
                     <Grid>
-                        <TextBlock Text="최적화를 먼저 실행하면 패턴이 시각화됩니다."
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="Gray" FontSize="14" FontStyle="Italic"
-                                   Visibility="{Binding HasSingleResult, Converter={StaticResource InverseBoolToVis}}"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Visibility="{Binding HasSingleResult, Converter={StaticResource InverseBoolToVis}}">
+                            <TextBlock Text="🧩" HorizontalAlignment="Center" FontSize="48" Foreground="LightGray"/>
+                            <TextBlock Text="시트 위 배치 패턴이 여기에 그려집니다" HorizontalAlignment="Center"
+                                       FontSize="14" Foreground="Gray" Margin="0,8,0,4"/>
+                            <TextBlock Text="시트와 주문을 입력하고 '최적화 실행' 버튼을 누르세요"
+                                       HorizontalAlignment="Center" FontSize="11" Foreground="DarkGray"/>
+                        </StackPanel>
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       Visibility="{Binding HasSingleResult, Converter={StaticResource BoolToVis}}">
                             <StackPanel x:Name="visualization2DPanel" Margin="10"/>
@@ -225,10 +237,14 @@
 
                 <TabItem Header="알고리즘 비교">
                     <Grid>
-                        <TextBlock Text="'알고리즘 비교' 버튼을 클릭하면 결과가 표시됩니다."
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="Gray" FontSize="14" FontStyle="Italic"
-                                   Visibility="{Binding HasComparisonResults, Converter={StaticResource InverseBoolToVis}}"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Visibility="{Binding HasComparisonResults, Converter={StaticResource InverseBoolToVis}}">
+                            <TextBlock Text="📈" HorizontalAlignment="Center" FontSize="48" Foreground="LightGray"/>
+                            <TextBlock Text="세 2D 알고리즘 결과를 비교합니다" HorizontalAlignment="Center"
+                                       FontSize="14" Foreground="Gray" Margin="0,8,0,4"/>
+                            <TextBlock Text="'알고리즘 비교' 버튼을 누르면 시트 사용/효율/시간 차트가 표시됩니다"
+                                       HorizontalAlignment="Center" FontSize="11" Foreground="DarkGray"/>
+                        </StackPanel>
                         <Grid Visibility="{Binding HasComparisonResults, Converter={StaticResource BoolToVis}}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
