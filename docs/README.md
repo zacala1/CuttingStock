@@ -14,7 +14,7 @@
 | [API_REFERENCE.md](API_REFERENCE.md) | 1D + 2D 공개 타입과 인터페이스 | ~20분 |
 | [2D_API_REFERENCE.md](2D_API_REFERENCE.md) | 2D 전용 API 상세 + Quick Start | ~15분 |
 | [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) | BenchmarkDotNet 측정치 + 테스트 커버리지 요약 | ~10분 |
-| [archive/](archive/) | 초기 분석/로드맵 등 historical 문서 (현 코드와 다를 수 있음) | — |
+| [CHANGELOG.md](../CHANGELOG.md) | 시간순 변경 이력 — 이전 PHASE 노트는 이리로 압축됨 | ~5분 |
 
 ## 빠른 시작 가이드
 

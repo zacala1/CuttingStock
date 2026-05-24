@@ -120,6 +120,18 @@ keep that split intact unless you have a concrete reason to invert it.
 4. Commit with a message that names the bug and quotes the
    file:line where it was introduced.
 
+## Changelog discipline
+
+The repo keeps a hand-rolled `CHANGELOG.md` at the root rather than
+generated release notes. After a meaningful round of work (bug fixes
+landing, a feature shipping, a refactor across multiple files), add a
+short bullet block at the top of `CHANGELOG.md` with the date heading
+and the commit SHAs you produced. Old PHASE notes used to live as
+separate files under `docs/archive/`; that approach grew stale (no one
+updated them after Jan 2026) and was collapsed into `CHANGELOG.md` in
+the May 2026 doc refresh. Don't reintroduce per-phase markdown files
+— append to `CHANGELOG.md` instead.
+
 ## When you add a feature
 
 1. Add it to `Core` if it has no WPF dependency, so it's testable.
