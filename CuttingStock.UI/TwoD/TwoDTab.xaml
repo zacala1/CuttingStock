@@ -6,6 +6,9 @@
              xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
              mc:Ignorable="d"
              d:DesignHeight="700" d:DesignWidth="1300">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="420" MinWidth="280"/>
@@ -24,6 +27,7 @@
             <GroupBox Header="시트 재고 (Sheets)" Grid.Row="0" Margin="0,0,0,5">
                 <StackPanel>
                     <DataGrid x:Name="sheetGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
+                              ItemsSource="{Binding Sheets}"
                               CanUserAddRows="True" CanUserDeleteRows="True"
                               KeyDown="DataGrid_KeyDown" CellEditEnding="DataGrid_CellEditEnding">
                         <DataGrid.Columns>
@@ -33,7 +37,7 @@
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Content="시트 추가" Click="AddSheet_Click" Margin="0,0,5,0" Width="80"/>
+                        <Button Content="시트 추가" Command="{Binding AddSheetCommand}" Margin="0,0,5,0" Width="80"/>
                         <Button Content="선택 삭제" Click="DeleteSheet_Click" Width="80"/>
                     </StackPanel>
                     <TextBlock Text="※ 엑셀 붙여넣기(Ctrl+V) 지원 / Delete키로 행 삭제" FontSize="11" Foreground="Gray" HorizontalAlignment="Center" Margin="0,5,0,0"/>
@@ -43,6 +47,7 @@
             <GroupBox Header="주문 (Items)" Grid.Row="1" Margin="0,5,0,0">
                 <StackPanel>
                     <DataGrid x:Name="rectOrderGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
+                              ItemsSource="{Binding Orders}"
                               CanUserAddRows="True" CanUserDeleteRows="True"
                               KeyDown="DataGrid_KeyDown" CellEditEnding="DataGrid_CellEditEnding">
                         <DataGrid.Columns>
@@ -53,7 +58,7 @@
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button Content="주문 추가" Click="AddRectOrder_Click" Width="80" Margin="0,0,5,0"/>
+                        <Button Content="주문 추가" Command="{Binding AddRectOrderCommand}" Width="80" Margin="0,0,5,0"/>
                         <Button Content="선택 삭제" Click="DeleteRectOrder_Click" Width="80"/>
                     </StackPanel>
                     <TextBlock Text="※ 엑셀 붙여넣기(Ctrl+V) 지원 / Delete키로 행 삭제" FontSize="11" Foreground="Gray" HorizontalAlignment="Center" Margin="0,5,0,0"/>
@@ -61,12 +66,12 @@
             </GroupBox>
 
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
-                <Button Content="예제 로드" Click="LoadExample_Click" Width="80" Margin="0,0,5,0"/>
-                <Button Content="시나리오 저장" Click="SaveScenario_Click" Width="100" Margin="0,0,5,0"
+                <Button Content="예제 로드" Command="{Binding LoadExampleCommand}" Width="80" Margin="0,0,5,0"/>
+                <Button Content="시나리오 저장" Command="{Binding SaveScenarioCommand}" Width="100" Margin="0,0,5,0"
                         ToolTip="현재 시트/주문/옵션을 .json 파일로 저장"/>
-                <Button Content="시나리오 열기" Click="LoadScenario_Click" Width="100" Margin="0,0,5,0"
+                <Button Content="시나리오 열기" Command="{Binding LoadScenarioCommand}" Width="100" Margin="0,0,5,0"
                         ToolTip="저장된 .json 시나리오를 불러오기"/>
-                <Button Content="전체 초기화" Click="ClearAll_Click" Width="80"/>
+                <Button Content="전체 초기화" Command="{Binding ClearAllCommand}" Width="80"/>
             </StackPanel>
         </Grid>
 
@@ -94,7 +99,8 @@
                     </Grid.RowDefinitions>
 
                     <TextBlock Text="알고리즘 선택:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="5"/>
-                    <ComboBox x:Name="algoCombo2D" Grid.Row="0" Grid.Column="1" Margin="5" SelectedIndex="0">
+                    <ComboBox Grid.Row="0" Grid.Column="1" Margin="5"
+                              SelectedIndex="{Binding AlgorithmIndex}">
                         <ComboBoxItem Content="Shelf Guillotine (NFDH/FFDH/BFDH, 빠름)"/>
                         <ComboBoxItem Content="Column Generation 2D (Gilmore-Gomory)"/>
                         <ComboBoxItem Content="Staged MIP Guillotine (CBC, 정확)"/>
@@ -117,58 +123,66 @@
 
                         <TextBlock Text="Kerf:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"
                                    ToolTip="톱날 두께 (mm). 인접 절단마다 소비되는 재료 손실. 0 = 무시"/>
-                        <TextBox x:Name="kerf2D" Grid.Row="0" Grid.Column="1" Text="0" Margin="5"
-                                 PreviewTextInput="IntegerTextBox_PreviewTextInput"
-                                 ToolTip="톱날 두께 (mm). 0 = 무시"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Margin="5"
+                                 Text="{Binding KerfText, UpdateSourceTrigger=PropertyChanged}"
+                                 PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
 
                         <TextBlock Text="Trim:" Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"
                                    ToolTip="시트 가장자리에서 사용 불가한 트림 폭 (mm). 모든 변에 적용"/>
-                        <TextBox x:Name="trim2D" Grid.Row="0" Grid.Column="3" Text="0" Margin="5"
-                                 PreviewTextInput="IntegerTextBox_PreviewTextInput"
-                                 ToolTip="트림 폭 (mm). 모든 변에 적용"/>
+                        <TextBox Grid.Row="0" Grid.Column="3" Margin="5"
+                                 Text="{Binding TrimText, UpdateSourceTrigger=PropertyChanged}"
+                                 PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
 
                         <TextBlock Text="Stage:" Grid.Row="0" Grid.Column="4" VerticalAlignment="Center" Margin="10,5,0,5"
                                    ToolTip="길로틴 단계 수. 산업용 패널 톱은 보통 2-stage"/>
-                        <ComboBox x:Name="stage2D" Grid.Row="0" Grid.Column="5" Margin="5" SelectedIndex="0">
+                        <ComboBox Grid.Row="0" Grid.Column="5" Margin="5"
+                                  SelectedIndex="{Binding StageIndex}">
                             <ComboBoxItem Content="2-stage"/>
                             <ComboBoxItem Content="3-stage"/>
                         </ComboBox>
 
                         <TextBlock Text="α (mm² 단가):" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"
-                                   ToolTip="면적 1mm² 당 비용 (원/mm²). 총 비용 계산에 사용"/>
-                        <TextBox x:Name="alphaArea2D" Grid.Row="1" Grid.Column="1" Text="1" Margin="5"
-                                 PreviewTextInput="DecimalTextBox_PreviewTextInput"
-                                 ToolTip="면적 단가"/>
+                                   ToolTip="면적 1mm² 당 비용 (원/mm²)"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Margin="5"
+                                 Text="{Binding AlphaAreaText, UpdateSourceTrigger=PropertyChanged}"
+                                 PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
 
                         <TextBlock Text="시간 제한(ms):" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"
                                    ToolTip="CG/MIP 솔버 wall-clock 제한 (ms)"/>
-                        <TextBox x:Name="timeLimit2D" Grid.Row="1" Grid.Column="3" Text="30000" Margin="5"
-                                 PreviewTextInput="IntegerTextBox_PreviewTextInput"
-                                 ToolTip="시간 제한 (ms)"/>
+                        <TextBox Grid.Row="1" Grid.Column="3" Margin="5"
+                                 Text="{Binding TimeLimitText, UpdateSourceTrigger=PropertyChanged}"
+                                 PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
 
-                        <CheckBox x:Name="rotation2D" Grid.Row="1" Grid.Column="4" Grid.ColumnSpan="2"
-                                  Content="90° 회전 허용" IsChecked="True" Margin="10,5,0,5" VerticalAlignment="Center"
+                        <CheckBox Grid.Row="1" Grid.Column="4" Grid.ColumnSpan="2"
+                                  Content="90° 회전 허용"
+                                  IsChecked="{Binding AllowRotation}"
+                                  Margin="10,5,0,5" VerticalAlignment="Center"
                                   ToolTip="True면 주문 사각형을 90° 돌려 배치 가능"/>
                     </Grid>
 
                     <TextBlock Text="재고 사용 순서:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="5"
                                ToolTip="여러 시트 크기 중 어떤 것부터 소진할지"/>
-                    <ComboBox x:Name="usageOrder2D" Grid.Row="2" Grid.Column="1" Margin="5,0,5,5" SelectedIndex="1">
+                    <ComboBox Grid.Row="2" Grid.Column="1" Margin="5,0,5,5"
+                              SelectedIndex="{Binding UsageOrderIndex}">
                         <ComboBoxItem Content="작은 것부터 (Small to Large)"/>
                         <ComboBoxItem Content="큰 것부터 (Large to Small)"/>
                     </ComboBox>
 
                     <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5">
-                        <Button x:Name="btnCalc2D" Content="최적화 실행" Click="Calculate2D_Click" Width="120" Height="35" Margin="0,0,10,0" FontWeight="Bold"/>
-                        <Button x:Name="btnComp2D" Content="알고리즘 비교" Click="Compare2D_Click" Width="120" Height="35" FontWeight="Bold"/>
+                        <Button Content="최적화 실행" Command="{Binding CalculateCommand}" Width="120" Height="35" Margin="0,0,10,0" FontWeight="Bold"/>
+                        <Button Content="알고리즘 비교" Command="{Binding CompareCommand}" Width="120" Height="35" FontWeight="Bold"/>
                     </StackPanel>
 
                     <!-- 진행 상태 오버레이 -->
-                    <Grid x:Name="loadingOverlay2D" Grid.Row="0" Grid.RowSpan="4" Grid.ColumnSpan="2"
-                          Background="#80FFFFFF" Visibility="Collapsed">
+                    <Grid Grid.Row="0" Grid.RowSpan="4" Grid.ColumnSpan="2"
+                          Background="#80FFFFFF"
+                          Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <ProgressBar x:Name="loadingBar2D" IsIndeterminate="True" Width="200" Height="20"/>
-                            <TextBlock x:Name="loadingText2D" Text="계산 중..." HorizontalAlignment="Center" Margin="0,5,0,0" FontWeight="Bold"/>
+                            <ProgressBar Width="200" Height="20"
+                                         IsIndeterminate="{Binding ProgressIndeterminate}"
+                                         Value="{Binding ProgressPercent}"
+                                         Minimum="0" Maximum="100"/>
+                            <TextBlock Text="{Binding ProgressText}" HorizontalAlignment="Center" Margin="0,5,0,0" FontWeight="Bold"/>
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -182,24 +196,26 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBox x:Name="report2DBox" Grid.Row="0" IsReadOnly="True"
+                        <TextBox Grid.Row="0" IsReadOnly="True"
                                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                                 FontFamily="Consolas" Padding="10"/>
+                                 FontFamily="Consolas" Padding="10"
+                                 Text="{Binding ReportText, Mode=OneWay}"/>
 
                         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
-                            <Button x:Name="btnExport2DCsv"   Content="CSV로 내보내기"   Click="Export2DToCsv_Click"   Width="120" Margin="0,0,5,0" IsEnabled="False"/>
-                            <Button x:Name="btnExport2DExcel" Content="Excel로 내보내기" Click="Export2DToExcel_Click" Width="120" IsEnabled="False"/>
+                            <Button Content="CSV로 내보내기"   Command="{Binding ExportToCsvCommand}"   Width="120" Margin="0,0,5,0" IsEnabled="{Binding HasSingleResult}"/>
+                            <Button Content="Excel로 내보내기" Command="{Binding ExportToExcelCommand}" Width="120" IsEnabled="{Binding HasSingleResult}"/>
                         </StackPanel>
                     </Grid>
                 </TabItem>
 
                 <TabItem Header="패턴 시각화">
                     <Grid>
-                        <TextBlock x:Name="visualization2DPlaceholder"
-                                   Text="최적화를 먼저 실행하면 패턴이 시각화됩니다."
+                        <TextBlock Text="최적화를 먼저 실행하면 패턴이 시각화됩니다."
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="Gray" FontSize="14" FontStyle="Italic"/>
-                        <ScrollViewer x:Name="visualization2DScroll" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                                   Foreground="Gray" FontSize="14" FontStyle="Italic"
+                                   Visibility="{Binding HasSingleResult, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      Visibility="{Binding HasSingleResult, Converter={StaticResource BoolToVis}}">
                             <StackPanel x:Name="visualization2DPanel" Margin="10"/>
                         </ScrollViewer>
                     </Grid>
@@ -207,20 +223,21 @@
 
                 <TabItem Header="알고리즘 비교">
                     <Grid>
-                        <TextBlock x:Name="compare2DPlaceholder"
-                                   Text="'알고리즘 비교' 버튼을 클릭하면 결과가 표시됩니다."
+                        <TextBlock Text="'알고리즘 비교' 버튼을 클릭하면 결과가 표시됩니다."
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="Gray" FontSize="14" FontStyle="Italic"/>
-                        <Grid x:Name="compare2DContent" Visibility="Collapsed">
+                                   Foreground="Gray" FontSize="14" FontStyle="Italic"
+                                   Visibility="{Binding HasComparisonResults, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
+                        <Grid Visibility="{Binding HasComparisonResults, Converter={StaticResource BoolToVis}}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="260"/>
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            <DataGrid x:Name="compare2DGrid" Grid.Row="0"
+                            <DataGrid Grid.Row="0"
                                       AutoGenerateColumns="False" IsReadOnly="True"
-                                      Height="160" Margin="10">
+                                      Height="160" Margin="10"
+                                      ItemsSource="{Binding CompareRows}">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="알고리즘" Binding="{Binding AlgorithmName}" Width="240"/>
                                     <DataGridTextColumn Header="시트 사용" Binding="{Binding SheetsUsed}" Width="100"/>
@@ -253,12 +270,13 @@
                                 </Grid>
                             </GroupBox>
 
-                            <TextBox x:Name="compare2DBox" Grid.Row="2" IsReadOnly="True"
+                            <TextBox Grid.Row="2" IsReadOnly="True"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                                     FontFamily="Consolas" Padding="10" Margin="10,0,10,10"/>
+                                     FontFamily="Consolas" Padding="10" Margin="10,0,10,10"
+                                     Text="{Binding CompareText, Mode=OneWay}"/>
                             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10,0,10,10">
-                                <Button x:Name="btnExportComp2DCsv"   Content="비교 결과 CSV로 저장"   Click="ExportComp2DToCsv_Click"   Width="150" Margin="0,0,5,0" IsEnabled="False"/>
-                                <Button x:Name="btnExportComp2DExcel" Content="비교 결과 Excel로 저장" Click="ExportComp2DToExcel_Click" Width="150" IsEnabled="False"/>
+                                <Button Content="비교 결과 CSV로 저장"   Command="{Binding ExportCompareToCsvCommand}"   Width="150" Margin="0,0,5,0" IsEnabled="{Binding HasComparisonResults}"/>
+                                <Button Content="비교 결과 Excel로 저장" Command="{Binding ExportCompareToExcelCommand}" Width="150" IsEnabled="{Binding HasComparisonResults}"/>
                             </StackPanel>
                         </Grid>
                     </Grid>
