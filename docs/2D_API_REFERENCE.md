@@ -60,12 +60,12 @@ Console.WriteLine(result.GetDetailedReport(options));
 ### `SolverOptions2D`
 | 멤버 | 타입 | 기본값 | 설명 |
 |---|---|---|---|
-| `Kerf` | int | 0 | 톱날 두께 (mm) |
-| `Trim` | int | 0 | 시트 가장자리 폐기 (mm) |
-| `AllowRotation` | bool | true | 글로벌 회전 허용 |
+| `Kerf` | int | 0 | 톱날 두께 (mm). 인접 컷 사이에 소비 |
+| `Trim` | int | 0 | 시트 각 변의 트림 폐기 (mm) |
+| `AllowRotation` | bool | true | 글로벌 90° 회전 토글 (per-`RectOrder` 플래그도 활성이어야 함) |
 | `AlphaArea` | float | 1.0 | mm² 당 폐기 비용 |
-| `Stage` | int | 2 | 길로틴 stage 수 (2 또는 3) |
-| `TimeLimitMs` | int | 30000 | 정확/CG 솔버 시간 제한 |
+| `Stage` | int | 2 | 길로틴 stage 수 (2 또는 3). **현재 advisory only** — 어떤 솔버도 3-stage를 강제하지 않으며 출력은 unrestricted-stage 길로틴이다 |
+| `TimeLimitMs` | int | 30000 | CG/MIP 솔버 **절대 wall-clock deadline**. 솔버 시작 시점부터 카운트되며 warm-start / bootstrap 시간도 포함 |
 | `UsageOrder` | enum | LargeToSmall | 시트 소비 순서 |
 
 ### `SolverResult2D`
@@ -123,7 +123,20 @@ public interface ICuttingSolver2D
 - `ColumnGeneration2DSolver` — Gilmore-Gomory CG (OR-Tools GLOP + Beasley DP)
 - `StagedMipGuillotineSolver` — 패턴 풀 + 정수 마스터 (OR-Tools CBC)
 
+**모든 솔버는 진입 즉시 `SolverUtils2D.AggregateByDims(sheets)`를 호출** —
+`Sheet.Equals`가 구조적이라 동일 dim 행이 여러 개 있으면 `Dictionary<Sheet, _>`에서
+키가 충돌해 인벤토리가 절반으로 잘리거나 `ArgumentException`이 난다. 외부에서 시트
+리스트를 만들 때 미리 합쳐도 되고, 그대로 넘겨도 솔버 안에서 안전하게 합산된다.
+
 ## 유틸리티
+
+### `SolverUtils2D.AggregateByDims`
+```csharp
+public static List<Sheet> AggregateByDims(List<Sheet> sheets);
+```
+동일 `(Width, Height)` 행을 한 `Sheet` 로 합쳐 `Quantity` 를 더한다. 모든 2D 솔버의
+진입부에서 호출하므로 일반적인 사용자가 직접 호출할 필요는 없으나, 외부 코드가
+LP 마스터 같은 하위 컴포넌트에 직접 접근하는 경우 같이 호출해야 한다.
 
 ### `GuillotineValidator`
 ```csharp

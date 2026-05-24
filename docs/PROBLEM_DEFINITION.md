@@ -105,21 +105,21 @@
 
 현재 3종의 1D 솔버(`ICuttingSolver`)와 3종의 2D 솔버(`ICuttingSolver2D`)가 구현되어 있다.
 상세는 `docs/ALGORITHMS.md` (1D) 및 `docs/2D_ALGORITHMS.md` (2D) 참조.
+공개 표면은 `docs/API_REFERENCE.md`, 측정치는 `docs/BENCHMARK_REPORT.md`에 정리되어 있다.
 
-## 9. 참고 문헌
+## 8. 참고 문헌
 
-### 9.1 이론적 배경
+### 8.1 이론적 배경
 - **Cutting Stock Problem**: NP-hard 조합 최적화 문제
 - **Bin Packing Problem**: 쌍대 문제
 - **Column Generation**: Dantzig-Wolfe 분해
 
-### 9.2 표준 알고리즘
+### 8.2 표준 알고리즘
 1. **FFD (First Fit Decreasing)**: 근사 비율 11/9
 2. **BFD (Best Fit Decreasing)**: 평균적으로 FFD보다 우수
 3. **Column Generation + Branch & Price**: 최적해
+4. **Arc Flow (Valerio de Carvalho 1999)**: 정확 MIP — 본 프로젝트 1D 정확 솔버
 
 ---
 
-**문서 버전**: 1.0
-**작성일**: 2025-11-02
-**작성자**: Claude (알고리즘 분석 및 리팩토링)
+**최근 갱신**: 2026-05 — MVVM 전환 / 615 테스트 / CG 버그 fix (kerf-aware initial column, single-stock demand filter) 반영
