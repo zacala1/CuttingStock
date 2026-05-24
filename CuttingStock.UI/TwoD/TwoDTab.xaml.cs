@@ -1,38 +1,32 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using CuttingStock.Core.TwoD.Algorithms;
 using CuttingStock.Core.TwoD.Domain;
-using CuttingStock.Core.TwoD.Models;
+using CuttingStock.UI.Services;
+using CuttingStock.UI.ViewModels;
+using LiveChartsCore;
+using LiveChartsCore.SkiaSharpView;
+using LiveChartsCore.SkiaSharpView.Painting;
+using SkiaSharp;
 
 namespace CuttingStock.UI.TwoD
 {
+    /// <summary>
+    /// 2D 탭. MVVM 전환 후 thin view 역할만 한다 — DataContext는 TwoDViewModel이고
+    /// View는 Canvas 직접 렌더링, DataGrid SelectedItems 위임, LiveCharts 시리즈
+    /// 갱신, 클립보드 paste만 처리한다.
+    /// </summary>
     public partial class TwoDTab : UserControl
     {
-        public sealed class SheetRow
-        {
-            public int Width { get; set; } = 2440;
-            public int Height { get; set; } = 1220;
-            public int Quantity { get; set; } = 5;
-        }
-
-        public sealed class RectOrderRow
-        {
-            public int Width { get; set; } = 600;
-            public int Height { get; set; } = 400;
-            public int Quantity { get; set; } = 4;
-            public bool AllowRotation { get; set; } = true;
-        }
-
-        private readonly ObservableCollection<SheetRow> _sheets = new();
-        private readonly ObservableCollection<RectOrderRow> _orders = new();
+        private readonly TwoDViewModel _vm;
+        private static readonly Regex IntegerRegex = new("[^0-9]+", RegexOptions.Compiled);
+        private static readonly Regex DecimalRegex = new("[^0-9.]+", RegexOptions.Compiled);
 
         private static readonly Brush[] Palette = new Brush[]
         {
@@ -49,199 +43,171 @@ namespace CuttingStock.UI.TwoD
         public TwoDTab()
         {
             InitializeComponent();
-            sheetGrid.ItemsSource = _sheets;
-            rectOrderGrid.ItemsSource = _orders;
+            _vm = new TwoDViewModel(new DialogService());
+            DataContext = _vm;
+            _vm.SingleResultReady  += (_, _) => Dispatcher.Invoke(() => RenderPatterns(_vm.LastResult!, _vm.LastOptions!));
+            _vm.CompareResultReady += (_, _) => Dispatcher.Invoke(() => { UpdateCompareCharts(); if (_vm.LastResult != null) RenderPatterns(_vm.LastResult, _vm.LastOptions!); });
         }
 
-        private void AddSheet_Click(object sender, RoutedEventArgs e) => _sheets.Add(new SheetRow());
+        // ─── DataGrid: selection delete / paste / validation ─────────
 
-        private void DeleteSheet_Click(object sender, RoutedEventArgs e)
+        private void DeleteSheet_Click(object sender, RoutedEventArgs e) =>
+            _vm.DeleteSelectedSheets(sheetGrid.SelectedItems.Cast<SheetRow>());
+
+        private void DeleteRectOrder_Click(object sender, RoutedEventArgs e) =>
+            _vm.DeleteSelectedOrders(rectOrderGrid.SelectedItems.Cast<RectOrderRow>());
+
+        private void DataGrid_KeyDown(object sender, KeyEventArgs e)
         {
-            if (sheetGrid.SelectedItem is SheetRow s) _sheets.Remove(s);
-        }
+            if (e.Key != Key.V || (Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control) return;
+            if (sender is not DataGrid grid) return;
 
-        private void AddRectOrder_Click(object sender, RoutedEventArgs e) => _orders.Add(new RectOrderRow());
-
-        private void DeleteRectOrder_Click(object sender, RoutedEventArgs e)
-        {
-            if (rectOrderGrid.SelectedItem is RectOrderRow o) _orders.Remove(o);
-        }
-
-        private void LoadExample_Click(object sender, RoutedEventArgs e)
-        {
-            _sheets.Clear();
-            _orders.Clear();
-            _sheets.Add(new SheetRow { Width = 2440, Height = 1220, Quantity = 5 });
-            _sheets.Add(new SheetRow { Width = 1220, Height = 1220, Quantity = 5 });
-            _orders.Add(new RectOrderRow { Width = 600, Height = 400, Quantity = 6 });
-            _orders.Add(new RectOrderRow { Width = 800, Height = 300, Quantity = 4 });
-            _orders.Add(new RectOrderRow { Width = 300, Height = 300, Quantity = 8 });
-            _orders.Add(new RectOrderRow { Width = 1200, Height = 500, Quantity = 2 });
-        }
-
-        private void ClearAll_Click(object sender, RoutedEventArgs e)
-        {
-            _sheets.Clear();
-            _orders.Clear();
-            report2DBox.Text = "";
-            visualization2DPanel.Children.Clear();
-            compare2DBox.Text = "";
-            compare2DGrid.ItemsSource = null;
-        }
-
-        private List<Sheet> BuildSheets()
-        {
-            var list = new List<Sheet>();
-            foreach (var s in _sheets)
-            {
-                if (s.Width > 0 && s.Height > 0 && s.Quantity > 0)
-                    list.Add(new Sheet(s.Width, s.Height, s.Quantity));
-            }
-            return list;
-        }
-
-        private List<RectOrder> BuildOrders()
-        {
-            var list = new List<RectOrder>();
-            foreach (var o in _orders)
-            {
-                if (o.Width > 0 && o.Height > 0 && o.Quantity > 0)
-                    list.Add(new RectOrder(o.Width, o.Height, o.Quantity, o.AllowRotation));
-            }
-            return list;
-        }
-
-        private SolverOptions2D BuildOptions()
-        {
-            var o = new SolverOptions2D
-            {
-                Kerf = ParseInt(kerf2D.Text, 0),
-                Trim = ParseInt(trim2D.Text, 0),
-                AllowRotation = rotation2D.IsChecked == true,
-                AlphaArea = (float)ParseDouble(alphaArea2D.Text, 1.0),
-                Stage = ((stage2D.SelectedItem as ComboBoxItem)?.Content?.ToString() == "3") ? 3 : 2,
-                TimeLimitMs = Math.Max(1000, ParseInt(timeLimit2D.Text, 30000)),
-            };
-            return o;
-        }
-
-        private static int ParseInt(string s, int fallback) =>
-            int.TryParse(s, out var v) ? v : fallback;
-
-        private static double ParseDouble(string s, double fallback) =>
-            double.TryParse(s, out var v) ? v : fallback;
-
-        private ICuttingSolver2D GetSelectedSolver() => algoCombo2D.SelectedIndex switch
-        {
-            0 => new ShelfGuillotineSolver(),
-            1 => new ColumnGeneration2DSolver(),
-            2 => new StagedMipGuillotineSolver(),
-            _ => new ShelfGuillotineSolver(),
-        };
-
-        private async void Calculate2D_Click(object sender, RoutedEventArgs e)
-        {
             try
             {
-                var sheets = BuildSheets();
-                var orders = BuildOrders();
-                if (sheets.Count == 0 || orders.Count == 0)
+                var text = Clipboard.GetText();
+                if (string.IsNullOrWhiteSpace(text)) return;
+
+                int added = 0;
+                foreach (var row in text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    MessageBox.Show("시트와 주문을 모두 입력하세요.", "입력 필요", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-                var options = BuildOptions();
-                var solver = GetSelectedSolver();
-
-                btnCalc2D.IsEnabled = false;
-                btnComp2D.IsEnabled = false;
-                report2DBox.Text = "계산 중...";
-
-                var result = await Task.Run(() => solver.Solve(sheets, orders, options));
-                if (!result.Success)
-                {
-                    report2DBox.Text = $"실패: {result.ErrorMessage}";
-                    return;
-                }
-
-                report2DBox.Text = result.GetDetailedReport(options);
-                RenderPatterns(result, options);
-                result2DTabs.SelectedIndex = 0;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                btnCalc2D.IsEnabled = true;
-                btnComp2D.IsEnabled = true;
-            }
-        }
-
-        private async void Compare2D_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var sheets = BuildSheets();
-                var orders = BuildOrders();
-                if (sheets.Count == 0 || orders.Count == 0)
-                {
-                    MessageBox.Show("시트와 주문을 모두 입력하세요.", "입력 필요", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-                var options = BuildOptions();
-
-                btnCalc2D.IsEnabled = false;
-                btnComp2D.IsEnabled = false;
-                compare2DBox.Text = "비교 중...";
-
-                ICuttingSolver2D[] solvers =
-                {
-                    new ShelfGuillotineSolver(),
-                    new ColumnGeneration2DSolver(),
-                    new StagedMipGuillotineSolver(),
-                };
-
-                var rows = new List<ComparisonResult2D>();
-                var details = new StringBuilder();
-
-                foreach (var s in solvers)
-                {
-                    var r = await Task.Run(() => s.Solve(sheets, orders, options));
-                    rows.Add(new ComparisonResult2D
+                    var cols = row.Split(new[] { '\t', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (grid.ItemsSource == _vm.Sheets)
                     {
-                        AlgorithmName = s.Name,
-                        TotalCost = r.TotalCost,
-                        WasteArea = r.TotalWasteArea,
-                        SheetsUsed = r.SheetsUsed,
-                        MaterialEfficiency = r.MaterialEfficiency,
-                        ExecutionTimeMs = r.ExecutionTimeMs,
-                        Success = r.Success,
-                    });
-                    details.AppendLine($"=== {s.Name} ===");
-                    details.AppendLine(r.Success ? r.GetDetailedReport(options) : ("실패: " + r.ErrorMessage));
-                    details.AppendLine();
+                        if (cols.Length < 3) continue;
+                        if (!int.TryParse(cols[0].Trim(), out int w) ||
+                            !int.TryParse(cols[1].Trim(), out int h) ||
+                            !int.TryParse(cols[2].Trim(), out int q) ||
+                            w <= 0 || h <= 0 || q <= 0) continue;
+                        _vm.Sheets.Add(new SheetRow { Width = w, Height = h, Quantity = q });
+                        added++;
+                    }
+                    else if (grid.ItemsSource == _vm.Orders)
+                    {
+                        if (cols.Length < 3) continue;
+                        if (!int.TryParse(cols[0].Trim(), out int w) ||
+                            !int.TryParse(cols[1].Trim(), out int h) ||
+                            !int.TryParse(cols[2].Trim(), out int q) ||
+                            w <= 0 || h <= 0 || q <= 0) continue;
+                        bool rot = cols.Length < 4 || ParseBool(cols[3].Trim(), defaultValue: true);
+                        _vm.Orders.Add(new RectOrderRow { Width = w, Height = h, Quantity = q, AllowRotation = rot });
+                        added++;
+                    }
                 }
-
-                int rank = 1;
-                foreach (var r in rows.OrderBy(r => r.TotalCost).ThenBy(r => r.SheetsUsed))
-                    r.Rank = rank++;
-
-                compare2DGrid.ItemsSource = rows.OrderBy(r => r.Rank).ToList();
-                compare2DBox.Text = details.ToString();
-                result2DTabs.SelectedIndex = 2;
+                if (added > 0)
+                    MessageBox.Show($"{added}개의 항목을 붙여넣었습니다.", "붙여넣기 성공",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                e.Handled = true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"오류: {ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                btnCalc2D.IsEnabled = true;
-                btnComp2D.IsEnabled = true;
+                MessageBox.Show($"붙여넣기 중 오류가 발생했습니다: {ex.Message}", "오류",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private static bool ParseBool(string s, bool defaultValue)
+        {
+            if (bool.TryParse(s, out var b)) return b;
+            if (s == "1" || s.Equals("yes", StringComparison.OrdinalIgnoreCase) || s.Equals("y", StringComparison.OrdinalIgnoreCase)) return true;
+            if (s == "0" || s.Equals("no", StringComparison.OrdinalIgnoreCase) || s.Equals("n", StringComparison.OrdinalIgnoreCase)) return false;
+            return defaultValue;
+        }
+
+        private void DataGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            if (e.EditAction == DataGridEditAction.Cancel) return;
+            if (sender is not DataGrid grid) return;
+            if (e.EditingElement is not TextBox tb) return;
+            string header = e.Column?.Header?.ToString() ?? string.Empty;
+            // 회전 컬럼은 CheckBox이므로 여기 도달하지 않음.
+            if (!int.TryParse(tb.Text, out int v) || v <= 0)
+            {
+                MessageBox.Show($"'{header}'에는 양의 정수만 입력 가능합니다.", "입력 오류",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                e.Cancel = true;
+            }
+        }
+
+        // ─── Numeric input filtering ─────────────────────────────────
+
+        private void IntegerTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e) =>
+            e.Handled = IntegerRegex.IsMatch(e.Text);
+
+        private void DecimalTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            if (DecimalRegex.IsMatch(e.Text)) { e.Handled = true; return; }
+            if (e.Text == "." && sender is TextBox tb && tb.Text.Contains('.')) e.Handled = true;
+        }
+
+        // ─── Charts (LiveCharts series construction) ─────────────────
+
+        private void UpdateCompareCharts()
+        {
+            var ok = _vm.CompareRows.Where(r => r.Success).ToList();
+            if (ok.Count == 0)
+            {
+                sheetsChart2D.Series = Array.Empty<ISeries>();
+                effChart2D.Series = Array.Empty<ISeries>();
+                timeChart2D.Series = Array.Empty<ISeries>();
+                return;
+            }
+
+            string[] labels = ok.Select(r => AbbreviateName(r.AlgorithmName)).ToArray();
+
+            sheetsChart2D.Series = new ISeries[]
+            {
+                new ColumnSeries<double>
+                {
+                    Values = ok.Select(r => (double)r.SheetsUsed).ToArray(),
+                    Fill = new SolidColorPaint(SKColors.CornflowerBlue),
+                    DataLabelsPaint = new SolidColorPaint(SKColors.Black),
+                    DataLabelsSize = 12,
+                    DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                },
+            };
+            sheetsChart2D.XAxes = new[] { new Axis { Labels = labels, LabelsRotation = -15 } };
+            sheetsChart2D.YAxes = new[] { new Axis { Name = "시트 사용 (개)" } };
+
+            effChart2D.Series = new ISeries[]
+            {
+                new ColumnSeries<double>
+                {
+                    Values = ok.Select(r => r.MaterialEfficiency).ToArray(),
+                    Fill = new SolidColorPaint(SKColors.MediumSeaGreen),
+                    DataLabelsPaint = new SolidColorPaint(SKColors.Black),
+                    DataLabelsSize = 12,
+                    DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                    DataLabelsFormatter = pt => $"{pt.Coordinate.PrimaryValue:F1}%",
+                },
+            };
+            effChart2D.XAxes = new[] { new Axis { Labels = labels, LabelsRotation = -15 } };
+            effChart2D.YAxes = new[] { new Axis { Name = "효율 (%)", MinLimit = 0, MaxLimit = 100 } };
+
+            timeChart2D.Series = new ISeries[]
+            {
+                new ColumnSeries<double>
+                {
+                    Values = ok.Select(r => r.ExecutionTimeMs).ToArray(),
+                    Fill = new SolidColorPaint(SKColors.Coral),
+                    DataLabelsPaint = new SolidColorPaint(SKColors.Black),
+                    DataLabelsSize = 12,
+                    DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                    DataLabelsFormatter = pt => $"{pt.Coordinate.PrimaryValue:F1}ms",
+                },
+            };
+            timeChart2D.XAxes = new[] { new Axis { Labels = labels, LabelsRotation = -15 } };
+            timeChart2D.YAxes = new[] { new Axis { Name = "시간 (ms)" } };
+        }
+
+        private static string AbbreviateName(string name)
+        {
+            int paren = name.IndexOf('(');
+            if (paren > 0 && paren < name.Length - 1)
+                return name[..paren].TrimEnd() + Environment.NewLine + name[paren..];
+            return name;
+        }
+
+        // ─── Pattern canvas rendering ────────────────────────────────
 
         private void RenderPatterns(SolverResult2D result, SolverOptions2D options)
         {
@@ -273,18 +239,15 @@ namespace CuttingStock.UI.TwoD
 
                 var canvas = new Canvas
                 {
-                    Width = cw,
-                    Height = ch,
+                    Width = cw, Height = ch,
                     Background = new SolidColorBrush(Color.FromRgb(0xF8, 0xF8, 0xF8)),
                 };
-                // Sheet outline.
                 canvas.Children.Add(new Rectangle
                 {
                     Width = cw, Height = ch,
                     Stroke = Brushes.Black, StrokeThickness = 1.2,
                     Fill = Brushes.Transparent,
                 });
-                // Trim outline.
                 if (options.Trim > 0)
                 {
                     double tx = options.Trim * scale;
@@ -300,17 +263,13 @@ namespace CuttingStock.UI.TwoD
                     Canvas.SetTop(trimRect, tx);
                     canvas.Children.Add(trimRect);
                 }
-                // Items.
                 foreach (var pl in pat.Placements)
                 {
                     var brush = Palette[pl.OrderIndex % Palette.Length];
                     var rect = new Rectangle
                     {
-                        Width = pl.Width * scale,
-                        Height = pl.Height * scale,
-                        Fill = brush,
-                        Stroke = Brushes.DimGray,
-                        StrokeThickness = 0.6,
+                        Width = pl.Width * scale, Height = pl.Height * scale,
+                        Fill = brush, Stroke = Brushes.DimGray, StrokeThickness = 0.6,
                         ToolTip = $"O{pl.OrderIndex} ({pl.Width}×{pl.Height})" + (pl.Rotated ? " ↻" : ""),
                     };
                     Canvas.SetLeft(rect, pl.X * scale);
@@ -320,8 +279,7 @@ namespace CuttingStock.UI.TwoD
                     var label = new TextBlock
                     {
                         Text = pl.Rotated ? $"O{pl.OrderIndex}↻" : $"O{pl.OrderIndex}",
-                        FontSize = 10,
-                        Foreground = Brushes.Black,
+                        FontSize = 10, Foreground = Brushes.Black,
                     };
                     Canvas.SetLeft(label, pl.X * scale + 2);
                     Canvas.SetTop(label, pl.Y * scale + 2);

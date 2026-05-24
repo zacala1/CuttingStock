@@ -148,27 +148,38 @@ namespace CuttingStock.Core.Algorithms
                             var bestCandidate = candidates[0];
                             double bestFutureScore = double.MaxValue;
 
-                            // Build lightweight snapshot once
-                            var orderSnapshot = new Dictionary<int, int>();
+                            // Mutable working buffer keyed by order length — much cheaper than
+                            // copying a Dictionary per candidate. Each candidate applies its
+                            // cuts, scores future waste, then reverts via the appliedCuts log;
+                            // the buffer is reused across candidates.
+                            var workingQty = new Dictionary<int, int>(sortedOrders.Count);
                             foreach (var o in sortedOrders)
                             {
-                                orderSnapshot[o.Length] = o.Quantity;
+                                workingQty[o.Length] = o.Quantity;
                             }
+                            var appliedCuts = new List<int>();
 
                             foreach (var candidate in candidates)
                             {
-                                // Simulate on dictionary copy (lightweight)
-                                var simulated = new Dictionary<int, int>(orderSnapshot);
+                                appliedCuts.Clear();
                                 foreach (var cut in candidate.Cuts)
                                 {
-                                    if (simulated.TryGetValue(cut, out int qty) && qty > 0)
+                                    if (workingQty.TryGetValue(cut, out int qty) && qty > 0)
                                     {
-                                        simulated[cut] = qty - 1;
+                                        workingQty[cut] = qty - 1;
+                                        appliedCuts.Add(cut);
                                     }
                                 }
 
-                                double futureWaste = EstimateFutureWasteFFDFromDict(simulated, stockItem.Length);
+                                double futureWaste = EstimateFutureWasteMFFDFromDict(workingQty, stockItem.Length);
                                 double totalScore = candidate.Waste + futureWaste;
+
+                                // Revert by replaying the applied log — the only cuts that
+                                // actually consumed from workingQty.
+                                foreach (var cut in appliedCuts)
+                                {
+                                    workingQty[cut]++;
+                                }
 
                                 if (totalScore < bestFutureScore)
                                 {
@@ -276,7 +287,10 @@ namespace CuttingStock.Core.Algorithms
 
             foreach (var order in orders.Where(o => o.Quantity > 0))
             {
-                var newEntries = new List<KeyValuePair<int, List<int>>>();
+                // Dedup by key, keeping the cut list with the fewest entries. A list
+                // was used here previously, but later overwrites by insertion order
+                // could let a worse candidate overwrite a better one for the same key.
+                var newEntries = new Dictionary<int, List<int>>();
                 var maxUsage = maxUsagePerOrder.GetValueOrDefault(order.Length, 1);
 
                 foreach (var kvp in dp)
@@ -303,23 +317,19 @@ namespace CuttingStock.Core.Algorithms
                         if (alreadyUsed + count > maxUsage)
                             continue;
 
-                        var newCuts = new List<int>(currentCuts);
-                        for (int j = 0; j < count; j++)
-                        {
-                            newCuts.Add(order.Length);
-                        }
+                        int newCutCount = currentCuts.Count + count;
 
-                        if (!dp.ContainsKey(newLength))
-                        {
-                            newEntries.Add(new KeyValuePair<int, List<int>>(newLength, newCuts));
-                        }
-                        else
-                        {
-                            if (newCuts.Count < dp[newLength].Count)
-                            {
-                                newEntries.Add(new KeyValuePair<int, List<int>>(newLength, newCuts));
-                            }
-                        }
+                        // Skip if neither dp nor newEntries holds an inferior entry
+                        // for this key — avoids allocating a list we'd throw away.
+                        if (dp.TryGetValue(newLength, out var existingDp) && newCutCount >= existingDp.Count)
+                            continue;
+                        if (newEntries.TryGetValue(newLength, out var existingNew) && newCutCount >= existingNew.Count)
+                            continue;
+
+                        var newCuts = new List<int>(newCutCount);
+                        newCuts.AddRange(currentCuts);
+                        for (int j = 0; j < count; j++) newCuts.Add(order.Length);
+                        newEntries[newLength] = newCuts;
                     }
                 }
 
@@ -457,8 +467,6 @@ namespace CuttingStock.Core.Algorithms
 
                     foreach (var (pieceLength, stockLength) in pieces)
                     {
-                        // Always create a new plan for welded pieces to avoid
-                        // corrupting existing plans' leftover calculations
                         var cut = new Cut
                         {
                             Length = pieceLength,
@@ -467,14 +475,43 @@ namespace CuttingStock.Core.Algorithms
                             WeldGroupId = requiresWelding ? weldGroupId : null
                         };
 
-                        var weldCuts = new List<Cut> { cut };
-                        var plan = new CuttingPlan
+                        // Partial-bar pieces (pieceLength < stockLength) may fit into an
+                        // existing non-welded plan's leftover. Doing so avoids burning a
+                        // fresh bar when a tail piece can ride along on an already-cut bar.
+                        // Full-bar pieces must take a fresh bar; their bar usage was
+                        // already reserved above via stockUsage.
+                        CuttingPlan? hostPlan = null;
+                        if (pieceLength < stockLength)
                         {
-                            StockLength = stockLength,
-                            Cuts = weldCuts,
-                            Leftover = SolverUtils.ComputeLeftover(stockLength, weldCuts, options.Kerf)
-                        };
-                        result.CuttingPlans.Add(plan);
+                            hostPlan = FindHostPlanForWeld(result.CuttingPlans, pieceLength, options);
+                        }
+
+                        if (hostPlan != null)
+                        {
+                            hostPlan.Cuts.Add(cut);
+                            hostPlan.Leftover = SolverUtils.ComputeLeftover(hostPlan.StockLength, hostPlan.Cuts, options.Kerf);
+
+                            // Free the bar we had reserved for this piece — it wasn't needed.
+                            for (int si = sortedStock.Count - 1; si >= 0; si--)
+                            {
+                                if (sortedStock[si].Length == stockLength && stockUsage[si] > 0)
+                                {
+                                    stockUsage[si]--;
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            var weldCuts = new List<Cut> { cut };
+                            var plan = new CuttingPlan
+                            {
+                                StockLength = stockLength,
+                                Cuts = weldCuts,
+                                Leftover = SolverUtils.ComputeLeftover(stockLength, weldCuts, options.Kerf)
+                            };
+                            result.CuttingPlans.Add(plan);
+                        }
                     }
 
                     if (requiresWelding)
@@ -498,7 +535,38 @@ namespace CuttingStock.Core.Algorithms
             }
         }
 
-        private double EstimateFutureWasteFFDFromDict(Dictionary<int, int> orderDict, int stockLength)
+        /// <summary>
+        /// Locates an existing non-welded plan whose leftover (after a fresh kerf) can
+        /// accommodate a welded piece. Picks the smallest viable leftover to keep larger
+        /// scraps available for later. Returns null when no such plan exists.
+        /// </summary>
+        private static CuttingPlan? FindHostPlanForWeld(List<CuttingPlan> plans, int pieceLength, SolverOptions options)
+        {
+            CuttingPlan? best = null;
+            int bestLeftover = int.MaxValue;
+
+            foreach (var plan in plans)
+            {
+                // Welded plans are structurally 1 cut per bar — adding to them breaks that
+                // invariant and the local-search/redistribute guards that rely on it.
+                bool isWeldedPlan = false;
+                foreach (var c in plan.Cuts)
+                {
+                    if (c.WeldGroupId.HasValue) { isWeldedPlan = true; break; }
+                }
+                if (isWeldedPlan) continue;
+
+                int needed = pieceLength + (plan.Cuts.Count > 0 ? options.Kerf : 0);
+                if (plan.Leftover >= needed && plan.Leftover < bestLeftover)
+                {
+                    best = plan;
+                    bestLeftover = plan.Leftover;
+                }
+            }
+            return best;
+        }
+
+        private double EstimateFutureWasteMFFDFromDict(Dictionary<int, int> orderDict, int stockLength)
         {
             var items = new List<int>();
             foreach (var kvp in orderDict)

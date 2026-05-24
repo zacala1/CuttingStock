@@ -33,17 +33,19 @@ namespace CuttingStock.Core.TwoD.Algorithms
             var result = new SolverResult2D { AlgorithmName = Name };
             try
             {
-                if (sheets == null || sheets.Count == 0)
-                    throw new ArgumentException("At least one sheet must be provided.", nameof(sheets));
-                if (orders == null || orders.Count == 0)
+                if (SolverUtils2D.ValidateInputs(sheets, orders, result))
                 {
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;
                 }
 
-                int n = orders.Count;
+                int n = orders!.Count;
                 int[] demand = orders.Select(o => o.Quantity).ToArray();
+
+                // Sheet equality is structural — duplicate-dim rows must be merged
+                // before any downstream Dictionary<Sheet,_> usage.
+                sheets = SolverUtils2D.AggregateByDims(sheets!);
 
                 // 1) Warm start with the shelf heuristic.
                 var warm = new ShelfGuillotineSolver().Solve(sheets, orders, options);
@@ -67,7 +69,9 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 // 2) Column generation loop with multi-pricing: every iteration picks ALL
                 //    improving columns (one per sheet type), not just the best one. Empirically
                 //    this shrinks the iteration count by 2–4× on multi-sheet inputs.
-                long deadline = sw.ElapsedMilliseconds + options.TimeLimitMs;
+                // TimeLimitMs is the total wall-clock budget; warm start already consumed
+                // some of it, so the deadline is from session start, not from "now".
+                long deadline = options.TimeLimitMs;
                 for (int iter = 0; iter < MaxCgIterations; iter++)
                 {
                     if (sw.ElapsedMilliseconds > deadline) break;

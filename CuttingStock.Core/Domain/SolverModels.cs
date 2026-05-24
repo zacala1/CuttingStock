@@ -68,7 +68,7 @@ namespace CuttingStock.Core.Domain
         public List<int> ReusableLeftovers { get; set; } = new();
         public int WasteLength { get; set; }
         public int WeldCount { get; set; }
-        public int TotalCost { get; set; }
+        public long TotalCost { get; set; }
         public double ExecutionTimeMs { get; set; }
         public bool Success { get; set; } = true;
         public string? ErrorMessage { get; set; }
@@ -145,19 +145,20 @@ namespace CuttingStock.Core.Domain
     }
 
     /// <summary>One stock bar and how it's cut.</summary>
-    public class CuttingPlan
+    public sealed class CuttingPlan
     {
-        public int StockLength { get; set; }
-        public List<Cut> Cuts { get; set; } = new();
+        public int StockLength { get; init; }
+        public List<Cut> Cuts { get; init; } = new();
+        // Mutable: post-processing (relocate/swap) recomputes this after Cuts changes.
         public int Leftover { get; set; }
     }
 
     /// <summary>A single cut piece from a stock bar.</summary>
-    public class Cut
+    public sealed class Cut
     {
-        public int Length { get; set; }
-        public int OrderIndex { get; set; }
-        public bool RequiresWelding { get; set; }
-        public int? WeldGroupId { get; set; }
+        public int Length { get; init; }
+        public int OrderIndex { get; init; }
+        public bool RequiresWelding { get; init; }
+        public int? WeldGroupId { get; init; }
     }
 }

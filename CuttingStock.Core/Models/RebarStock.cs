@@ -1,12 +1,10 @@
 namespace CuttingStock.Core.Models
 {
-    /// <summary>Available rebar stock. All lengths in mm.</summary>
+    /// <summary>Available rebar stock. All lengths in mm. Immutable value type.</summary>
     public sealed class RebarStock : IEquatable<RebarStock>
     {
-        public int Length { get; set; }
-        public int Quantity { get; set; }
-
-        public RebarStock() { }
+        public int Length { get; }
+        public int Quantity { get; }
 
         public RebarStock(int length, int quantity)
         {

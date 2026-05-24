@@ -24,11 +24,48 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             return list;
         }
 
+        /// <summary>
+        /// Validates sheets and orders for 2D solvers. Returns true if the result has
+        /// been finalized (caller should return) — either due to invalid sheets or an
+        /// empty order list (treated as trivially solved with no patterns).
+        /// </summary>
+        public static bool ValidateInputs(
+            List<Sheet>? sheets, List<RectOrder>? orders, SolverResult2D result)
+        {
+            if (sheets == null || sheets.Count == 0)
+            {
+                result.Success = false;
+                result.ErrorMessage = "At least one sheet must be provided.";
+                return true;
+            }
+            if (orders == null || orders.Count == 0)
+            {
+                // Empty demand is trivially solved with no patterns; success stays true.
+                return true;
+            }
+            return false;
+        }
+
         public static List<Sheet> OrderSheets(List<Sheet> sheets, SolverOptions2D options)
         {
             return options.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge
                 ? sheets.OrderBy(s => s.Area).ToList()
                 : sheets.OrderByDescending(s => s.Area).ToList();
+        }
+
+        /// <summary>
+        /// Collapse same-dimension Sheet rows into a single row with summed Quantity.
+        /// Required by every solver because Sheet.Equals/GetHashCode are structural —
+        /// two distinct rows with the same (Width, Height, Quantity) collide as the
+        /// same key in Dictionary&lt;Sheet,_&gt;, hiding half the inventory and causing
+        /// either an ArgumentException or a silently low capacity.
+        /// </summary>
+        public static List<Sheet> AggregateByDims(List<Sheet> sheets)
+        {
+            return sheets
+                .GroupBy(s => (s.Width, s.Height))
+                .Select(g => new Sheet(g.Key.Width, g.Key.Height, g.Sum(s => s.Quantity)))
+                .ToList();
         }
 
         public static void Finalize(SolverResult2D result, SolverOptions2D options)

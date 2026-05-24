@@ -167,8 +167,13 @@ namespace CuttingStock.Core.Algorithms
             int stockLength = primaryStock.Length;
             int availableStock = stock.Where(s => s.Length == stockLength).Sum(s => s.Quantity);
 
+            // Filter out orders that cannot fit in the stock. Without this the LP
+            // would create an "identity pattern" with a 15000mm cut placed inside a
+            // 6000mm bar and never know it's infeasible — the final extracted plan
+            // would claim success while physically violating the stock length.
             var demand = orders.GroupBy(o => o.Length)
-                              .ToDictionary(g => g.Key, g => g.Sum(o => o.Quantity));
+                               .Where(g => g.Key <= stockLength)
+                               .ToDictionary(g => g.Key, g => g.Sum(o => o.Quantity));
 
             SolveSingleStockInternal(result, stockLength, availableStock, demand, kerf, progress);
         }
@@ -196,27 +201,37 @@ namespace CuttingStock.Core.Algorithms
                 patterns.Add(col);
             }
 
-            // Add Greedy Patterns to improve convergence and integer solution quality
+            // Add Greedy Patterns to improve convergence and integer solution quality.
+            // Kerf is consumed BETWEEN adjacent cuts, so the n-th cut (0-indexed) on a
+            // bar costs `len` if it's the first cut and `len + kerf` otherwise. Earlier
+            // versions of this loop dropped the kerf term entirely, generating columns
+            // that the LP would happily select but that would over-pack the bar by
+            // (cuts-1)*kerf mm at extraction time.
             foreach (var startLen in distinctLengths)
             {
                 var col = new CuttingPatternColumn(numConstraints);
                 int currentRem = stockLength;
+                int cutsSoFar = 0;
 
                 int startIdx = distinctLengths.IndexOf(startLen);
                 if (startLen <= currentRem)
                 {
                     col.Counts[startIdx]++;
                     currentRem -= startLen;
+                    cutsSoFar++;
                 }
 
-                // Fill remaining space with largest possible items
+                // Fill remaining space with largest possible items, kerf-aware.
                 for (int i = 0; i < numConstraints; i++)
                 {
                     int len = distinctLengths[i];
-                    while (len <= currentRem)
+                    while (true)
                     {
+                        int weight = len + (cutsSoFar > 0 ? kerf : 0);
+                        if (weight > currentRem) break;
                         col.Counts[i]++;
-                        currentRem -= len;
+                        currentRem -= weight;
+                        cutsSoFar++;
                     }
                 }
 
@@ -327,7 +342,13 @@ namespace CuttingStock.Core.Algorithms
             return res;
         }
 
-        private void GenerateSolutionHybrid(
+        /// <summary>
+        /// Greedy fallback used as Phase 2 of <see cref="GenerateSolutionFloorResidual"/>.
+        /// Picks the pattern with the smallest kerf-adjusted waste each step and applies
+        /// it as many times as the remaining demand allows. Used when LP floor leaves
+        /// uncovered demand.
+        /// </summary>
+        private void ApplyGreedyResidual(
             SolverResult result,
             List<CuttingPatternColumn> patterns,
             Dictionary<int, int> demand,
@@ -538,7 +559,7 @@ namespace CuttingStock.Core.Algorithms
             // Phase 2: Solve residual demand with greedy fallback
             if (currentDemand.Any(kv => kv.Value > 0) && usedStockCount < maxStockCount)
             {
-                GenerateSolutionHybrid(result, patterns, currentDemand, lengths, stockLength, maxStockCount - usedStockCount, kerf);
+                ApplyGreedyResidual(result, patterns, currentDemand, lengths, stockLength, maxStockCount - usedStockCount, kerf);
             }
         }
 

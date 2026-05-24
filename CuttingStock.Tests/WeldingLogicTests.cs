@@ -261,7 +261,45 @@ namespace CuttingStock.Tests
             var weldCost = result.WeldCount * parameters.Beta;
             weldCost.Should().Be(1000, "2회 × 500원 = 1000원");
 
-            result.TotalCost.Should().BeGreaterThanOrEqualTo((int)weldCost, "총 비용에 용접 비용 포함");
+            result.TotalCost.Should().BeGreaterThanOrEqualTo((long)weldCost, "총 비용에 용접 비용 포함");
+        }
+
+        /// <summary>
+        /// 용접 부분 조각이 기존 plan의 leftover를 활용해 추가 재고 사용을 줄여야 함 (B2 회귀).
+        /// </summary>
+        [Test]
+        public void WeldTailPiece_ShouldReuseExistingLeftover()
+        {
+            // 정상 주문: 12000mm 재고에서 2000mm 8개 사용 → leftover 0 plans 다수.
+            // 한 plan만 8000mm 사용 → leftover 4000mm.
+            // 용접 주문: 15000mm → 12000 + 3000.
+            //   - 12000 piece: full bar, 새 plan
+            //   - 3000  piece: partial, 위의 4000mm leftover에 호스트 가능 → 새 bar 절약
+            var stock = new List<RebarStock> { new RebarStock(12000, 10) };
+            var orders = new List<Order>
+            {
+                new Order(8000, 1),
+                new Order(15000, 1),
+            };
+            var parameters = new SolverOptions
+            {
+                Alpha = 1.0f, Beta = 500.0f,
+                Gamma = 100, Delta = 1000,
+                EnableWelding = true,
+            };
+
+            var result = new GreedyKnapsackSolver().Solve(stock, orders, parameters);
+
+            result.Success.Should().BeTrue();
+            // 8000 + 15000 = 23000mm 총 cut, 12m 재고 2개면 24000mm — 3개째 필요 없어야 함.
+            result.StockUsed.Should().Be(2, "leftover 호스트로 인해 2 bar 만 사용");
+
+            var weldedCuts = result.CuttingPlans
+                .SelectMany(p => p.Cuts)
+                .Where(c => c.WeldGroupId.HasValue)
+                .ToList();
+            weldedCuts.Should().HaveCount(2, "12000 + 3000 = 2 piece");
+            weldedCuts.Sum(c => c.Length).Should().Be(15000);
         }
 
         /// <summary>

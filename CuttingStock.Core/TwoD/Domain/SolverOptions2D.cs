@@ -36,7 +36,11 @@ namespace CuttingStock.Core.TwoD.Domain
         /// <summary>Global 90° rotation toggle. Per-item flag must also be true.</summary>
         public bool AllowRotation { get; set; } = true;
 
-        /// <summary>Guillotine stage count (2 or 3). Industry panel saws are typically 2-stage.</summary>
+        /// <summary>
+        /// Guillotine stage count (2 or 3). Industry panel saws are typically 2-stage.
+        /// NOTE: Currently advisory only — the shipped solvers (Shelf/CG2D/StagedMip)
+        /// produce unrestricted-stage guillotine patterns. Reserved for future enforcement.
+        /// </summary>
         public int Stage
         {
             get => _stage;

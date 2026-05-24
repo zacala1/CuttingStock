@@ -37,17 +37,19 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             try
             {
-                if (sheets == null || sheets.Count == 0)
-                    throw new ArgumentException("At least one sheet must be provided.", nameof(sheets));
-                if (orders == null || orders.Count == 0)
+                if (SolverUtils2D.ValidateInputs(sheets, orders, result))
                 {
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;
                 }
 
-                int n = orders.Count;
+                int n = orders!.Count;
                 int[] demand = orders.Select(o => o.Quantity).ToArray();
+
+                // Sheet equality is structural — duplicate-dim rows must be merged
+                // before any downstream Dictionary<Sheet,_> usage.
+                sheets = SolverUtils2D.AggregateByDims(sheets!);
 
                 // 1) Bootstrap pool with shelf heuristic.
                 var heur = new ShelfGuillotineSolver().Solve(sheets, orders, options);
@@ -68,8 +70,10 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 // 2) Enrich pool with multi-pricing column generation. Half the time budget
                 //    goes to CG, the other half to the integer master. Every iteration adds
                 //    one improving column per sheet type.
-                long deadline = sw.ElapsedMilliseconds + options.TimeLimitMs;
-                long pricingEnd = sw.ElapsedMilliseconds + options.TimeLimitMs / 2;
+                // TimeLimitMs is the total wall-clock budget; bootstrap already consumed
+                // some of it, so the deadlines are from session start.
+                long deadline = options.TimeLimitMs;
+                long pricingEnd = options.TimeLimitMs / 2;
 
                 for (int iter = 0; iter < MaxCgIterations; iter++)
                 {
@@ -234,13 +238,21 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 c.SetCoefficient(over[i], -1);
             }
 
-            // Sheet inventory: Σ_{p: sheet=s} x_p ≤ Q_s
-            for (int s = 0; s < sheets.Count; s++)
+            // Sheet inventory: Σ_{p: sheet dims = (w,h)} x_p ≤ Σ Q_s for that (w,h).
+            // Aggregating by (Width, Height) is critical when the caller hands us
+            // multiple Sheet rows with identical dimensions — without the group-sum,
+            // every per-row constraint clamps to its individual Quantity, and the
+            // smallest one dominates (e.g. two rows of 2440×1220 with qty 3 and 5
+            // would cap the IP at 3 sheets total instead of 8).
+            var sheetTotals = sheets
+                .GroupBy(s => (s.Width, s.Height))
+                .Select(g => (Dims: g.Key, Total: g.Sum(s => s.Quantity)))
+                .ToList();
+            foreach (var (dims, total) in sheetTotals)
             {
-                var sheet = sheets[s];
-                var c = solver.MakeConstraint(0, sheet.Quantity, $"q{s}");
+                var c = solver.MakeConstraint(0, total, $"q_{dims.Width}x{dims.Height}");
                 for (int p = 0; p < m; p++)
-                    if (columns[p].Sheet.Width == sheet.Width && columns[p].Sheet.Height == sheet.Height)
+                    if (columns[p].Sheet.Width == dims.Width && columns[p].Sheet.Height == dims.Height)
                         c.SetCoefficient(vars[p], 1);
             }
 

@@ -43,10 +43,60 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                         Rotated = pl.Rotated
                     };
                 }
-                // Need to split off the rectangle from waste — try a single guillotine cut.
-                return TrySplit(x0, y0, w, h, rects, placements);
+                // Single rect doesn't fill region: peel waste off one edge at a time.
+                // TrySplit can't help here because TryPartition requires both sides non-empty.
+                return SplitOffSingleRect(x0, y0, w, h, r, placements);
             }
             return TrySplit(x0, y0, w, h, rects, placements);
+        }
+
+        /// <summary>
+        /// Decompose a region containing exactly one rectangle by peeling off waste
+        /// from each side that doesn't touch the rect. At most 4 cuts.
+        /// </summary>
+        private static GuillotineNode? SplitOffSingleRect(
+            int x0, int y0, int w, int h,
+            (int x, int y, int w, int h, int OrigIdx) r,
+            List<Placement> placements)
+        {
+            int x1 = x0 + w, y1 = y0 + h;
+
+            // Peel left waste strip.
+            if (r.x > x0)
+            {
+                var left  = new GuillotineNode { Kind = NodeKind.Waste, X = x0,  Y = y0, Width = r.x - x0, Height = h };
+                var right = BuildRec(r.x, y0, x1 - r.x, h, new() { r }, placements);
+                if (right == null) return null;
+                return new GuillotineNode { Kind = NodeKind.VCut, X = x0, Y = y0, Width = w, Height = h, Children = { left, right } };
+            }
+            // Peel right waste strip.
+            int rx2 = r.x + r.w;
+            if (rx2 < x1)
+            {
+                var left  = BuildRec(x0, y0, rx2 - x0, h, new() { r }, placements);
+                if (left == null) return null;
+                var right = new GuillotineNode { Kind = NodeKind.Waste, X = rx2, Y = y0, Width = x1 - rx2, Height = h };
+                return new GuillotineNode { Kind = NodeKind.VCut, X = x0, Y = y0, Width = w, Height = h, Children = { left, right } };
+            }
+            // Peel top waste strip.
+            if (r.y > y0)
+            {
+                var top = new GuillotineNode { Kind = NodeKind.Waste, X = x0, Y = y0, Width = w, Height = r.y - y0 };
+                var bot = BuildRec(x0, r.y, w, y1 - r.y, new() { r }, placements);
+                if (bot == null) return null;
+                return new GuillotineNode { Kind = NodeKind.HCut, X = x0, Y = y0, Width = w, Height = h, Children = { top, bot } };
+            }
+            // Peel bottom waste strip.
+            int ry2 = r.y + r.h;
+            if (ry2 < y1)
+            {
+                var top = BuildRec(x0, y0, w, ry2 - y0, new() { r }, placements);
+                if (top == null) return null;
+                var bot = new GuillotineNode { Kind = NodeKind.Waste, X = x0, Y = ry2, Width = w, Height = y1 - ry2 };
+                return new GuillotineNode { Kind = NodeKind.HCut, X = x0, Y = y0, Width = w, Height = h, Children = { top, bot } };
+            }
+            // Rect fills the region exactly — already handled by the caller.
+            return null;
         }
 
         private static GuillotineNode? TrySplit(
