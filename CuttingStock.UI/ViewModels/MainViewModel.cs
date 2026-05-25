@@ -248,6 +248,9 @@ namespace CuttingStock.UI.ViewModels
             var optimizer = BuildOptimizer();
 
             int runId = ++_currentRunId;
+            // Dispose any leftover CTS from a previous run before allocating a new one
+            // — without this we leak one kernel handle per Calculate / Compare invocation.
+            _currentCts?.Dispose();
             _currentCts = new System.Threading.CancellationTokenSource();
 
             try
@@ -338,6 +341,7 @@ namespace CuttingStock.UI.ViewModels
             _lastOptions = parameters;
 
             int runId = ++_currentRunId;
+            _currentCts?.Dispose();
             _currentCts = new System.Threading.CancellationTokenSource();
 
             try

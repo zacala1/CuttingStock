@@ -16,9 +16,13 @@ namespace CuttingStock.Core.Persistence
         // Window
         public double WindowWidth  { get; set; } = 1400;
         public double WindowHeight { get; set; } = 820;
-        public double WindowLeft   { get; set; } = double.NaN;  // NaN → centered on first run
-        public double WindowTop    { get; set; } = double.NaN;
-        public bool   WindowMaximized { get; set; }
+        /// <summary>Null on first run — caller centres the window. Was previously
+        /// double.NaN, but System.Text.Json with default options throws on NaN, so
+        /// any close-from-maximized that kept the NaN default lost the entire
+        /// preferences file. Nullable double round-trips cleanly.</summary>
+        public double? WindowLeft  { get; set; }
+        public double? WindowTop   { get; set; }
+        public bool    WindowMaximized { get; set; }
 
         /// <summary>0 = 1D Rebar tab, 1 = 2D Sheet tab.</summary>
         public int LastTopTabIndex { get; set; }
@@ -71,18 +75,33 @@ namespace CuttingStock.Core.Persistence
             }
         }
 
-        /// <summary>Save preferences. Swallows errors (writing prefs must never break the app).</summary>
+        /// <summary>
+        /// Save preferences atomically — write to a temp file in the same directory
+        /// then rename over the target so a power loss / crash mid-write cannot leave
+        /// a half-written prefs.json that would prevent the app from starting next
+        /// time. Swallows errors (writing prefs must never break the app).
+        /// </summary>
         public static void Save(UserPreferences prefs, string? path = null)
         {
             path ??= DefaultPath;
+            string? tempPath = null;
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllText(path, JsonSerializer.Serialize(prefs, Json));
+                var dir = Path.GetDirectoryName(path)!;
+                Directory.CreateDirectory(dir);
+                tempPath = Path.Combine(dir, Path.GetFileName(path) + ".tmp");
+                File.WriteAllText(tempPath, JsonSerializer.Serialize(prefs, Json));
+                // File.Move with overwrite is atomic on NTFS for files on the same
+                // volume — which is guaranteed because tempPath is in the same dir.
+                File.Move(tempPath, path, overwrite: true);
             }
             catch
             {
-                // Quietly give up — preference loss is not worth surfacing.
+                // Quietly give up. Best-effort cleanup of the temp file.
+                if (tempPath != null)
+                {
+                    try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                }
             }
         }
 

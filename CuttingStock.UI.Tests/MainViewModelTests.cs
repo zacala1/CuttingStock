@@ -305,6 +305,31 @@ namespace CuttingStock.UI.Tests
             }
         }
 
+        // ─── CTS lifecycle ───────────────────────────────────────────
+
+        [Test]
+        public async Task Calculate_Twice_DisposesOldCts()
+        {
+            // First run — completes synchronously enough that _currentCts is set.
+            _vm.Stocks.Add(new StockRow { Length = 12000, Quantity = 3 });
+            _vm.Orders.Add(new OrderRow { Length = 4000, Quantity = 2 });
+
+            await _vm.CalculateCommand.ExecuteAsync(null);
+
+            // Capture the CTS reference via reflection so we can verify it's disposed
+            // when the second run replaces it.
+            var ctsField = typeof(MainViewModel).GetField("_currentCts",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            var firstCts = (System.Threading.CancellationTokenSource?)ctsField.GetValue(_vm);
+            firstCts.Should().NotBeNull();
+
+            await _vm.CalculateCommand.ExecuteAsync(null);
+
+            // Old CTS should now be disposed (calling Cancel throws ObjectDisposedException).
+            var act = () => firstCts!.Cancel();
+            act.Should().Throw<ObjectDisposedException>("old CTS must be disposed when a new run starts");
+        }
+
         [Test]
         public void LoadScenario_FiresScenarioLoadedEvent()
         {

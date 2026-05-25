@@ -234,6 +234,7 @@ namespace CuttingStock.UI.ViewModels
             var solver = BuildSolver(AlgorithmIndex);
 
             int runId = ++_currentRunId;
+            _currentCts?.Dispose();
             _currentCts = new System.Threading.CancellationTokenSource();
 
             try
@@ -246,6 +247,7 @@ namespace CuttingStock.UI.ViewModels
 
                 var progress = new Progress<double>(pct =>
                 {
+                    if (runId != _currentRunId) return;  // ignore stale callback after cancel/supersede
                     ProgressIndeterminate = false;
                     double v = pct <= 1.0 ? pct * 100.0 : pct;
                     v = Math.Clamp(v, 0, 100);
@@ -293,6 +295,7 @@ namespace CuttingStock.UI.ViewModels
             { _dialog.ShowWarning("입력 오류", "유효한 시트/주문이 없습니다."); return; }
 
             int runId = ++_currentRunId;
+            _currentCts?.Dispose();
             _currentCts = new System.Threading.CancellationTokenSource();
 
             try
@@ -325,6 +328,7 @@ namespace CuttingStock.UI.ViewModels
 
                     var sliceProgress = new Progress<double>(pct =>
                     {
+                        if (runId != _currentRunId) return;
                         double frac = pct <= 1.0 ? pct : pct / 100.0;
                         double overall = (solverIdx + Math.Clamp(frac, 0, 1)) / solvers.Length * 100.0;
                         ProgressPercent = Math.Clamp(overall, 0, 100);

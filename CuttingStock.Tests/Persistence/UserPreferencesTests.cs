@@ -127,5 +127,30 @@ namespace CuttingStock.Tests.Persistence
             recent.Should().HaveCount(1);
             recent[0].Should().Be("c:/foo.json", "second push wins");
         }
+
+        // ─── Atomic write: temp file is cleaned up + crash-mid-write doesn't strand it ──
+
+        [Test]
+        public void Save_LeavesNoTempFileBehind()
+        {
+            UserPreferencesStore.Save(new UserPreferences { WindowWidth = 1234 }, _tempPath);
+
+            File.Exists(_tempPath).Should().BeTrue();
+            File.Exists(_tempPath + ".tmp").Should().BeFalse(
+                "atomic write must rename the temp file, not leave it stranded");
+        }
+
+        [Test]
+        public void Save_OverwritesExistingFileAtomically()
+        {
+            // First write
+            UserPreferencesStore.Save(new UserPreferences { WindowWidth = 1000 }, _tempPath);
+            // Second write — must replace, not crash on duplicate
+            UserPreferencesStore.Save(new UserPreferences { WindowWidth = 2000 }, _tempPath);
+
+            var loaded = UserPreferencesStore.Load(_tempPath);
+            loaded.WindowWidth.Should().Be(2000);
+            File.Exists(_tempPath + ".tmp").Should().BeFalse();
+        }
     }
 }

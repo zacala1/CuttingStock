@@ -64,10 +64,10 @@ namespace CuttingStock
             {
                 if (_prefs.WindowWidth  > 200) Width  = _prefs.WindowWidth;
                 if (_prefs.WindowHeight > 200) Height = _prefs.WindowHeight;
-                if (!double.IsNaN(_prefs.WindowLeft) && !double.IsNaN(_prefs.WindowTop))
+                if (_prefs.WindowLeft.HasValue && _prefs.WindowTop.HasValue)
                 {
-                    Left = _prefs.WindowLeft;
-                    Top  = _prefs.WindowTop;
+                    Left = _prefs.WindowLeft.Value;
+                    Top  = _prefs.WindowTop.Value;
                     WindowStartupLocation = WindowStartupLocation.Manual;
                 }
             }
@@ -132,10 +132,17 @@ namespace CuttingStock
         {
             if (!System.IO.File.Exists(path))
             {
-                MessageBox.Show($"파일을 찾을 수 없습니다:\n{path}", "오류",
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                _prefs.Recent1D.Remove(path);
-                UserPreferencesStore.Save(_prefs);
+                // Ask the user before silently rewriting the MRU — they may have
+                // moved the file rather than deleted it and want to fix the path
+                // themselves before we forget about it.
+                var choice = MessageBox.Show(
+                    $"파일을 찾을 수 없습니다:\n{path}\n\n최근 목록에서 제거하시겠습니까?",
+                    "파일 없음", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (choice == MessageBoxResult.Yes)
+                {
+                    _prefs.Recent1D.Remove(path);
+                    UserPreferencesStore.Save(_prefs);
+                }
                 return;
             }
             try
@@ -192,6 +199,12 @@ namespace CuttingStock
             if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
             var files = (string[])e.Data.GetData(DataFormats.FileDrop);
             if (files == null || files.Length == 0) return;
+            if (files.Length > 1)
+            {
+                MessageBox.Show($"한 번에 하나의 시나리오 파일만 열 수 있습니다. {files.Length}개 파일이 드롭됨.",
+                    "여러 파일", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             var path = files[0];
 
             try
@@ -442,7 +455,18 @@ namespace CuttingStock
             { _vm.ExportToExcelCommand.Execute(null); e.Handled = true; return; }
             if (ctrl && !shift && e.Key == Key.F)
             {
-                ToggleSearchBar(true); e.Handled = true; return;
+                // Ctrl+F should open the search bar OR re-focus the box if it's
+                // already open — never close it. Closing is Esc's job.
+                if (searchBar.Visibility == Visibility.Visible)
+                {
+                    searchBox.Focus();
+                    searchBox.SelectAll();
+                }
+                else
+                {
+                    ToggleSearchBar(true);
+                }
+                e.Handled = true; return;
             }
             if (e.Key == Key.F3 && shift)
             { SearchPrev_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
