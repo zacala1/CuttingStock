@@ -5,7 +5,7 @@ namespace CuttingStock.Core.Models
     {
         public string AlgorithmName { get; set; } = string.Empty;
         public long TotalCost { get; set; }
-        public int WasteLength { get; set; }
+        public long WasteLength { get; set; }
         public int StockUsed { get; set; }
         public double MaterialEfficiency { get; set; }
         public double ExecutionTimeMs { get; set; }

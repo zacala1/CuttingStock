@@ -3,6 +3,36 @@
 `docs/archive/` 에 흩어져 있던 PHASE 노트들을 시간순으로 압축한 변경 이력.
 원본은 git history 에 보존되어 있다 (`git log -- docs/archive/`).
 
+## 2026-05 (late) — 전방위 안정성 sweep + UX 마감
+
+영역별 audit 에이전트(1D / 2D / 2D util / domain / persistence / VM / View)를
+순차로 띄워 캐치한 실제 버그 + 결정된 false positive를 정리.
+
+- **CG Simplex NaN propagation 차단** — 작은 pivot이 NaN을 tableau에 남기면
+  duals가 NaN이 되고 knapsack pricing이 NaN 값을 받아 `> 1.00001` 비교가 silently
+  false 처리되어 CG 조기 종료. NaN/Infinity 감지 후 fallback 정수화로 점프.
+- **UserPreferences atomic write race** — `.tmp` 파일명이 모든 호출자 동일이라
+  drag-drop + scenario save 동시 호출 시 경쟁. `<pid>.<guid>` suffix로 unique.
+- **Scenario schema 엄격 매치 완화** — `cutting-stock-1d/v1` 정확 매치만 통과하던
+  것을 `cutting-stock-1d/` 접두사 매치로 변경. 향후 minor 버전 bump가 사용자
+  파일을 깨뜨리지 않음.
+- **UserPreferences.Load 에러 breadcrumb** — 손상 파일 silent 폴백할 때 `crash.log`
+  에 1줄 기록.
+- **WasteLength int → long** — TotalCost 와 일관성, overflow 안전.
+- **GuillotineNode.Children → IReadOnlyList** — 트리 구성 후 외부 mutation 차단.
+- **App-wide unhandled exception 핸들러** — DispatcherUnhandledException +
+  AppDomain.UnhandledException + TaskScheduler.UnobservedTaskException. silent
+  crash 방지 + `crash.log` 기록.
+- **WindowLeft/Top double.NaN → double?** — 첫 실행 max-then-close 시 NaN을
+  `System.Text.Json` 이 throw 해 prefs 전체 손실되던 잠복 버그 해결.
+- **CancellationTokenSource leak** — 매 run마다 새로 할당하되 이전 것 dispose.
+- **2D ViewModel Progress runId guard** — 1D 와 동일한 stale-callback 가드.
+- **UR1-4: 2D Esc, StatusText, Recent 메뉴, 검색바 탭 전환** — MVVM 1차 audit 후속.
+- **R1-2: BoolToVisibilityConverter Inverse, Calculate/Compare CanExecute** —
+  MVVM 라운드 직후 catch한 두 critical UX bug.
+
+5개 commit (`a061993`...`5c49231`...`현재`).
+
 ## 2026-05 — MVVM + 강력한 테스트 + 잔여 버그 정리
 
 - **WPF UI MVVM 전환** (`8075cc7`) — CommunityToolkit.Mvvm 도입. `MainViewModel` /

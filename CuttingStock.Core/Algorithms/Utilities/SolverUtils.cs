@@ -93,7 +93,7 @@ namespace CuttingStock.Core.Algorithms.Utilities
 
             result.WasteLength = result.CuttingPlans
                 .Where(p => p.Leftover < options.Gamma)
-                .Sum(p => p.Leftover);
+                .Sum(p => (long)p.Leftover);
 
             var weldGroups = result.CuttingPlans
                 .SelectMany(p => p.Cuts)

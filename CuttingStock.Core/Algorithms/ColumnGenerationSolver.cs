@@ -255,7 +255,21 @@ namespace CuttingStock.Core.Algorithms
                 var solver = new SimplexSolver();
                 var simplexResult = solver.SolveRelaxed(patterns, demand, distinctLengths);
 
-                // 4. Solve Pricing Problem (Knapsack)
+                // 4. Solve Pricing Problem (Knapsack).
+                // NaN guard: a near-zero pivot in the custom Simplex can leave NaN
+                // in tableau cells, which leaks into the duals. If we feed NaN
+                // values into the pricing DP, every comparison silently fails
+                // (NaN > x is always false), the loop exits with `improved=false`,
+                // and we never realize the LP itself was unstable. Detect that
+                // condition and stop cleanly so the LP-rounding fallback runs on
+                // the patterns we've already accumulated.
+                bool dualsValid = true;
+                for (int i = 0; i < numConstraints; i++)
+                {
+                    if (!double.IsFinite(simplexResult.Duals[i])) { dualsValid = false; break; }
+                }
+                if (!dualsValid) break;
+
                 var knapsackItems = new List<KnapsackItem>();
                 for (int i = 0; i < numConstraints; i++)
                 {

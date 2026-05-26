@@ -68,18 +68,39 @@ namespace CuttingStock.Core.Persistence
                 var text = File.ReadAllText(path);
                 return JsonSerializer.Deserialize<UserPreferences>(text, Json) ?? new UserPreferences();
             }
-            catch
+            catch (Exception ex)
             {
-                // Corrupt / unreadable file — fall back to defaults rather than crash.
+                // Corrupt / unreadable file — fall back to defaults rather than crash,
+                // but leave a breadcrumb in crash.log so we can diagnose silent prefs loss.
+                TryAppendCrashLog($"UserPreferences.Load failed for '{path}': {ex.GetType().Name}: {ex.Message}");
                 return new UserPreferences();
             }
         }
 
+        /// <summary>Best-effort write of an exception breadcrumb. Never throws.</summary>
+        private static void TryAppendCrashLog(string message)
+        {
+            try
+            {
+                var dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "CuttingStock");
+                Directory.CreateDirectory(dir);
+                File.AppendAllText(
+                    Path.Combine(dir, "crash.log"),
+                    $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+            }
+            catch { /* logging is a luxury, not a guarantee */ }
+        }
+
         /// <summary>
-        /// Save preferences atomically — write to a temp file in the same directory
-        /// then rename over the target so a power loss / crash mid-write cannot leave
-        /// a half-written prefs.json that would prevent the app from starting next
-        /// time. Swallows errors (writing prefs must never break the app).
+        /// Save preferences atomically — write to a unique temp file in the same
+        /// directory then rename over the target so a power loss / crash mid-write
+        /// cannot leave a half-written prefs.json. The temp suffix carries the
+        /// process id + a random token so two concurrent callers don't compete on
+        /// the same tmp filename (e.g. drag-drop firing at the same time as a
+        /// scenario save). Swallows errors — writing prefs must never break the
+        /// app — but cleans up the temp file on failure.
         /// </summary>
         public static void Save(UserPreferences prefs, string? path = null)
         {
@@ -89,7 +110,8 @@ namespace CuttingStock.Core.Persistence
             {
                 var dir = Path.GetDirectoryName(path)!;
                 Directory.CreateDirectory(dir);
-                tempPath = Path.Combine(dir, Path.GetFileName(path) + ".tmp");
+                string suffix = $".{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+                tempPath = Path.Combine(dir, Path.GetFileName(path) + suffix);
                 File.WriteAllText(tempPath, JsonSerializer.Serialize(prefs, Json));
                 // File.Move with overwrite is atomic on NTFS for files on the same
                 // volume — which is guaranteed because tempPath is in the same dir.

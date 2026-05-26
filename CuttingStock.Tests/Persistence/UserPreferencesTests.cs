@@ -136,7 +136,10 @@ namespace CuttingStock.Tests.Persistence
             UserPreferencesStore.Save(new UserPreferences { WindowWidth = 1234 }, _tempPath);
 
             File.Exists(_tempPath).Should().BeTrue();
-            File.Exists(_tempPath + ".tmp").Should().BeFalse(
+            var dir = Path.GetDirectoryName(_tempPath)!;
+            var baseName = Path.GetFileName(_tempPath);
+            // Unique-suffix temp files match "<basename>.<pid>.<guid>.tmp".
+            Directory.GetFiles(dir, baseName + ".*.tmp").Should().BeEmpty(
                 "atomic write must rename the temp file, not leave it stranded");
         }
 

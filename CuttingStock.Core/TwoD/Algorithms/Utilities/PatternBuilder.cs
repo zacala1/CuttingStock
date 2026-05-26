@@ -67,7 +67,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                 var left  = new GuillotineNode { Kind = NodeKind.Waste, X = x0,  Y = y0, Width = r.x - x0, Height = h };
                 var right = BuildRec(r.x, y0, x1 - r.x, h, new() { r }, placements);
                 if (right == null) return null;
-                return new GuillotineNode { Kind = NodeKind.VCut, X = x0, Y = y0, Width = w, Height = h, Children = { left, right } };
+                return new GuillotineNode { Kind = NodeKind.VCut, X = x0, Y = y0, Width = w, Height = h, Children = new[] { left, right } };
             }
             // Peel right waste strip.
             int rx2 = r.x + r.w;
@@ -76,7 +76,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                 var left  = BuildRec(x0, y0, rx2 - x0, h, new() { r }, placements);
                 if (left == null) return null;
                 var right = new GuillotineNode { Kind = NodeKind.Waste, X = rx2, Y = y0, Width = x1 - rx2, Height = h };
-                return new GuillotineNode { Kind = NodeKind.VCut, X = x0, Y = y0, Width = w, Height = h, Children = { left, right } };
+                return new GuillotineNode { Kind = NodeKind.VCut, X = x0, Y = y0, Width = w, Height = h, Children = new[] { left, right } };
             }
             // Peel top waste strip.
             if (r.y > y0)
@@ -84,7 +84,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                 var top = new GuillotineNode { Kind = NodeKind.Waste, X = x0, Y = y0, Width = w, Height = r.y - y0 };
                 var bot = BuildRec(x0, r.y, w, y1 - r.y, new() { r }, placements);
                 if (bot == null) return null;
-                return new GuillotineNode { Kind = NodeKind.HCut, X = x0, Y = y0, Width = w, Height = h, Children = { top, bot } };
+                return new GuillotineNode { Kind = NodeKind.HCut, X = x0, Y = y0, Width = w, Height = h, Children = new[] { top, bot } };
             }
             // Peel bottom waste strip.
             int ry2 = r.y + r.h;
@@ -93,7 +93,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                 var top = BuildRec(x0, y0, w, ry2 - y0, new() { r }, placements);
                 if (top == null) return null;
                 var bot = new GuillotineNode { Kind = NodeKind.Waste, X = x0, Y = ry2, Width = w, Height = y1 - ry2 };
-                return new GuillotineNode { Kind = NodeKind.HCut, X = x0, Y = y0, Width = w, Height = h, Children = { top, bot } };
+                return new GuillotineNode { Kind = NodeKind.HCut, X = x0, Y = y0, Width = w, Height = h, Children = new[] { top, bot } };
             }
             // Rect fills the region exactly — already handled by the caller.
             return null;
@@ -125,7 +125,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                         {
                             Kind = NodeKind.VCut,
                             X = x0, Y = y0, Width = w, Height = h,
-                            Children = { l, rN }
+                            Children = new[] { l, rN }
                         };
                 }
             }
@@ -149,7 +149,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                         {
                             Kind = NodeKind.HCut,
                             X = x0, Y = y0, Width = w, Height = h,
-                            Children = { tN, bN }
+                            Children = new[] { tN, bN }
                         };
                 }
             }
