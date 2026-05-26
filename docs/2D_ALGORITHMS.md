@@ -2,6 +2,19 @@
 
 본 프로젝트는 1D 솔버 3종(Greedy KP / Column Generation / Arc Flow MIP)을 거울 삼아 2D에서도 3종 솔버를 제공한다. 모두 동일 인터페이스 `ICuttingSolver2D` 를 구현한다.
 
+**공통 진입 규약.** 세 솔버는 입력 즉시 `SolverUtils2D.AggregateByDims`를 호출해
+동일 `(Width, Height)` 시트 행을 합산한다. `Sheet.Equals`가 구조적이라 분산된 행은
+`Dictionary<Sheet, _>` 키 충돌로 인벤토리 절반을 잃거나 `ArgumentException`을 던진다.
+
+**TimeLimit 의미.** `SolverOptions2D.TimeLimitMs`는 솔버 시작 시점 기준 **절대
+wall-clock deadline**. warm-start / bootstrap 시간도 예산 안에 포함된다 — 이전에는
+`deadline = sw.ElapsedMilliseconds + TimeLimitMs`로 워밍업 시간을 이중 계산했으나
+2026-05 수정되어 user-visible 한도와 일치한다.
+
+**Stage 옵션.** `SolverOptions2D.Stage`는 2 또는 3 을 받지만 현재 advisory only —
+어떤 솔버도 3-stage 컷을 강제하지 않고 출력은 unrestricted-stage 길로틴이다.
+UI는 "2-stage" / "3-stage"로 노출하나 동작은 동일하다.
+
 | Solver | 특성 | 복잡도 | 출처 |
 |---|---|---|---|
 | `ShelfGuillotineSolver` | 빠른 휴리스틱 | O(K · N log N) | Coffman et al. 1980; Berkey & Wang 1987 |
@@ -111,7 +124,7 @@ F(W, H) = max {
 
 모든 솔버 출력은 `GuillotineValidator.IsGuillotineCompliant` 를 통과해야 한다. 검증기는 Beasley 1985 의 재귀 분리 테스트를 구현 — 부모 직사각형에서 어떤 직사각형도 가로지르지 않는 가로/세로 직선을 찾고, 양쪽 부분에 재귀 적용한다. 핀휠(pinwheel) 같은 비-길로틴 패턴은 즉시 거부된다 (테스트 케이스 참조).
 
-## 벤치마크 결과 (i5-14600KF, .NET 8.0, BenchmarkDotNet v0.15.5)
+## 벤치마크 결과 (i5-14600KF, .NET 10, BenchmarkDotNet v0.15.5)
 
 ### 실행 속도
 

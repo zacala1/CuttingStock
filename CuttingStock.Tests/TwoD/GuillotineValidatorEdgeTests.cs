@@ -79,7 +79,7 @@ namespace CuttingStock.Tests.TwoD
             {
                 Kind = NodeKind.HCut,
                 X = 0, Y = 0, Width = 100, Height = 100,
-                Children =
+                Children = new GuillotineNode[]
                 {
                     new() { Kind = NodeKind.Leaf, X = 0, Y = 0,  Width = 100, Height = 60 },
                     new() { Kind = NodeKind.Leaf, X = 0, Y = 60, Width = 100, Height = 50 },  // overflows
@@ -95,7 +95,7 @@ namespace CuttingStock.Tests.TwoD
             {
                 Kind = NodeKind.HCut,
                 X = 0, Y = 0, Width = 100, Height = 100,
-                Children =
+                Children = new GuillotineNode[]
                 {
                     new() { Kind = NodeKind.Leaf, X = 0, Y = 0,  Width = 100, Height = 30 },
                     new() { Kind = NodeKind.Leaf, X = 0, Y = 50, Width = 100, Height = 50 },  // gap of 20
@@ -112,7 +112,7 @@ namespace CuttingStock.Tests.TwoD
             {
                 Kind = NodeKind.VCut,
                 X = 0, Y = 0, Width = 100, Height = 100,
-                Children =
+                Children = new GuillotineNode[]
                 {
                     new() { Kind = NodeKind.Leaf, X = 50, Y = 0, Width = 50, Height = 100 },
                     new() { Kind = NodeKind.Leaf, X = 0,  Y = 0, Width = 50, Height = 100 },
@@ -128,13 +128,13 @@ namespace CuttingStock.Tests.TwoD
             {
                 Kind = NodeKind.HCut,
                 X = 0, Y = 0, Width = 100, Height = 100,
-                Children =
+                Children = new GuillotineNode[]
                 {
                     new()
                     {
                         Kind = NodeKind.VCut,
                         X = 0, Y = 0, Width = 100, Height = 50,
-                        Children =
+                        Children = new GuillotineNode[]
                         {
                             new() { Kind = NodeKind.Leaf,  X = 0,  Y = 0, Width = 60, Height = 50 },
                             new() { Kind = NodeKind.Waste, X = 60, Y = 0, Width = 40, Height = 50 },

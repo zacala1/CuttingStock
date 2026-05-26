@@ -67,8 +67,14 @@ namespace CuttingStock.Core.Persistence
             var text = File.ReadAllText(path);
             var scenario = JsonSerializer.Deserialize<Scenario1D>(text, Json)
                 ?? throw new InvalidDataException("Empty or invalid 1D scenario file.");
-            if (!string.Equals(scenario.Schema, Schema1D, StringComparison.Ordinal))
-                throw new InvalidDataException($"Expected schema '{Schema1D}' but got '{scenario.Schema}'.");
+            // Lenient match on the schema family ("cutting-stock-1d/...") so that
+            // future minor revisions (v2, v3...) still load. The exact-version
+            // check that lived here previously meant any bump would break every
+            // user's saved scenarios. Only reject if it's a *different family*
+            // (e.g. someone dropped a 2D file into the 1D Open dialog).
+            if (string.IsNullOrEmpty(scenario.Schema) ||
+                !scenario.Schema.StartsWith("cutting-stock-1d/", StringComparison.Ordinal))
+                throw new InvalidDataException($"Expected 1D scenario but got schema '{scenario.Schema}'.");
             return scenario;
         }
 
@@ -119,8 +125,9 @@ namespace CuttingStock.Core.Persistence
             var text = File.ReadAllText(path);
             var scenario = JsonSerializer.Deserialize<Scenario2D>(text, Json)
                 ?? throw new InvalidDataException("Empty or invalid 2D scenario file.");
-            if (!string.Equals(scenario.Schema, Schema2D, StringComparison.Ordinal))
-                throw new InvalidDataException($"Expected schema '{Schema2D}' but got '{scenario.Schema}'.");
+            if (string.IsNullOrEmpty(scenario.Schema) ||
+                !scenario.Schema.StartsWith("cutting-stock-2d/", StringComparison.Ordinal))
+                throw new InvalidDataException($"Expected 2D scenario but got schema '{scenario.Schema}'.");
             return scenario;
         }
     }

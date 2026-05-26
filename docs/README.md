@@ -1,267 +1,98 @@
-# 📚 철근 절단 최적화 프로젝트 문서
+# 📚 Cutting Stock 프로젝트 문서
 
-## 개요
+`docs/` 디렉터리는 알고리즘과 API, 벤치마크에 대한 깊이 있는 자료를 모은다.
+빠른 시작은 루트의 [README.md](../README.md), 에이전트 컨벤션은 [CLAUDE.md](../CLAUDE.md)를 보라.
 
-이 디렉토리는 Cutting Stock Problem (철근 절단 최적화) 프로젝트의 분석 및 개선 문서를 포함합니다.
+## 문서 인덱스
 
-## 📄 문서 목록
+| 문서 | 내용 | 분량 |
+|---|---|---|
+| [PROBLEM_DEFINITION.md](PROBLEM_DEFINITION.md) | 1D 절단 문제 정의 — 입력, 제약, 목적 함수 | ~10분 |
+| [2D_PROBLEM_DEFINITION.md](2D_PROBLEM_DEFINITION.md) | 2D 길로틴 절단 문제 정의 — 길로틴 제약, 회전, 트림 | ~10분 |
+| [ALGORITHMS.md](ALGORITHMS.md) | 1D 솔버 3종 알고리즘 요약 | ~15분 |
+| [2D_ALGORITHMS.md](2D_ALGORITHMS.md) | 2D 솔버 3종(Shelf / CG2D / StagedMip) 상세 + 벤치 | ~20분 |
+| [API_REFERENCE.md](API_REFERENCE.md) | 1D + 2D 공개 타입과 인터페이스 | ~20분 |
+| [2D_API_REFERENCE.md](2D_API_REFERENCE.md) | 2D 전용 API 상세 + Quick Start | ~15분 |
+| [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) | BenchmarkDotNet 측정치 + 테스트 커버리지 요약 | ~10분 |
+| [CHANGELOG.md](../CHANGELOG.md) | 시간순 변경 이력 — 이전 PHASE 노트는 이리로 압축됨 | ~5분 |
 
-### 1. [PROBLEM_DEFINITION.md](./PROBLEM_DEFINITION.md) 🎯
-**문제 정의서** - 가장 먼저 읽어야 할 문서
+## 빠른 시작 가이드
 
-**내용**:
-- 비즈니스 배경 및 도메인 설명
-- 입력 데이터 형식 (재고, 주문, 파라미터)
-- 제약 조건 (물리적, 용접, 자투리)
-- 목적 함수 (총 비용 = 자투리 + 용접)
-- 현재 구현 상태 개요
+| 상황 | 읽을 문서 |
+|---|---|
+| "이 프로젝트가 뭐 하는 거지?" | [루트 README.md](../README.md) → [PROBLEM_DEFINITION.md](PROBLEM_DEFINITION.md) |
+| "1D / 2D 솔버 차이가 뭐야?" | [ALGORITHMS.md](ALGORITHMS.md) + [2D_ALGORITHMS.md](2D_ALGORITHMS.md) |
+| "어떤 솔버를 골라야 하지?" | [BENCHMARK_REPORT.md § 알고리즘 선택 가이드](BENCHMARK_REPORT.md) |
+| "코드에서 어떻게 호출해?" | [API_REFERENCE.md § Quick Start](API_REFERENCE.md) |
+| "에이전트로 이 프로젝트 작업해야 함" | [CLAUDE.md](../CLAUDE.md) |
 
-**읽는 시간**: 10분
-
----
-
-### 2. [ALGORITHM_ANALYSIS.md](./ALGORITHM_ANALYSIS.md) 🔬
-**알고리즘 상세 분석 리포트**
-
-**내용**:
-- 현재 구현된 3가지 알고리즘 깊이 분석
-  - **Current (DP)**: 시간 복잡도, 장단점, 버그
-  - **Origin (Brute Force)**: 왜 느린지, 어떻게 고칠지
-  - **FFD**: 무엇이 빠졌는지
-- 코드 레벨 상세 분석 (라인별)
-- 종합 비교표
-- 버그 목록 및 수정 방안
-
-**읽는 시간**: 20-30분
-
-**추천 독자**: 개발자, 알고리즘 개선 담당자
-
----
-
-### 3. [TEST_CASES.md](./TEST_CASES.md) 🧪
-**테스트 케이스 설계서**
-
-**내용**:
-- 15개 테스트 케이스 상세 정의
-  - 기본 케이스 (TC-001~004)
-  - 용접 케이스 (TC-005~006)
-  - 복잡한 케이스 (TC-007~008)
-  - 경계 케이스 (TC-009~012)
-  - 성능 테스트 (TC-013~015)
-- 검증 체크리스트
-- 테스트 실행 계획
-
-**읽는 시간**: 15분
-
-**관련 파일**: `../Tests/TestData/*.json`, `../Tests/AlgorithmTester.cs`
-
----
-
-### 4. [IMPROVEMENT_ROADMAP.md](./IMPROVEMENT_ROADMAP.md) 🗺️
-**개선 로드맵** - 다음에 무엇을 할지
-
-**내용**:
-- Phase별 작업 계획 (6단계)
-- 우선순위 매트릭스
-- 구체적 구현 방안 (코드 예제 포함)
-- 예상 소요 시간
-- 성공 기준
-
-**읽는 시간**: 25분
-
-**추천 독자**: 프로젝트 관리자, 개발 리더
-
----
-
-## 🚀 빠른 시작 가이드
-
-### 상황 1: "현재 코드에 무슨 문제가 있는지 알고 싶어요"
-→ **[ALGORITHM_ANALYSIS.md](./ALGORITHM_ANALYSIS.md) 섹션 3, 5 읽기**
-- 3. 종합 비교표
-- 5. 버그 및 개선사항 목록
-
-### 상황 2: "비용 계산이 이상해요"
-→ **[PROBLEM_DEFINITION.md](./PROBLEM_DEFINITION.md) 섹션 4 + [ALGORITHM_ANALYSIS.md](./ALGORITHM_ANALYSIS.md) A 섹션**
-- 목적 함수 정의 확인
-- Current 알고리즘의 치명적 단점 1번 읽기
-
-### 상황 3: "빨리 고치고 싶어요"
-→ **[IMPROVEMENT_ROADMAP.md](./IMPROVEMENT_ROADMAP.md) Phase 2**
-- 긴급 수정 가이드 (2-3일 소요)
-- 코드 예제 포함
-
-### 상황 4: "제대로 다시 만들고 싶어요"
-→ **[IMPROVEMENT_ROADMAP.md](./IMPROVEMENT_ROADMAP.md) 전체 읽기**
-- Phase 2~4 순차 진행
-- 예상 시간: 1-2주
-
-### 상황 5: "테스트부터 돌려보고 싶어요"
-→ **[TEST_CASES.md](./TEST_CASES.md) + `../Tests/AlgorithmTester.cs`**
-```bash
-# .NET 환경에서
-cd Tests
-dotnet run AlgorithmTester.cs ./TestData
-```
-
----
-
-## 📊 핵심 발견사항 요약
-
-### ❌ 치명적 문제 3가지
-
-1. **비용 최적화 안함** (Current)
-   ```
-   목표: 비용 최소화
-   실제: 공간 최대화
-   → 목적 함수 불일치
-   ```
-
-2. **실행 불가능한 속도** (Origin)
-   ```
-   주문 10개: ~5초
-   주문 20개: ~10분+
-   → 메모이제이션 부재
-   ```
-
-3. **용접 미구현** (FFD)
-   ```
-   재고 < 주문 길이: 처리 불가
-   → 기능 미완성
-   ```
-
-### ✅ 즉시 조치 사항
-
-| 우선순위 | 작업 | 파일 | 시간 |
-|---------|------|------|------|
-| 🔴 1 | 비용 함수 수정 | `CuttingStockOptimizer.cs:98` | 4시간 |
-| 🟡 2 | 테스트 실행 | `AlgorithmTester.cs` | 2시간 |
-| 🟢 3 | 문서 업데이트 | `README.md` (프로젝트 루트) | 1시간 |
-
----
-
-## 📁 프로젝트 구조
+## 프로젝트 구조
 
 ```
 CuttingStock/
-├── Domain/               # 비즈니스 로직
-│   ├── CuttingStockOptimizer.cs          # 현재 메인 (DP)
-│   ├── CuttingStockOptimizer_Origin.cs   # 원본 (Brute Force)
-│   └── CuttingStockOptimizer_FFD.cs      # FFD
-├── Models/              # 데이터 모델
-│   ├── Order.cs
-│   └── RebarStock.cs
-├── Tests/               # 테스트 코드
-│   ├── AlgorithmTester.cs
-│   └── TestData/
-│       ├── TC-001.json
-│       ├── TC-002.json
-│       ├── TC-003.json
-│       └── TC-007.json
-├── docs/                # 📚 이 디렉토리
-│   ├── README.md                    # ← 지금 읽고 있는 파일
-│   ├── PROBLEM_DEFINITION.md
-│   ├── ALGORITHM_ANALYSIS.md
-│   ├── TEST_CASES.md
-│   └── IMPROVEMENT_ROADMAP.md
-└── MainWindow.xaml[.cs] # WPF UI
+├── CuttingStock.Core/                # 알고리즘 + 도메인 모델 (no WPF)
+│   ├── Algorithms/                   # 1D 솔버 (Greedy / CG / ArcFlow) + Utilities
+│   ├── TwoD/Algorithms/              # 2D 솔버 (Shelf / CG2D / StagedMip) + Utilities
+│   ├── Domain/                       # SolverModels, ICuttingSolver, SolverOptions...
+│   ├── TwoD/Domain/                  # 2D 동일 (ICuttingSolver2D, ...)
+│   ├── Models/                       # Order, RebarStock, ComparisonResult (1D)
+│   ├── TwoD/Models/                  # Sheet, RectOrder, ComparisonResult2D (2D)
+│   └── Persistence/                  # ScenarioService (.cstock1d/2d.json)
+├── CuttingStock.UI/                  # WPF (.NET 10 Windows), MVVM
+│   ├── MainWindow.xaml(.cs)          # 1D 탭 View
+│   ├── TwoD/TwoDTab.xaml(.cs)        # 2D 탭 View
+│   ├── ViewModels/                   # MainViewModel, TwoDViewModel + row DTOs
+│   └── Services/                     # DialogService, ExportService, VisualizationService
+├── CuttingStock.Tests/               # NUnit + FluentAssertions (615+ tests)
+│   ├── Algorithms/                   # Greedy/CG/ArcFlow 단위 + Quality/Robustness/Stress/Perf
+│   ├── TwoD/                         # 2D 솔버 + Invariant 매트릭스 (90 fuzz runs)
+│   └── Persistence/                  # ScenarioService 라운드트립
+├── CuttingStock.Benchmarks/          # BenchmarkDotNet (인포메이셔널)
+├── docs/                             # ← 지금 보고 있는 디렉터리
+├── CLAUDE.md                         # 에이전트 컨벤션
+└── README.md                         # 한국어 사용자 가이드
 ```
 
----
+## 의존성
 
-## 🔧 권장 작업 흐름
+| 라이브러리 | 버전 | 용도 |
+|---|---|---|
+| Google.OrTools | 9.15.6755 | ArcFlow MIP (SCIP) + 2D CG (GLOP) + StagedMip (CBC) |
+| LiveChartsCore.SkiaSharpView.WPF | 2.0.0-rc2 | 비교 탭 막대 차트 |
+| ClosedXML | 0.105.0 | Excel 임포트/내보내기 |
+| CommunityToolkit.Mvvm | 8.4.2 | `[ObservableProperty]` / `[RelayCommand]` |
+| NUnit | 4.4.0 | 테스트 러너 |
+| FluentAssertions | 8.8.0 | 단언문 |
+| BenchmarkDotNet | 0.15.5 | 성능 측정 |
 
-### 단기 (이번 주)
-```
-Day 1: Phase 1 완료 (✅ 완료!)
-Day 2-3: Phase 2 - 긴급 수정
-  - [ ] 비용 함수 수정
-  - [ ] 테스트 실행
-  - [ ] 회귀 확인
+## 빌드 및 실행
 
-Day 4-5: 문서화 및 배포
-  - [ ] 프로젝트 README 업데이트
-  - [ ] 커밋 및 푸시
-```
+```bash
+# 전체 빌드
+dotnet build CuttingStock.slnx -c Release
 
-### 중기 (다음 주)
-```
-Week 2: Phase 3 - 아키텍처 재설계
-  - [ ] IOptimizer 인터페이스
-  - [ ] 기존 알고리즘 리팩토링
-  - [ ] UI 개선
-```
+# 테스트 (615+, Stress 제외)
+dotnet test CuttingStock.slnx -c Release --filter "TestCategory!=Stress"
 
-### 장기 (이번 달)
-```
-Week 3-4: Phase 4 - 새 알고리즘
-  - [ ] BFD 구현
-  - [ ] Branch & Bound (선택)
-  - [ ] 성능 벤치마크
+# 모든 테스트 (Stress 포함, ~4분)
+dotnet test CuttingStock.slnx -c Release
+
+# Explicit LargeScale 벤치마크
+dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
+
+# WPF 앱 실행
+dotnet run --project CuttingStock.UI
 ```
 
----
-
-## 📈 예상 성과
-
-### 현재 상태
-- ⚠️ 비용 최적화: 작동 안함
-- ⚠️ 용접 지원: 미완성
-- ✅ 실행 속도: 빠름 (50ms)
-
-### Phase 2 완료 후
-- ✅ 비용 최적화: 작동
-- ⚠️ 용접 지원: 부분 작동
-- ✅ 실행 속도: 유지 (50-100ms)
-- **비용 10-20% 개선 예상**
-
-### Phase 4 완료 후
-- ✅ 비용 최적화: 완전 작동
-- ✅ 용접 지원: 완전 작동
-- ✅ 알고리즘 선택: 3가지 이상
-- **비용 30-50% 개선 예상**
-
----
-
-## 🎓 참고 자료
+## 참고 자료
 
 ### 학술 자료
-1. **Cutting Stock Problem**: Gilmore & Gomory (1961)
-2. **Column Generation**: Dantzig-Wolfe 분해
-3. **FFD 알고리즘**: Johnson (1973) - 근사 비율 11/9
-
-### 온라인 자료
-- [Wikipedia: Cutting Stock Problem](https://en.wikipedia.org/wiki/Cutting_stock_problem)
-- [OR-Tools: Bin Packing](https://developers.google.com/optimization/bin/bin_packing)
+- Gilmore & Gomory, "A Linear Programming Approach to the Cutting-Stock Problem," *Operations Research* 9, 1961.
+- Beasley, "Algorithms for unconstrained two-dimensional guillotine cutting," *JORS* 36(4), 1985.
+- Valerio de Carvalho, "Exact solution of bin-packing problems using column generation and branch-and-bound," *Annals of OR* 86, 1999.
+- Coffman, Garey, Johnson, Tarjan, "Performance bounds for level-oriented two-dimensional packing algorithms," *SIAM J. Computing* 9(4), 1980.
 
 ### 도구
-- **Google OR-Tools**: LP/MIP 솔버
-- **BenchmarkDotNet**: .NET 성능 측정
-- **xUnit**: 단위 테스트
-
----
-
-## 📞 문의 및 기여
-
-### 버그 리포트
-`ALGORITHM_ANALYSIS.md` 섹션 5에 알려진 버그 목록 있음
-
-### 기여 방법
-1. `IMPROVEMENT_ROADMAP.md`에서 작업 선택
-2. 테스트 작성 (`TEST_CASES.md` 참고)
-3. 구현
-4. Pull Request
-
----
-
-## 📝 버전 히스토리
-
-| 버전 | 날짜 | 변경 사항 |
-|------|------|-----------|
-| 1.0 | 2025-11-02 | Phase 1 완료 - 초기 분석 및 문서화 |
-
----
-
-**다음 단계**: [IMPROVEMENT_ROADMAP.md](./IMPROVEMENT_ROADMAP.md) Phase 2 시작
-
-**작성자**: Claude (알고리즘 분석 및 리팩토링)
-**문서 위치**: `/docs/README.md`
+- [Google OR-Tools](https://developers.google.com/optimization) — LP/MIP 솔버
+- [BenchmarkDotNet](https://benchmarkdotnet.org/) — .NET 성능 측정
+- [CommunityToolkit.Mvvm](https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/) — WPF MVVM source generators

@@ -61,10 +61,33 @@ namespace CuttingStock.UI.ViewModels
 
         [ObservableProperty] private string _reportText = string.Empty;
         [ObservableProperty] private string _compareText = string.Empty;
-        [ObservableProperty] private bool _isRunning;
+
+        [ObservableProperty] private string _statusText = "준비됨";
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CalculateCommand))]
+        [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
+        private bool _isRunning;
+
         [ObservableProperty] private double _progressPercent;
         [ObservableProperty] private bool _progressIndeterminate = true;
         [ObservableProperty] private string _progressText = "계산 중...";
+
+        /// <summary>CanExecute gate for Calculate / Compare — re-entrancy guard.</summary>
+        private bool CanRunSolver() => !IsRunning;
+
+        private bool CanCancelSolver() => CanCancel;
+
+        [RelayCommand(CanExecute = nameof(CanCancelSolver))]
+        private void Cancel()
+        {
+            _currentRunId++;
+            try { _currentCts?.Cancel(); } catch { }
+            IsRunning = false;
+            CanCancel = false;
+            ProgressText = "취소됨";
+            StatusText = "취소됨";
+        }
 
         [ObservableProperty] private bool _hasSingleResult;
         [ObservableProperty] private bool _hasComparisonResults;
@@ -72,6 +95,13 @@ namespace CuttingStock.UI.ViewModels
         private SolverResult2D? _lastResult;
         private SolverOptions2D? _lastOptions;
         private ICuttingSolver2D? _lastSolver;
+
+        private int _currentRunId;
+        private System.Threading.CancellationTokenSource? _currentCts;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
+        private bool _canCancel;
 
         /// <summary>
         /// Last successful single solve. View reads this to render the placement
@@ -117,6 +147,7 @@ namespace CuttingStock.UI.ViewModels
             Orders.Add(new RectOrderRow { Width = 800,  Height = 300, Quantity = 4 });
             Orders.Add(new RectOrderRow { Width = 300,  Height = 300, Quantity = 8 });
             Orders.Add(new RectOrderRow { Width = 1200, Height = 500, Quantity = 2 });
+            StatusText = "2D 예제 데이터 로드됨";
         }
 
         // ─── Scenario save / load ────────────────────────────────────
@@ -151,6 +182,7 @@ namespace CuttingStock.UI.ViewModels
                     },
                 };
                 ScenarioService.Save2D(path, scenario);
+                StatusText = $"저장됨: {System.IO.Path.GetFileName(path)}";
                 _dialog.ShowInfo("저장 완료", $"시나리오를 저장했습니다.\n{path}");
             }
             catch (Exception ex) { _dialog.ShowError("오류", $"시나리오 저장 오류: {ex.Message}"); }
@@ -181,13 +213,14 @@ namespace CuttingStock.UI.ViewModels
                 AllowRotation = o2.AllowRotation;
                 StageIndex = o2.Stage == 3 ? 1 : 0;
                 UsageOrderIndex = o2.UsageOrder == StockUsageOrder.SmallToLarge ? 0 : 1;
+                StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
             }
             catch (Exception ex) { _dialog.ShowError("오류", $"시나리오 불러오기 오류: {ex.Message}"); }
         }
 
         // ─── Solve / Compare ─────────────────────────────────────────
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanRunSolver))]
         private async Task CalculateAsync()
         {
             if (Sheets.Count == 0 || Orders.Count == 0)
@@ -200,15 +233,21 @@ namespace CuttingStock.UI.ViewModels
             { _dialog.ShowWarning("입력 오류", "유효한 시트/주문이 없습니다."); return; }
             var solver = BuildSolver(AlgorithmIndex);
 
+            int runId = ++_currentRunId;
+            _currentCts?.Dispose();
+            _currentCts = new System.Threading.CancellationTokenSource();
+
             try
             {
                 IsRunning = true;
+                CanCancel = true;
                 ProgressIndeterminate = true;
                 ProgressPercent = 0;
                 ProgressText = "계산 중...";
 
                 var progress = new Progress<double>(pct =>
                 {
+                    if (runId != _currentRunId) return;  // ignore stale callback after cancel/supersede
                     ProgressIndeterminate = false;
                     double v = pct <= 1.0 ? pct * 100.0 : pct;
                     v = Math.Clamp(v, 0, 100);
@@ -217,6 +256,8 @@ namespace CuttingStock.UI.ViewModels
                 });
 
                 var result = await Task.Run(() => solver.Solve(sheetSnapshot, orderSnapshot, options, progress));
+                if (runId != _currentRunId) return;
+
                 _lastResult = result;
                 _lastOptions = options;
                 _lastSolver = solver;
@@ -225,13 +266,23 @@ namespace CuttingStock.UI.ViewModels
                     ? result.GetDetailedReport(options)
                     : $"실패: {result.ErrorMessage}";
                 HasSingleResult = result.Success;
+                if (result.Success)
+                    StatusText = $"완료: {solver.Name} · {result.SheetsUsed} 시트 · 효율 {result.MaterialEfficiency:F1}% · {result.ExecutionTimeMs:F0}ms";
+                else
+                    StatusText = $"실패: {result.ErrorMessage}";
                 SingleResultReady?.Invoke(this, EventArgs.Empty);
             }
-            catch (Exception ex) { _dialog.ShowError("오류", $"오류: {ex.Message}"); }
-            finally { IsRunning = false; }
+            catch (Exception ex)
+            {
+                if (runId == _currentRunId) _dialog.ShowError("오류", $"오류: {ex.Message}");
+            }
+            finally
+            {
+                if (runId == _currentRunId) { IsRunning = false; CanCancel = false; }
+            }
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanRunSolver))]
         private async Task CompareAsync()
         {
             if (Sheets.Count == 0 || Orders.Count == 0)
@@ -243,9 +294,14 @@ namespace CuttingStock.UI.ViewModels
             if (sheetSnapshot.Count == 0 || orderSnapshot.Count == 0)
             { _dialog.ShowWarning("입력 오류", "유효한 시트/주문이 없습니다."); return; }
 
+            int runId = ++_currentRunId;
+            _currentCts?.Dispose();
+            _currentCts = new System.Threading.CancellationTokenSource();
+
             try
             {
                 IsRunning = true;
+                CanCancel = true;
                 ProgressIndeterminate = true;
                 ProgressText = "비교 중...";
 
@@ -264,6 +320,7 @@ namespace CuttingStock.UI.ViewModels
 
                 for (int i = 0; i < solvers.Length; i++)
                 {
+                    if (runId != _currentRunId) return;
                     var s = solvers[i];
                     int solverIdx = i;
                     ProgressText = $"비교 중... ({i + 1}/{solvers.Length} — {s.Name})";
@@ -271,12 +328,14 @@ namespace CuttingStock.UI.ViewModels
 
                     var sliceProgress = new Progress<double>(pct =>
                     {
+                        if (runId != _currentRunId) return;
                         double frac = pct <= 1.0 ? pct : pct / 100.0;
                         double overall = (solverIdx + Math.Clamp(frac, 0, 1)) / solvers.Length * 100.0;
                         ProgressPercent = Math.Clamp(overall, 0, 100);
                     });
 
                     var r = await Task.Run(() => s.Solve(sheetSnapshot, orderSnapshot, options, sliceProgress));
+                    if (runId != _currentRunId) return;
                     rows.Add(new ComparisonResult2D
                     {
                         AlgorithmName = s.Name,
@@ -316,10 +375,21 @@ namespace CuttingStock.UI.ViewModels
                     HasSingleResult = true;
                 }
                 HasComparisonResults = true;
+                var bestRow = CompareRows.FirstOrDefault(r => r.Success);
+                if (bestRow != null)
+                    StatusText = $"비교 완료 · 최고: {bestRow.AlgorithmName} · 효율 {bestRow.MaterialEfficiency:F1}%";
+                else
+                    StatusText = "비교 완료 (모두 실패)";
                 CompareResultReady?.Invoke(this, EventArgs.Empty);
             }
-            catch (Exception ex) { _dialog.ShowError("오류", $"오류: {ex.Message}"); }
-            finally { IsRunning = false; }
+            catch (Exception ex)
+            {
+                if (runId == _currentRunId) _dialog.ShowError("오류", $"오류: {ex.Message}");
+            }
+            finally
+            {
+                if (runId == _currentRunId) { IsRunning = false; CanCancel = false; }
+            }
         }
 
         // ─── Export ──────────────────────────────────────────────────

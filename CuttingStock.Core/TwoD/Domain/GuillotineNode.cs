@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace CuttingStock.Core.TwoD.Domain
@@ -13,6 +14,8 @@ namespace CuttingStock.Core.TwoD.Domain
     /// <summary>
     /// Node in a guillotine cut tree. Internal nodes (HCut/VCut) represent edge-to-edge
     /// straight cuts; leaves are items or waste. Coordinates are absolute within the sheet.
+    /// Children is exposed as <see cref="IReadOnlyList{T}"/> so consumers can't mutate
+    /// the tree after construction; PatternBuilder builds a concrete list and assigns it.
     /// </summary>
     public sealed class GuillotineNode
     {
@@ -26,7 +29,7 @@ namespace CuttingStock.Core.TwoD.Domain
         public int? OrderIndex { get; init; }
         public bool Rotated { get; init; }
 
-        public List<GuillotineNode> Children { get; init; } = new();
+        public IReadOnlyList<GuillotineNode> Children { get; init; } = Array.Empty<GuillotineNode>();
 
         public int Right => X + Width;
         public int Bottom => Y + Height;

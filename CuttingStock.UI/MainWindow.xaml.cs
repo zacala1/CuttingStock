@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using ClosedXML.Excel;
 using CuttingStock.Core.Models;
+using CuttingStock.Core.Persistence;
 using CuttingStock.UI.Services;
 using CuttingStock.UI.ViewModels;
 using LiveChartsCore;
@@ -29,6 +30,7 @@ namespace CuttingStock
     public partial class MainWindow : Window
     {
         private readonly MainViewModel _vm;
+        private UserPreferences _prefs = new();
 
         public MainWindow()
         {
@@ -36,7 +38,214 @@ namespace CuttingStock
             _vm = new MainViewModel(new DialogService());
             DataContext = _vm;
             _vm.PropertyChanged += Vm_PropertyChanged;
+            _vm.ScenarioSaved  += (_, path) => OnScenarioPathUsed(path);
+            _vm.ScenarioLoaded += (_, path) => OnScenarioPathUsed(path);
             UpdateAdvancedOptions();
+        }
+
+        /// <summary>Push a recently-touched scenario path into the MRU list and persist.</summary>
+        private void OnScenarioPathUsed(string path)
+        {
+            UserPreferencesStore.PushRecent(_prefs.Recent1D, path);
+            UserPreferencesStore.Save(_prefs);
+        }
+
+        // ─── Preferences: window state, last tab, last algorithm ──────
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            _prefs = UserPreferencesStore.Load();
+
+            if (_prefs.WindowMaximized)
+            {
+                WindowState = WindowState.Maximized;
+            }
+            else
+            {
+                if (_prefs.WindowWidth  > 200) Width  = _prefs.WindowWidth;
+                if (_prefs.WindowHeight > 200) Height = _prefs.WindowHeight;
+                if (_prefs.WindowLeft.HasValue && _prefs.WindowTop.HasValue)
+                {
+                    Left = _prefs.WindowLeft.Value;
+                    Top  = _prefs.WindowTop.Value;
+                    WindowStartupLocation = WindowStartupLocation.Manual;
+                }
+            }
+
+            topTabControl.SelectedIndex = Math.Clamp(_prefs.LastTopTabIndex, 0, 1);
+            _vm.AlgorithmIndex = Math.Clamp(_prefs.LastAlgorithm1D, 0, 2);
+            UpdateAdvancedOptions();
+        }
+
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            _prefs.WindowMaximized = WindowState == WindowState.Maximized;
+            if (!_prefs.WindowMaximized)
+            {
+                _prefs.WindowWidth  = Width;
+                _prefs.WindowHeight = Height;
+                _prefs.WindowLeft   = Left;
+                _prefs.WindowTop    = Top;
+            }
+            _prefs.LastTopTabIndex = topTabControl.SelectedIndex;
+            _prefs.LastAlgorithm1D = _vm.AlgorithmIndex;
+            UserPreferencesStore.Save(_prefs);
+        }
+
+        // ─── Recent scenarios dropdown ────────────────────────────────
+
+        private void Recent1D_Click(object sender, RoutedEventArgs e)
+        {
+            var menu = new ContextMenu { Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, PlacementTarget = btnRecent1D };
+            if (_prefs.Recent1D.Count == 0)
+            {
+                menu.Items.Add(new MenuItem { Header = "(최근 시나리오 없음)", IsEnabled = false });
+            }
+            else
+            {
+                foreach (var path in _prefs.Recent1D)
+                {
+                    var fileName = System.IO.Path.GetFileName(path);
+                    var menuItem = new MenuItem
+                    {
+                        Header = fileName,
+                        ToolTip = path,
+                        IsEnabled = System.IO.File.Exists(path),
+                    };
+                    var capturedPath = path;
+                    menuItem.Click += (_, _) => LoadRecentScenario(capturedPath);
+                    menu.Items.Add(menuItem);
+                }
+                menu.Items.Add(new Separator());
+                var clear = new MenuItem { Header = "목록 지우기" };
+                clear.Click += (_, _) =>
+                {
+                    _prefs.Recent1D.Clear();
+                    UserPreferencesStore.Save(_prefs);
+                };
+                menu.Items.Add(clear);
+            }
+            menu.IsOpen = true;
+        }
+
+        private void LoadRecentScenario(string path)
+        {
+            if (!System.IO.File.Exists(path))
+            {
+                // Ask the user before silently rewriting the MRU — they may have
+                // moved the file rather than deleted it and want to fix the path
+                // themselves before we forget about it.
+                var choice = MessageBox.Show(
+                    $"파일을 찾을 수 없습니다:\n{path}\n\n최근 목록에서 제거하시겠습니까?",
+                    "파일 없음", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (choice == MessageBoxResult.Yes)
+                {
+                    _prefs.Recent1D.Remove(path);
+                    UserPreferencesStore.Save(_prefs);
+                }
+                return;
+            }
+            try
+            {
+                var scenario = ScenarioService.Load1D(path);
+                _vm.Stocks.Clear();
+                foreach (var s in scenario.Stocks)
+                    _vm.Stocks.Add(new StockRow { Length = s.Length, Quantity = s.Quantity });
+                _vm.Orders.Clear();
+                foreach (var o in scenario.Orders)
+                    _vm.Orders.Add(new OrderRow { Length = o.Length, Quantity = o.Quantity });
+
+                var p = scenario.Parameters;
+                _vm.AlphaText = p.Alpha.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.BetaText  = p.Beta.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.GammaText = p.Gamma.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.DeltaText = p.Delta.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.KerfText  = p.Kerf.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.UsageOrderIndex = p.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge ? 0 : 1;
+                _vm.EnableWelding = p.EnableWelding;
+
+                UserPreferencesStore.PushRecent(_prefs.Recent1D, path);
+                UserPreferencesStore.Save(_prefs);
+                _vm.StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"시나리오를 불러올 수 없습니다.\n{ex.Message}", "오류",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // ─── Drag-and-drop scenario load ──────────────────────────────
+
+        private void MainWindow_DragOver(object sender, DragEventArgs e)
+        {
+            e.Effects = DragDropEffects.None;
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length == 1 &&
+                    (files[0].EndsWith(".cstock1d.json", StringComparison.OrdinalIgnoreCase) ||
+                     files[0].EndsWith(".cstock2d.json", StringComparison.OrdinalIgnoreCase) ||
+                     files[0].EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
+                {
+                    e.Effects = DragDropEffects.Copy;
+                }
+            }
+            e.Handled = true;
+        }
+
+        private void MainWindow_Drop(object sender, DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files == null || files.Length == 0) return;
+            if (files.Length > 1)
+            {
+                MessageBox.Show($"한 번에 하나의 시나리오 파일만 열 수 있습니다. {files.Length}개 파일이 드롭됨.",
+                    "여러 파일", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            var path = files[0];
+
+            try
+            {
+                // Try 1D first then 2D — both use schema validation so wrong-tab loads throw.
+                if (path.EndsWith(".cstock2d.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    topTabControl.SelectedIndex = 1; // 2D tab
+                    // TwoDTab's VM picks the file up via its own drag handler if we extend later.
+                    MessageBox.Show("2D 시나리오는 2D 탭의 '시나리오 열기' 버튼을 사용하세요.",
+                        "안내", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var scenario = ScenarioService.Load1D(path);
+                topTabControl.SelectedIndex = 0;
+                _vm.Stocks.Clear();
+                foreach (var s in scenario.Stocks)
+                    _vm.Stocks.Add(new StockRow { Length = s.Length, Quantity = s.Quantity });
+                _vm.Orders.Clear();
+                foreach (var o in scenario.Orders)
+                    _vm.Orders.Add(new OrderRow { Length = o.Length, Quantity = o.Quantity });
+
+                var p = scenario.Parameters;
+                _vm.AlphaText = p.Alpha.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.BetaText  = p.Beta.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.GammaText = p.Gamma.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.DeltaText = p.Delta.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.KerfText  = p.Kerf.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _vm.UsageOrderIndex = p.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge ? 0 : 1;
+                _vm.EnableWelding = p.EnableWelding;
+
+                UserPreferencesStore.PushRecent(_prefs.Recent1D, path);
+                UserPreferencesStore.Save(_prefs);
+                _vm.StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"드롭한 파일을 불러올 수 없습니다.\n{ex.Message}", "오류",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -243,7 +452,89 @@ namespace CuttingStock
             if (ctrl && shift && e.Key == Key.C)
             { _vm.CompareAlgorithmsCommand.Execute(null); e.Handled = true; return; }
             if (ctrl && !shift && e.Key == Key.S && _vm.HasSingleResult)
-            { _vm.ExportToExcelCommand.Execute(null); e.Handled = true; }
+            { _vm.ExportToExcelCommand.Execute(null); e.Handled = true; return; }
+            if (ctrl && !shift && e.Key == Key.F)
+            {
+                // Ctrl+F should open the search bar OR re-focus the box if it's
+                // already open — never close it. Closing is Esc's job.
+                if (searchBar.Visibility == Visibility.Visible)
+                {
+                    searchBox.Focus();
+                    searchBox.SelectAll();
+                }
+                else
+                {
+                    ToggleSearchBar(true);
+                }
+                e.Handled = true; return;
+            }
+            if (e.Key == Key.F3 && shift)
+            { SearchPrev_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (e.Key == Key.F3)
+            { SearchNext_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
+            if (e.Key == Key.Escape && _vm.CanCancel)
+            { _vm.CancelCommand.Execute(null); e.Handled = true; return; }
+            if (e.Key == Key.Escape && searchBar.Visibility == Visibility.Visible)
+            { ToggleSearchBar(false); e.Handled = true; }
+        }
+
+        // ─── Search bar (Ctrl+F) ─────────────────────────────────────
+
+        /// <summary>Close the search bar when leaving the 1D tab (it's anchored inside 1D).</summary>
+        private void TopTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(e.OriginalSource, topTabControl)) return;
+            if (topTabControl.SelectedIndex != 0 && searchBar != null && searchBar.Visibility == Visibility.Visible)
+                ToggleSearchBar(false);
+        }
+
+        private void ToggleSearchBar(bool show)
+        {
+            searchBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (show) { searchBox.Focus(); searchBox.SelectAll(); }
+            else { searchStatus.Text = string.Empty; }
+        }
+
+        private void SearchBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            { SearchNext_Click(this, new RoutedEventArgs()); e.Handled = true; }
+            else if (e.Key == Key.Escape)
+            { ToggleSearchBar(false); e.Handled = true; }
+        }
+
+        private void SearchNext_Click(object sender, RoutedEventArgs e) => FindAndSelect(forward: true);
+        private void SearchPrev_Click(object sender, RoutedEventArgs e) => FindAndSelect(forward: false);
+        private void SearchClose_Click(object sender, RoutedEventArgs e) => ToggleSearchBar(false);
+
+        private void FindAndSelect(bool forward)
+        {
+            string needle = searchBox.Text;
+            if (string.IsNullOrEmpty(needle)) { searchStatus.Text = string.Empty; return; }
+            string haystack = resultTextBox.Text ?? string.Empty;
+            if (haystack.Length == 0) { searchStatus.Text = "결과 없음"; return; }
+
+            int start = resultTextBox.SelectionStart;
+            int len   = resultTextBox.SelectionLength;
+            int idx;
+            if (forward)
+            {
+                int from = Math.Min(haystack.Length, start + Math.Max(1, len));
+                idx = haystack.IndexOf(needle, from, StringComparison.OrdinalIgnoreCase);
+                if (idx < 0) idx = haystack.IndexOf(needle, 0, StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                int from = Math.Max(0, start - 1);
+                idx = haystack.LastIndexOf(needle, from, StringComparison.OrdinalIgnoreCase);
+                if (idx < 0) idx = haystack.LastIndexOf(needle, haystack.Length - 1, StringComparison.OrdinalIgnoreCase);
+            }
+            if (idx < 0) { searchStatus.Text = "찾을 수 없음"; return; }
+
+            resultTextBox.Focus();
+            resultTextBox.Select(idx, needle.Length);
+            resultTextBox.ScrollToLine(resultTextBox.GetLineIndexFromCharacterIndex(idx));
+            searchStatus.Text = $"{idx + 1} 위치";
         }
 
         // ─── LiveCharts series refresh (called from PropertyChanged) ─

@@ -6,14 +6,27 @@
         xmlns:local="clr-namespace:CuttingStock"
         xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
         xmlns:twod="clr-namespace:CuttingStock.UI.TwoD"
+        xmlns:svc="clr-namespace:CuttingStock.UI.Services"
         mc:Ignorable="d"
         Title="Cutting Stock 최적화 (1D + 2D)" Height="820" Width="1400"
         MinHeight="600" MinWidth="900"
-        PreviewKeyDown="MainWindow_PreviewKeyDown">
+        AllowDrop="True"
+        PreviewKeyDown="MainWindow_PreviewKeyDown"
+        Drop="MainWindow_Drop"
+        DragOver="MainWindow_DragOver"
+        Loaded="MainWindow_Loaded"
+        Closing="MainWindow_Closing">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <svc:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
     </Window.Resources>
-    <TabControl>
+    <DockPanel>
+    <StatusBar DockPanel.Dock="Bottom" Background="#F0F0F0">
+        <StatusBarItem><TextBlock Text="{Binding StatusText, FallbackValue=준비됨}" Margin="6,0"/></StatusBarItem>
+        <Separator/>
+        <StatusBarItem><TextBlock Text="{Binding StatusTip, FallbackValue=Ctrl+R 실행 · Ctrl+Shift+C 비교 · F1 예제 · Esc 취소}" Foreground="Gray" Margin="6,0"/></StatusBarItem>
+    </StatusBar>
+    <TabControl x:Name="topTabControl" SelectedIndex="0" SelectionChanged="TopTabControl_SelectionChanged">
     <TabItem Header="1D 절단 (Rebar)">
     <Grid>
         <Grid.ColumnDefinitions>
@@ -31,7 +44,10 @@
             </Grid.RowDefinitions>
 
             <!-- 재고 입력 -->
-            <GroupBox Header="재고" Grid.Row="0" Margin="0,0,0,5">
+            <GroupBox Grid.Row="0" Margin="0,0,0,5">
+                <GroupBox.Header>
+                    <TextBlock><Run Text="재고 "/><Run Text="{Binding Stocks.Count, StringFormat='({0}건)', Mode=OneWay}" Foreground="Gray"/></TextBlock>
+                </GroupBox.Header>
                 <StackPanel>
                     <DataGrid x:Name="stockGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
                               ItemsSource="{Binding Stocks}"
@@ -51,7 +67,10 @@
             </GroupBox>
 
             <!-- 주문 입력 -->
-            <GroupBox Header="주문" Grid.Row="1" Margin="0,5,0,0">
+            <GroupBox Grid.Row="1" Margin="0,5,0,0">
+                <GroupBox.Header>
+                    <TextBlock><Run Text="주문 "/><Run Text="{Binding Orders.Count, StringFormat='({0}건)', Mode=OneWay}" Foreground="Gray"/></TextBlock>
+                </GroupBox.Header>
                 <StackPanel>
                     <DataGrid x:Name="orderGrid" AutoGenerateColumns="False" Height="200" Margin="0,0,0,10"
                               ItemsSource="{Binding Orders}"
@@ -77,6 +96,8 @@
                         ToolTip="현재 재고/주문/파라미터를 .json 파일로 저장"/>
                 <Button Content="시나리오 열기" Command="{Binding LoadScenarioCommand}" Width="100" Margin="0,0,5,0"
                         ToolTip="저장된 .json 시나리오를 불러오기"/>
+                <Button x:Name="btnRecent1D" Content="최근 ▾" Click="Recent1D_Click" Width="65" Margin="0,0,5,0"
+                        ToolTip="최근에 사용한 시나리오 (최대 5개)"/>
                 <Button Content="전체 초기화" Command="{Binding ClearAllCommand}" Width="80"/>
             </StackPanel>
         </Grid>
@@ -218,6 +239,8 @@
                                          Value="{Binding ProgressPercent}"
                                          Minimum="0" Maximum="100"/>
                             <TextBlock Text="{Binding ProgressText}" HorizontalAlignment="Center" Margin="0,5,0,0" FontWeight="Bold"/>
+                            <Button Content="취소" Command="{Binding CancelCommand}" Width="80" Margin="0,8,0,0" HorizontalAlignment="Center"
+                                    ToolTip="Esc 키로도 취소"/>
                         </StackPanel>
                     </Grid>
                 </Grid>
@@ -229,11 +252,25 @@
                 <TabItem Header="최적화 결과">
                     <Grid>
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBox Grid.Row="0" IsReadOnly="True"
+                        <!-- 검색 바 (Ctrl+F로 토글) -->
+                        <Border x:Name="searchBar" Grid.Row="0" Background="#F8F8F8" BorderBrush="LightGray" BorderThickness="0,0,0,1"
+                                Padding="6" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="검색:" VerticalAlignment="Center" Margin="2,0,6,0"/>
+                                <TextBox x:Name="searchBox" Width="220" KeyDown="SearchBox_KeyDown" VerticalAlignment="Center"/>
+                                <Button Content="다음 (F3)" Click="SearchNext_Click" Margin="6,0,0,0" Padding="6,2"/>
+                                <Button Content="이전 (Shift+F3)" Click="SearchPrev_Click" Margin="4,0,0,0" Padding="6,2"/>
+                                <Button Content="닫기 (Esc)" Click="SearchClose_Click" Margin="4,0,0,0" Padding="6,2"/>
+                                <TextBlock x:Name="searchStatus" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="Gray"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBox x:Name="resultTextBox" Grid.Row="1" IsReadOnly="True"
                                  VerticalScrollBarVisibility="Auto"
                                  HorizontalScrollBarVisibility="Auto"
                                  FontFamily="Consolas"
@@ -241,7 +278,7 @@
                                  Text="{Binding ResultText, Mode=OneWay}"/>
 
                         <!-- 내보내기 버튼 -->
-                        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="10">
                             <Button Content="CSV로 내보내기"   Command="{Binding ExportToCsvCommand}"   Width="120" Margin="0,0,5,0" IsEnabled="{Binding HasSingleResult}"/>
                             <Button Content="Excel로 내보내기" Command="{Binding ExportToExcelCommand}" Width="120" IsEnabled="{Binding HasSingleResult}"/>
                         </StackPanel>
@@ -251,10 +288,14 @@
                 <!-- 시각화 탭 -->
                 <TabItem Header="결과 시각화">
                     <Grid>
-                        <TextBlock Text="최적화를 먼저 실행하면 결과가 시각화됩니다."
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="Gray" FontSize="14" FontStyle="Italic"
-                                   Visibility="{Binding HasSingleResult, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Visibility="{Binding HasSingleResult, Converter={StaticResource InverseBoolToVis}}">
+                            <TextBlock Text="📊" HorizontalAlignment="Center" FontSize="48" Foreground="LightGray"/>
+                            <TextBlock Text="최적화 결과가 여기에 시각화됩니다" HorizontalAlignment="Center"
+                                       FontSize="14" Foreground="Gray" Margin="0,8,0,4"/>
+                            <TextBlock Text="좌측에 재고와 주문을 입력하고 '최적화 실행' (Ctrl+R)을 누르세요"
+                                       HorizontalAlignment="Center" FontSize="11" Foreground="DarkGray"/>
+                        </StackPanel>
 
                         <ScrollViewer VerticalScrollBarVisibility="Auto"
                                       Visibility="{Binding HasSingleResult, Converter={StaticResource BoolToVis}}">
@@ -331,10 +372,14 @@
                 <!-- 비교 결과 탭 -->
                 <TabItem Header="알고리즘 비교">
                     <Grid>
-                        <TextBlock Text="'알고리즘 비교' 버튼을 클릭하면 결과가 표시됩니다."
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Foreground="Gray" FontSize="14" FontStyle="Italic"
-                                   Visibility="{Binding HasComparisonResults, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Visibility="{Binding HasComparisonResults, Converter={StaticResource InverseBoolToVis}}">
+                            <TextBlock Text="📈" HorizontalAlignment="Center" FontSize="48" Foreground="LightGray"/>
+                            <TextBlock Text="세 알고리즘의 결과를 한눈에 비교합니다" HorizontalAlignment="Center"
+                                       FontSize="14" Foreground="Gray" Margin="0,8,0,4"/>
+                            <TextBlock Text="'알고리즘 비교' (Ctrl+Shift+C) 버튼을 누르면 표 · 차트 · 상세 리포트가 표시됩니다"
+                                       HorizontalAlignment="Center" FontSize="11" Foreground="DarkGray"/>
+                        </StackPanel>
 
                         <Grid Visibility="{Binding HasComparisonResults, Converter={StaticResource BoolToVis}}">
                             <Grid.RowDefinitions>
@@ -420,4 +465,5 @@
         <twod:TwoDTab/>
     </TabItem>
     </TabControl>
+    </DockPanel>
 </Window>

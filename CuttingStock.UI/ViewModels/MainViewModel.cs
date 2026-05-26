@@ -60,10 +60,43 @@ namespace CuttingStock.UI.ViewModels
 
         [ObservableProperty] private string _resultText = string.Empty;
         [ObservableProperty] private string _comparisonText = string.Empty;
-        [ObservableProperty] private bool _isRunning;
+
+        /// <summary>Status-bar message — last action / current state.</summary>
+        [ObservableProperty] private string _statusText = "준비됨";
+        [ObservableProperty] private string _statusTip  = "Ctrl+R 실행 · Ctrl+Shift+C 비교 · F1 예제 · Esc 취소";
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CalculateCommand))]
+        [NotifyCanExecuteChangedFor(nameof(CompareAlgorithmsCommand))]
+        private bool _isRunning;
+
         [ObservableProperty] private double _progressPercent;
         [ObservableProperty] private bool _progressIndeterminate = true;
         [ObservableProperty] private string _progressText = "계산 중...";
+
+        /// <summary>CanExecute gate for Calculate / CompareAlgorithms — prevents
+        /// concurrent solver runs from a re-entrant button click.</summary>
+        private bool CanRunSolver() => !IsRunning;
+
+        /// <summary>CanExecute for the Cancel command — only when a solve is in flight.</summary>
+        private bool CanCancelSolver() => CanCancel;
+
+        /// <summary>
+        /// Soft-cancel: invalidate the current run ID so the awaiting task discards
+        /// its result, signal the CTS for any solver that honours it, and free the UI.
+        /// The background compute itself may continue to completion (OR-Tools MIPs
+        /// can't be interrupted mid-solve), but the user sees an immediate response.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanCancelSolver))]
+        private void Cancel()
+        {
+            _currentRunId++;          // any in-flight task's result is now stale
+            try { _currentCts?.Cancel(); } catch { /* CTS may already be disposed */ }
+            IsRunning = false;
+            CanCancel = false;
+            ProgressText = "취소됨";
+            StatusText = "취소됨";
+        }
 
         /// <summary>True after Calculate succeeds — gates Export buttons.</summary>
         [ObservableProperty] private bool _hasSingleResult;
@@ -78,6 +111,21 @@ namespace CuttingStock.UI.ViewModels
         private SolverResult? _lastResult;
         private SolverOptions? _lastOptions;
         private ICuttingSolver? _lastSolver;
+
+        // Soft-cancel: each Calculate/Compare run gets a monotonically-increasing
+        // ID and a CTS. The background Task always finishes (we can't interrupt
+        // OR-Tools mid-MIP) but we discard its result if a newer run was started
+        // or the user cancelled.
+        private int _currentRunId;
+        private System.Threading.CancellationTokenSource? _currentCts;
+
+        /// <summary>Fires after a scenario is saved or loaded. Carries the file path.</summary>
+        public event EventHandler<string>? ScenarioSaved;
+        public event EventHandler<string>? ScenarioLoaded;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
+        private bool _canCancel;
 
         // ─── Input commands ──────────────────────────────────────────
 
@@ -105,6 +153,7 @@ namespace CuttingStock.UI.ViewModels
             Orders.Add(new OrderRow { Length = 4000, Quantity = 15 });
             Orders.Add(new OrderRow { Length = 3000, Quantity = 12 });
             Orders.Add(new OrderRow { Length = 2000, Quantity = 8 });
+            StatusText = "예제 데이터 로드됨";
             _dialog.ShowInfo("예제 로드",
                 "예제 데이터를 로드했습니다.\n재고: 12000mm × 20개\n주문: 5000mm×10, 4000mm×15, 3000mm×12, 2000mm×8");
         }
@@ -137,6 +186,8 @@ namespace CuttingStock.UI.ViewModels
                     },
                 };
                 ScenarioService.Save1D(path, scenario);
+                StatusText = $"저장됨: {System.IO.Path.GetFileName(path)}";
+                ScenarioSaved?.Invoke(this, path);
                 _dialog.ShowInfo("저장 완료", $"시나리오를 저장했습니다.\n{path}");
             }
             catch (Exception ex)
@@ -171,6 +222,8 @@ namespace CuttingStock.UI.ViewModels
                 KerfText  = p.Kerf.ToString(CultureInfo.InvariantCulture);
                 UsageOrderIndex = p.UsageOrder == StockUsageOrder.SmallToLarge ? 0 : 1;
                 EnableWelding = p.EnableWelding;
+                StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
+                ScenarioLoaded?.Invoke(this, path);
             }
             catch (Exception ex)
             {
@@ -180,7 +233,7 @@ namespace CuttingStock.UI.ViewModels
 
         // ─── Solve / Compare commands ────────────────────────────────
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanRunSolver))]
         private async Task CalculateAsync()
         {
             if (Stocks.Count == 0 || Orders.Count == 0)
@@ -194,21 +247,31 @@ namespace CuttingStock.UI.ViewModels
             var ordersSnapshot = Orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
             var optimizer = BuildOptimizer();
 
+            int runId = ++_currentRunId;
+            // Dispose any leftover CTS from a previous run before allocating a new one
+            // — without this we leak one kernel handle per Calculate / Compare invocation.
+            _currentCts?.Dispose();
+            _currentCts = new System.Threading.CancellationTokenSource();
+
             try
             {
                 IsRunning = true;
+                CanCancel = true;
                 ProgressIndeterminate = true;
                 ProgressPercent = 0;
                 ProgressText = "최적화 준비 중...";
 
                 var progress = new Progress<double>(pct =>
                 {
+                    if (runId != _currentRunId) return;  // stale callback
                     ProgressIndeterminate = false;
                     ProgressPercent = pct;
                     ProgressText = $"최적화 진행 중... {pct:F0}%";
                 });
 
                 var result = await Task.Run(() => optimizer.Solve(stockSnapshot, ordersSnapshot, parameters, progress));
+
+                if (runId != _currentRunId) return;  // cancelled or superseded — discard
 
                 _lastResult = result;
                 _lastOptions = parameters;
@@ -237,6 +300,7 @@ namespace CuttingStock.UI.ViewModels
                 }
                 else
                 {
+                    StatusText = $"완료: {optimizer.Name} · {result.StockUsed}개 사용 · 효율 {result.MaterialEfficiency:F1}% · {result.ExecutionTimeMs:F0}ms";
                     _dialog.ShowInfo("최적화 완료",
                         $"최적화가 완료되었습니다!\n\n" +
                         $"총 비용: {result.TotalCost:N0}원\n" +
@@ -246,15 +310,23 @@ namespace CuttingStock.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
+                if (runId == _currentRunId)
+                {
+                    StatusText = $"오류: {ex.Message}";
+                    _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
+                }
             }
             finally
             {
-                IsRunning = false;
+                if (runId == _currentRunId)
+                {
+                    IsRunning = false;
+                    CanCancel = false;
+                }
             }
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanRunSolver))]
         private async Task CompareAlgorithmsAsync()
         {
             if (Stocks.Count == 0 || Orders.Count == 0)
@@ -268,9 +340,14 @@ namespace CuttingStock.UI.ViewModels
             var orders = Orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
             _lastOptions = parameters;
 
+            int runId = ++_currentRunId;
+            _currentCts?.Dispose();
+            _currentCts = new System.Threading.CancellationTokenSource();
+
             try
             {
                 IsRunning = true;
+                CanCancel = true;
                 ProgressIndeterminate = true;
                 ProgressText = "알고리즘 비교 중...";
 
@@ -289,6 +366,7 @@ namespace CuttingStock.UI.ViewModels
 
                 for (int i = 0; i < optimizers.Count; i++)
                 {
+                    if (runId != _currentRunId) return;  // cancelled mid-loop
                     var optimizer = optimizers[i];
                     ProgressText = $"비교 중... ({i + 1}/{optimizers.Count} — {optimizer.Name})";
                     ProgressIndeterminate = false;
@@ -296,6 +374,7 @@ namespace CuttingStock.UI.ViewModels
 
                     var ordersCopy = orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
                     var result = await Task.Run(() => optimizer.Solve(stockSnapshot, ordersCopy, parameters));
+                    if (runId != _currentRunId) return;  // cancelled while this solver was running
 
                     rows.Add(new ComparisonResult
                     {
@@ -329,6 +408,7 @@ namespace CuttingStock.UI.ViewModels
                 var best = sorted.FirstOrDefault();
                 if (best != null)
                 {
+                    StatusText = $"비교 완료 · 최고: {best.AlgorithmName} · 효율 {best.MaterialEfficiency:F1}%";
                     _dialog.ShowInfo("비교 완료",
                         "알고리즘 비교가 완료되었습니다!\n\n" +
                         $"최고 성능: {best.AlgorithmName}\n" +
@@ -339,11 +419,16 @@ namespace CuttingStock.UI.ViewModels
             }
             catch (Exception ex)
             {
-                _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
+                if (runId == _currentRunId)
+                    _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
             }
             finally
             {
-                IsRunning = false;
+                if (runId == _currentRunId)
+                {
+                    IsRunning = false;
+                    CanCancel = false;
+                }
             }
         }
 

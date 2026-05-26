@@ -6,9 +6,9 @@
 |---|---|
 | CPU | Intel Core i5-14600KF 3.50GHz (14C/20T) |
 | OS | Windows 11 (10.0.26200) |
-| Runtime | .NET 8.0.25, RyuJIT x86-64-v3 |
+| Runtime | .NET 10.0, RyuJIT x86-64-v3 |
 | 측정 | BenchmarkDotNet v0.15.5 (DefaultJob) |
-| 테스트 | 500개 통과 (NUnit 4.4.0 + FluentAssertions 8.8.0) |
+| 테스트 | 615개 통과 (NUnit 4.4.0 + FluentAssertions 8.8.0) |
 
 ---
 
@@ -125,25 +125,33 @@
 
 | 분류 | 테스트 수 |
 |---|---:|
-| 1D 도메인/모델/알고리즘 | 254 |
-| 2D 도메인/모델 (Sheet, RectOrder, SolverOptions2D) | 30 |
-| 2D 유틸리티 (Validator, KnapsackDP, PatternBuilder, SolverUtils) | 49 |
-| 2D 솔버 (Shelf, CG2D, MIP) | 82 |
-| 2D 불변식 퍼징 (30 seeds × 3 solvers) | 90 |
-| 2D 솔버 간 일관성 | 11 |
-| PatternPool 인프라 | 8 |
-| **합계** | **500** |
+| 1D 도메인/모델/알고리즘 (단위 + 통합) | 350+ |
+| 1D 불변식 매트릭스 (15 seeds × 3 솔버) | 45 |
+| 1D 견고성 (adversarial / 큰 kerf / 극단 α-β / 빈 입력) | 16 |
+| 1D 품질 비교 (cross-solver smoke) | 5 |
+| 1D 성능 budget (wall-clock × 3 솔버 × 3 사이즈) | 8 |
+| 1D 스트레스 (`[Category("Stress")]`) | 5 |
+| 2D 도메인/모델 + 유틸 | 80+ |
+| 2D 솔버 (Shelf / CG2D / MIP) + 일관성 | 30+ |
+| 2D 불변식 퍼징 (30 seeds × 3 솔버) | 90 |
+| 2D 성능 budget | 8 |
+| ScenarioService 라운드트립 | 4 |
+| **합계** | **615** |
 
 불변식 테스트(fuzzing)가 검증하는 속성:
 1. 수요 정확 충족 (과생산/미달 0)
-2. 시트 경계 내 (trim 적용)
+2. 시트/스톡 경계 내 (trim/kerf 적용)
 3. 겹침 없음 (kerf-aware)
-4. 길로틴 적합 (Beasley 분리 테스트)
-5. 차원 매칭 (order ↔ placement)
-6. 회전 플래그 존중
-7. 비용 일관성 (waste × alpha)
-8. 시트 재고 준수
+4. 2D: 길로틴 적합 (Beasley 분리 테스트)
+5. 차원 매칭 (order ↔ placement / cut)
+6. 회전 플래그 존중 (2D)
+7. 비용 일관성 (`WasteLength × Alpha + WeldCount × Beta`)
+8. 시트/스톡 재고 준수
+9. 1D: kerf-aware Leftover 공식 (`stockLen − Σcuts − (n−1)·kerf`)
+
+성능 budget 테스트는 BenchmarkDotNet 측정치의 3~5배를 상한으로 — 알고리즘 회귀
+(예: 후처리에 우연한 O(N²) 추가)는 잡되 CI 노이즈는 흘려보내는 폭으로 잡았다.
 
 ---
 
-*Measured: 2026-04-12 · CuttingStock v3.0 (1D + 2D)*
+*Last measured: 2026-04-12 · CuttingStock 1D + 2D + MVVM*

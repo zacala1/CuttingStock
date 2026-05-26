@@ -66,7 +66,7 @@ namespace CuttingStock.Core.Domain
         public string AlgorithmName { get; set; } = "";
         public List<CuttingPlan> CuttingPlans { get; set; } = new();
         public List<int> ReusableLeftovers { get; set; } = new();
-        public int WasteLength { get; set; }
+        public long WasteLength { get; set; }
         public int WeldCount { get; set; }
         public long TotalCost { get; set; }
         public double ExecutionTimeMs { get; set; }

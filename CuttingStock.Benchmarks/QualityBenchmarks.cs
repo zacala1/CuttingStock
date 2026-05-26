@@ -23,7 +23,7 @@ namespace CuttingStock.Benchmarks
 
         // 결과 저장용
         public long LastTotalCost { get; private set; }
-        public int LastWasteLength { get; private set; }
+        public long LastWasteLength { get; private set; }
         public int LastStockUsed { get; private set; }
         public double LastMaterialEfficiency { get; private set; }
 
