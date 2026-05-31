@@ -3,6 +3,21 @@
 `docs/archive/` 에 흩어져 있던 PHASE 노트들을 시간순으로 압축한 변경 이력.
 원본은 git history 에 보존되어 있다 (`git log -- docs/archive/`).
 
+## 2026-05-31 — 알고리즘 kerf / 수요 불변식 보강
+
+- **1D ArcFlow kerf 모델 정정** — arc 길이는 `length + kerf` 를 쓰되 stock capacity를
+  `stock + kerf` 로 확장해 첫 절단 edge kerf를 과금하지 않도록 수정. `205mm`
+  stock에 `100 + 5 + 100` exact-fit 회귀 테스트 추가.
+- **Greedy 입력 정규화 + 용접 tail 재분배** — 동일 길이 order/stock row를 solver
+  진입부에서 합산하고, 용접 잔여 tail이 `Delta` 미만일 때 직전 조각을 줄여
+  `5000 + 4100 + 1000 = 10100mm` 같은 feasible split을 찾도록 보강.
+- **2D guillotine DP kerf-aware normal set** — normal set에 `50 + 5 + 50 = 105`
+  같은 interior-kerf extent를 포함해 가능한 kerf 패턴을 pricing에서 놓치지 않게 함.
+- **2D CG/MIP exact-demand guard** — LP/MIP 패턴이 overproduce할 수 있는 경로를
+  최종 materialization에서 demand 기준으로 trim하고 정확히 덮지 못하면 실패 처리.
+
+2개 commit (`ece74b9`, `현재`).
+
 ## 2026-05 (late) — 전방위 안정성 sweep + UX 마감
 
 영역별 audit 에이전트(1D / 2D / 2D util / domain / persistence / VM / View)를
