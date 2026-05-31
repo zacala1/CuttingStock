@@ -191,6 +191,34 @@ namespace CuttingStock.Tests.TwoD
             counts[1].Should().Be(3);
         }
 
+        [Test]
+        public void TrimToDemand_RemovesOverproductionAcrossMultiplicity()
+        {
+            var sheet = new Sheet(100, 100, 5);
+            var pattern = new CuttingPattern2D
+            {
+                Sheet = sheet,
+                Multiplicity = 2,
+                Placements = new List<Placement>
+                {
+                    Make(0, 0, 0, 20, 20),
+                    Make(1, 20, 0, 20, 20),
+                },
+            };
+
+            var trimmed = SolverUtils2D.TrimToDemand(
+                new List<CuttingPattern2D> { pattern },
+                new[] { 1, 2 },
+                out var produced);
+
+            produced.Should().Equal(1, 2);
+            SolverUtils2D.CountPlaced(trimmed, orderCount: 2).Should().Equal(1, 2);
+            trimmed.Should().HaveCount(2);
+            trimmed.Should().OnlyContain(p => p.Multiplicity == 1);
+            trimmed[0].Placements.Select(p => p.OrderIndex).Should().Equal(0, 1);
+            trimmed[1].Placements.Select(p => p.OrderIndex).Should().Equal(1);
+        }
+
         // ----- helpers -----
 
         private static Placement Make(int oi, int x, int y, int w, int h) =>

@@ -69,6 +69,20 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 ? stock.OrderBy(s => s.Length).ToList()
                 : stock.OrderByDescending(s => s.Length).ToList();
         }
+        public static List<RebarStock> AggregateStockByLength(List<RebarStock> stock)
+        {
+            return stock
+                .GroupBy(s => s.Length)
+                .Select(g => new RebarStock(g.Key, g.Sum(s => s.Quantity)))
+                .ToList();
+        }
+        public static List<Order> AggregateOrdersByLength(List<Order> orders)
+        {
+            return orders
+                .GroupBy(o => o.Length)
+                .Select(g => new Order(g.Key, g.Sum(o => o.Quantity)))
+                .ToList();
+        }
         public static List<Order> SortOrdersByScarcity(List<Order> orders)
         {
             return orders

@@ -118,6 +118,13 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 if (integerPatterns.Count == 0)
                     integerPatterns = warm.Patterns;
 
+                integerPatterns = SolverUtils2D.TrimToDemand(integerPatterns, demand, out var finalProduced);
+                if (!finalProduced.SequenceEqual(demand) && result.Success)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "Failed to cover all residual demand exactly.";
+                }
+
                 result.Patterns = integerPatterns;
             }
             catch (Exception ex)

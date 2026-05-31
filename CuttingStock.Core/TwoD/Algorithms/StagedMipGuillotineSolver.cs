@@ -118,6 +118,13 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     outPatterns = heur.Patterns;
                 }
 
+                outPatterns = SolverUtils2D.TrimToDemand(outPatterns, demand, out var finalProduced);
+                if (!finalProduced.SequenceEqual(demand))
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "Failed to cover all demand exactly.";
+                }
+
                 result.Patterns = outPatterns;
                 progress?.Report(1.0);
             }

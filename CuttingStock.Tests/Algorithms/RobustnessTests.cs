@@ -55,6 +55,24 @@ namespace CuttingStock.Tests.Algorithms
         }
 
         [TestCaseSource(nameof(Solvers))]
+        public void Kerf_IsChargedOnlyBetweenAdjacentCuts(ICuttingSolver solver)
+        {
+            // Two 100mm cuts in a 205mm bar with 5mm kerf are an exact fit:
+            // 100 + 5 + 100 = 205. The first cut must not consume edge kerf.
+            var stocks = new List<RebarStock> { new(205, 1) };
+            var orders = new List<Order> { new(100, 2) };
+            var opt = new SolverOptions { Kerf = 5 };
+
+            var r = solver.Solve(stocks, orders, opt);
+
+            r.Success.Should().BeTrue("{0} must treat kerf as between adjacent cuts only", solver.Name);
+            r.StockUsed.Should().Be(1, "{0} should fit both cuts on the single exact-fit bar", solver.Name);
+            r.CuttingPlans.Should().ContainSingle();
+            r.CuttingPlans[0].Cuts.Should().HaveCount(2);
+            r.CuttingPlans[0].Leftover.Should().Be(0);
+        }
+
+        [TestCaseSource(nameof(Solvers))]
         public void SingleOrderSingleStock_ExactFit(ICuttingSolver solver)
         {
             var stocks = new List<RebarStock> { new(6000, 1) };

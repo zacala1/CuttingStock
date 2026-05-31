@@ -47,8 +47,8 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             _items = items;
             _kerf = kerf;
 
-            _xs = BuildNormalSet(width, items, axis: 0);
-            _ys = BuildNormalSet(height, items, axis: 1);
+            _xs = BuildNormalSet(width, items, axis: 0, kerf);
+            _ys = BuildNormalSet(height, items, axis: 1, kerf);
             for (int i = 0; i < _xs.Length; i++) _xi[_xs[i]] = i;
             for (int i = 0; i < _ys.Length; i++) _yi[_ys[i]] = i;
 
@@ -198,30 +198,42 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
         /// itself. Normal sets reduce the DP from O(W·H) to O(|X|·|Y|) without loss
         /// of optimality (Christofides &amp; Whitlock 1977; Beasley 1985).
         /// </summary>
-        private static int[] BuildNormalSet(int bound, List<Item> items, int axis)
+        private static int[] BuildNormalSet(int bound, List<Item> items, int axis, int kerf)
         {
-            // Standard subset-sum closure: start with {0} and, for each item dimension s,
-            // extend the set by all reachable s, 2s, 3s, ... not exceeding `bound`.
-            // Final set is union over all such closures, capped by `bound`.
-            var reachable = new HashSet<int> { 0, bound };
+            // Kerf-aware closure of occupied extents. Appending the first item adds
+            // s; appending later items adds kerf+s. This keeps extents like
+            // 50+5+50=105 in the normal set, which raw item sums would miss.
+            var dims = new List<int>();
             foreach (var it in items)
             {
                 int s = axis == 0 ? it.W : it.H;
                 if (s <= 0 || s > bound) continue;
-                var snapshot = reachable.ToArray();   // freeze prior values
-                foreach (var v in snapshot)
+                if (!dims.Contains(s)) dims.Add(s);
+            }
+
+            var reachable = new bool[bound + 1];
+            reachable[0] = true;
+            reachable[bound] = true;
+
+            for (int v = 0; v <= bound; v++)
+            {
+                if (!reachable[v]) continue;
+                foreach (int s in dims)
                 {
-                    int nv = v + s;
-                    while (nv <= bound)
-                    {
-                        reachable.Add(nv);            // duplicates are silently ignored
-                        nv += s;
-                    }
+                    int next = v == 0 ? s : v + kerf + s;
+                    if (next <= bound) reachable[next] = true;
                 }
             }
-            var arr = new int[reachable.Count];
-            reachable.CopyTo(arr);
-            Array.Sort(arr);
+
+            int count = 0;
+            for (int i = 0; i < reachable.Length; i++)
+                if (reachable[i]) count++;
+
+            var arr = new int[count];
+            int pos = 0;
+            for (int i = 0; i < reachable.Length; i++)
+                if (reachable[i]) arr[pos++] = i;
+
             return arr;
         }
 
