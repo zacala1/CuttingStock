@@ -6,7 +6,7 @@
 
 - **CuttingStock.Core** — 알고리즘, 도메인 모델, OR-Tools 통합, JSON 시나리오 영속화 (`Persistence/`)
 - **CuttingStock.UI** — WPF + MVVM(CommunityToolkit.Mvvm) UI. ViewModels / Services 분리
-- **CuttingStock.Tests** — NUnit + FluentAssertions, **615 테스트** (Stress + Performance 카테고리 포함)
+- **CuttingStock.Tests** — NUnit + FluentAssertions, Core **638 테스트** + UI **40 테스트** 통과
 - **CuttingStock.Benchmarks** — BenchmarkDotNet 성능 측정 (인포메이셔널)
 
 ## 1D 솔버 (`ICuttingSolver`)
@@ -15,8 +15,9 @@
 
 Sparse DP + 2-opt 후처리.
 
-- **전략**: Pass1(균등, 주문당 2cut) → Pass2(잔여, 5cut) → Pass3(채우기, 무제한) + swap/relocate
+- **전략**: 동일 길이 입력 합산 → Pass1(균등, 주문당 2cut) → Pass2(잔여, 5cut) → Pass3(채우기, 무제한) + swap/relocate
 - **잔여 leftover 호스트** — 부분 용접 조각이 기존 plan의 leftover에 들어갈 수 있으면 새 재고 안 씀 (`FindHostPlanForWeld`)
+- **용접 tail 보정** — 마지막 조각이 `Delta` 미만이면 직전 조각을 줄여 feasible split을 재시도
 - **복잡도**: O(N × L × Passes)
 - **장점**: 빠르고(<1ms 소규모), 용접/kerf 자연 지원
 - **단점**: 단일 길이 대량 demand 시 Pass1 캡으로 비최적 (∼ 2× 최적)
@@ -34,14 +35,14 @@ Sparse DP + 2-opt 후처리.
 
 DAG 네트워크 + SCIP MIP.
 
-- **전략**: 노드 = 위치, 아이템 arc = `length + kerf`, GCD 노드 압축
+- **전략**: 노드 = 위치, 아이템 arc = `length + kerf`, capacity = `stock + kerf`, GCD 노드 압축
 - **복잡도**: 정확(NP-hard, 30s 시간 제한)
 - **장점**: 수학적 최적, 다중 재고 지원
 - **단점**: 입력 distinct length가 많거나 kerf로 GCD 작아지면 시간 제한 도달 가능
 
 ## 2D 솔버 (`ICuttingSolver2D`)
 
-`CuttingStock.Core.TwoD` 네임스페이스에 1D 거울 구조 3종. 산업용 패널 톱이 요구하는 **길로틴(guillotine)** 절단, 90° 회전, kerf, 트림 모두 지원. **모든 솔버는 입력 시 `SolverUtils2D.AggregateByDims`로 동일 dim 시트 행을 합산** — `Sheet.Equals`가 구조적이므로 행 분산은 인벤토리 절반 손실로 이어진다.
+`CuttingStock.Core.TwoD` 네임스페이스에 1D 거울 구조 3종. 산업용 패널 톱이 요구하는 **길로틴(guillotine)** 절단, 90° 회전, kerf, 트림 모두 지원. **모든 솔버는 입력 시 `SolverUtils2D.AggregateByDims`로 동일 dim 시트 행을 합산**하고, `Success=true` 반환 전 시트 재고·수요 정확 충족·trim/kerf/회전·길로틴 적합성을 공통 validator로 재검증한다.
 
 | 솔버 | 핵심 알고리즘 | 출처 |
 |---|---|---|
@@ -92,6 +93,7 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 - 1D / 2D 각 3종 알고리즘 + 비교
 - Kerf(톱날 두께) 지원 — 현실 절단 손실 반영
 - 1D 용접 지원 — 긴 주문을 여러 조각으로 분할, 부분 조각은 기존 plan leftover에 호스트
+- 성공 결과 공통 validator — `Success=true` 결과는 재고/수요/kerf/용접/길로틴 불변식 통과
 - 후처리 최적화 (1D) — 2-opt swap + relocate
 - 결과 시각화 — 1D는 패턴 그룹핑 막대, 2D는 Canvas 배치
 - 비교 시각화 — LiveCharts (1D 3차트, 2D 3차트)
@@ -103,18 +105,11 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 
 ## 테스트
 
-| 카테고리 | 테스트 수 | 비고 |
+| 범위 | 테스트 수 | 비고 |
 |---|---:|---|
-| 1D 도메인/모델/알고리즘 | 350+ | Greedy/CG/ArcFlow 단위 + 통합 |
-| 1D 불변식 매트릭스 | 45 | 15 seeds × 3 솔버, 모든 invariant 검증 |
-| 1D 견고성 (adversarial) | 16 | 큰 kerf, 극단 α/β, 빈 입력 등 |
-| 1D 품질 비교 (cross-solver) | 5 | 모든 솔버 성공 + 3× 한계 + 70% 효율 |
-| 1D 성능 budget | 8 | wall-clock 예산 (Greedy/CG/ArcFlow × small/med/large) |
-| 1D 스트레스 (`[Category("Stress")]`) | 5 | 2000 distinct / 5000 동일 / 다중 stock |
-| 2D 솔버 + 도메인 | 100+ | 솔버, 일관성, 엣지, 도메인 |
-| 2D 불변식 매트릭스 | 90 | 30 seeds × 3 솔버, 8개 invariant |
-| ScenarioService 라운드트립 | 4 | 1D + 2D round-trip + 스키마 가드 |
-| **합계** | **615** | 모두 통과 (Stress 포함 ~4분) |
+| `CuttingStock.Tests` (Core) | 638 | 1D/2D 솔버, 도메인, persistence, invariant, robustness, performance/stress |
+| `CuttingStock.UI.Tests` | 40 | 1D/2D ViewModel command/state, dialog flow, visualization service |
+| **합계** | **678** | Release 전체 통과, `[Explicit]` LargeScale benchmark 1개는 기본 실행 제외 |
 
 `Benchmark_LargeScale_1000_Orders`는 `[Explicit]`로 디폴트 실행에서 제외, 별도 호출 시 ~7초.
 
@@ -133,11 +128,14 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 # 전체 빌드 (Release)
 dotnet build CuttingStock.slnx -c Release
 
-# 테스트 (Stress 제외, ~2분)
-dotnet test CuttingStock.slnx -c Release --filter "TestCategory!=Stress"
+# 전체 테스트 ([Explicit] LargeScale 제외)
+dotnet test CuttingStock.slnx -c Release --nologo
 
-# 전체 테스트 (Stress 포함, ~4분)
-dotnet test CuttingStock.slnx -c Release
+# 특정 카테고리
+dotnet test CuttingStock.slnx -c Release --filter "Category=Welding"
+
+# Explicit LargeScale 1000-orders benchmark
+dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
 
 # WPF 앱 실행
 dotnet run --project CuttingStock.UI

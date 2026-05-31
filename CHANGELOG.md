@@ -14,7 +14,7 @@
 - **validator 회귀 테스트** — 1D over-pack / over-production / welded order 합계,
   2D overlap / illegal rotation / valid kerf pattern 검증 케이스 추가.
 
-1개 commit (`현재`).
+1개 commit (`c7de45a`).
 
 ## 2026-05-31 — 알고리즘 kerf / 수요 불변식 보강
 
@@ -29,7 +29,7 @@
 - **2D CG/MIP exact-demand guard** — LP/MIP 패턴이 overproduce할 수 있는 경로를
   최종 materialization에서 demand 기준으로 trim하고 정확히 덮지 못하면 실패 처리.
 
-2개 commit (`ece74b9`, `현재`).
+2개 commit (`ece74b9`, `cee7d96`).
 
 ## 2026-05 (late) — 전방위 안정성 sweep + UX 마감
 
@@ -59,7 +59,7 @@
 - **R1-2: BoolToVisibilityConverter Inverse, Calculate/Compare CanExecute** —
   MVVM 라운드 직후 catch한 두 critical UX bug.
 
-5개 commit (`a061993`...`5c49231`...`현재`).
+5개 commit (`cf6660f`...`4b3c1ee`).
 
 ## 2026-05 — MVVM + 강력한 테스트 + 잔여 버그 정리
 

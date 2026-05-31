@@ -80,7 +80,7 @@ Console.WriteLine(result.GetDetailedReport(options));
 | `MaterialEfficiency` | double | 효율 (%) |
 | `TotalCost` | long | 폐기 면적 × `AlphaArea` |
 | `ExecutionTimeMs` | double | 실행 시간 |
-| `Success` | bool | 성공 여부 |
+| `Success` | bool | 성공 여부. `true` 이면 공통 validator가 sheet inventory, trim/kerf/회전, 길로틴, exact demand 불변식을 확인한 상태 |
 | `ErrorMessage` | string? | 실패 메시지 |
 | `GetDetailedReport(options)` | string | 사람-가독 리포트 |
 
@@ -128,6 +128,10 @@ public interface ICuttingSolver2D
 키가 충돌해 인벤토리가 절반으로 잘리거나 `ArgumentException`이 난다. 외부에서 시트
 리스트를 만들 때 미리 합쳐도 되고, 그대로 넘겨도 솔버 안에서 안전하게 합산된다.
 
+또한 모든 솔버는 `Success=true` 반환 전 `SolverUtils2D.ValidateSuccessfulResult` 를 통과한다.
+CG2D / Staged MIP는 정수화 또는 MIP materialization 뒤 `TrimToDemand` 로 과생산 배치를
+제거한 다음 validator를 실행한다.
+
 ## 유틸리티
 
 ### `SolverUtils2D.AggregateByDims`
@@ -137,6 +141,28 @@ public static List<Sheet> AggregateByDims(List<Sheet> sheets);
 동일 `(Width, Height)` 행을 한 `Sheet` 로 합쳐 `Quantity` 를 더한다. 모든 2D 솔버의
 진입부에서 호출하므로 일반적인 사용자가 직접 호출할 필요는 없으나, 외부 코드가
 LP 마스터 같은 하위 컴포넌트에 직접 접근하는 경우 같이 호출해야 한다.
+
+### `SolverUtils2D.TrimToDemand`
+```csharp
+public static List<CuttingPattern2D> TrimToDemand(
+    List<CuttingPattern2D> patterns,
+    int[] demand,
+    out int[] produced);
+```
+패턴 multiplicity를 개별 copy로 펼치면서 demand를 초과하는 placement를 제거한다.
+CG2D / Staged MIP의 최종 materialization에서 과생산을 제거하는 안전장치다.
+
+### `SolverUtils2D.ValidateSuccessfulResult`
+```csharp
+public static string? ValidateSuccessfulResult(
+    List<Sheet> sheets,
+    List<RectOrder> orders,
+    SolverOptions2D options,
+    SolverResult2D result);
+```
+성공 결과의 sheet inventory, multiplicity, trim bounds, kerf-aware overlap,
+guillotine compliance, order index, 치수/회전 플래그, exact demand coverage를 검증한다.
+문제가 없으면 `null`, 문제가 있으면 사용자에게 노출 가능한 오류 문자열을 반환한다.
 
 ### `GuillotineValidator`
 ```csharp

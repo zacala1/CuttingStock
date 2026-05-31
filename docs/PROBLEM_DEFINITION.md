@@ -27,6 +27,7 @@
 | **β (beta)** | 용접 1회당 비용 | 원/회 | 500 |
 | **γ (gamma)** | 재사용 가능한 자투리 최소 길이 | mm | 100-1000 |
 | **δ (delta)** | 용접 가능한 조각 최소 길이 | mm | 100-1000 |
+| **kerf** | 인접 절단 사이 톱날 손실 | mm | 0-5 |
 
 ## 3. 제약 조건
 
@@ -34,6 +35,7 @@
 1. **재고 길이 제약**: 주문 길이 ≤ 재고 길이 (단, 용접 허용 시 예외)
 2. **수량 제약**: 사용한 재고 수량 ≤ 보유 재고 수량
 3. **절단 가능성**: 하나의 재고에서 여러 조각 절단 가능
+4. **Kerf 규약**: `N` 개 cut의 소비 길이는 `Σ 길이 + (N - 1) × kerf`. 첫 cut은 edge kerf를 소비하지 않음
 
 ### 3.2 용접 제약
 1. **용접 가능 길이**: 용접 시 각 조각 ≥ δ (delta)
@@ -106,6 +108,8 @@
 현재 3종의 1D 솔버(`ICuttingSolver`)와 3종의 2D 솔버(`ICuttingSolver2D`)가 구현되어 있다.
 상세는 `docs/ALGORITHMS.md` (1D) 및 `docs/2D_ALGORITHMS.md` (2D) 참조.
 공개 표면은 `docs/API_REFERENCE.md`, 측정치는 `docs/BENCHMARK_REPORT.md`에 정리되어 있다.
+성공 결과는 1D/2D 공통 validator를 통과해야 하며, `Success=true` 는 재고/수요/kerf/용접/길로틴
+불변식이 맞는 결과라는 의미다.
 
 ## 8. 참고 문헌
 
@@ -122,4 +126,4 @@
 
 ---
 
-**최근 갱신**: 2026-05 — MVVM 전환 / 615 테스트 / CG 버그 fix (kerf-aware initial column, single-stock demand filter) 반영
+**최근 갱신**: 2026-06-01 — 678 테스트 스냅샷 / solver 성공 결과 validator / kerf·수요 불변식 보강 반영

@@ -15,6 +15,11 @@ wall-clock deadline**. warm-start / bootstrap 시간도 예산 안에 포함된�
 어떤 솔버도 3-stage 컷을 강제하지 않고 출력은 unrestricted-stage 길로틴이다.
 UI는 "2-stage" / "3-stage"로 노출하나 동작은 동일하다.
 
+**성공 결과 검증.** 세 솔버는 `Success=true` 반환 전
+`SolverUtils2D.ValidateSuccessfulResult` 를 통과해야 한다. 검증기는 sheet inventory,
+pattern multiplicity, trim bounds, kerf-aware overlap, guillotine compliance, order index,
+치수/회전 플래그, exact demand coverage 를 확인한다.
+
 | Solver | 특성 | 복잡도 | 출처 |
 |---|---|---|---|
 | `ShelfGuillotineSolver` | 빠른 휴리스틱 | O(K · N log N) | Coffman et al. 1980; Berkey & Wang 1987 |
@@ -73,7 +78,9 @@ F(W, H) = max {
 }
 ```
 
-**정규 집합(normal set)** `X`, `Y` — 모든 아이템 너비/높이의 합으로 도달 가능한 좌표만 모은 집합. `O(W · H)` 를 `O(|X| · |Y|)` 로 축소 (Christofides & Whitlock 1977; Beasley 1985).
+**정규 집합(normal set)** `X`, `Y` — 아이템 너비/높이 합으로 도달 가능한 좌표만 모은 집합.
+kerf가 있을 때는 `50 + 5 + 50 = 105` 같은 interior-kerf extent도 포함한다.
+`O(W · H)` 를 `O(|X| · |Y|)` 로 축소 (Christofides & Whitlock 1977; Beasley 1985).
 
 회전이 허용된 아이템은 두 방향(원본 + 회전)을 별개 "아이템"으로 등록한다.
 
@@ -85,7 +92,10 @@ F(W, H) = max {
 3. 각 시트 종류에 대해 pricing DP 풀고 reduced cost `s_p − Σ π_i · a_i^new < 0` 면 컬럼 추가
 4. 개선 컬럼 없으면 종료 (또는 시간 제한)
 
-**정수화.** LP 해를 floor 한 뒤 잔여 demand 는 ShelfGuillotineSolver 로 채운다 (1D `ColumnGenerationSolver` 와 동일 패턴).
+**정수화.** LP 해를 floor 한 뒤 잔여 demand 는 ShelfGuillotineSolver 로 채운다
+(1D `ColumnGenerationSolver` 와 동일 패턴). materialization 마지막에는
+`SolverUtils2D.TrimToDemand` 로 과생산 배치를 제거하고, 그래도 exact coverage가 아니면
+공통 validator가 실패로 전환한다.
 
 **참고**
 - Gilmore, Gomory, "Multistage cutting stock problems of two and more dimensions," *Operations Research* 13(1), 1965.
@@ -113,6 +123,10 @@ F(W, H) = max {
 
 **시간 제한.** 전체 `TimeLimitMs` 를 CG 워밍업과 IP 풀이로 분할(기본 절반/절반). CBC 가 시간 안에 최적해를 못 찾아도 베스트 feasible 을 반환한다.
 
+**정확 수요 materialization.** 정수 마스터는 과생산 slack에 빅-M 페널티를 두지만,
+풀 조합상 과생산 배치가 남을 수 있다. 출력 직전 `TrimToDemand` 로 demand 밖 배치를
+제거하고 `ValidateSuccessfulResult` 로 다시 검증한다.
+
 **참고**
 - Vance, Barnhart, Johnson, Nemhauser, "Solving binary cutting stock problems by column generation and branch-and-bound," *Comp. Optim. Appl.* 3, 1994.
 - Belov, Scheithauer, "A branch-and-cut-and-price algorithm for one-dimensional stock cutting and two-dimensional two-stage cutting," *EJOR* 171, 2006.
@@ -122,7 +136,11 @@ F(W, H) = max {
 
 ## 길로틴 검증
 
-모든 솔버 출력은 `GuillotineValidator.IsGuillotineCompliant` 를 통과해야 한다. 검증기는 Beasley 1985 의 재귀 분리 테스트를 구현 — 부모 직사각형에서 어떤 직사각형도 가로지르지 않는 가로/세로 직선을 찾고, 양쪽 부분에 재귀 적용한다. 핀휠(pinwheel) 같은 비-길로틴 패턴은 즉시 거부된다 (테스트 케이스 참조).
+모든 솔버 출력은 `GuillotineValidator.IsGuillotineCompliant` 를 통과해야 한다.
+이 검증은 `SolverUtils2D.ValidateSuccessfulResult` 안에서도 수행된다. 검증기는
+Beasley 1985 의 재귀 분리 테스트를 구현 — 부모 직사각형에서 어떤 직사각형도
+가로지르지 않는 가로/세로 직선을 찾고, 양쪽 부분에 재귀 적용한다. 핀휠(pinwheel)
+같은 비-길로틴 패턴은 즉시 거부된다 (테스트 케이스 참조).
 
 ## 벤치마크 결과 (i5-14600KF, .NET 10, BenchmarkDotNet v0.15.5)
 

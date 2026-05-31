@@ -6,8 +6,9 @@
 
 ### 1. `GreedyKnapsackSolver`
 
-다중 패스 bounded knapsack DP + 2-opt 후처리.
+동일 길이 입력을 합산한 뒤 다중 패스 bounded knapsack DP + 2-opt 후처리를 수행한다.
 
+- **입력 정규화**: 같은 길이의 `RebarStock` / `Order` row는 solver 진입부에서 quantity를 합산
 - **Pass 1** (balanced): 주문당 최대 2 cut, scarcity-first 정렬
 - **Pass 2** (residual): 주문당 최대 5 cut
 - **Pass 3** (fill): 제한 없음
@@ -17,6 +18,8 @@
 - **부분 조각 호스트 (`FindHostPlanForWeld`)** — 용접 그룹의 마지막 partial 조각은
   기존 비-용접 plan의 leftover에 들어갈 수 있으면 새 재고를 안 쓴다. 가장 작은
   여유 plan을 선택해 큰 leftover를 보존한다.
+- **짧은 tail 재분배** — 마지막 partial 조각이 `Delta` 미만이면 직전 조각을 줄여
+  `5000 + 4100 + 1000 = 10100mm` 같은 유효한 용접 split을 찾는다.
 
 복잡도: O(N × L × Passes). 일반적 입력에서 빠름 (밀리초 단위).
 
@@ -42,7 +45,8 @@ Gilmore-Gomory 칼럼 생성 + 커스텀 Simplex 마스터.
 
 Arc Flow 네트워크 + OR-Tools SCIP MIP.
 
-- **그래프**: nodes 0..stockLength, item arc 의 폭 = `length + kerf`
+- **그래프**: nodes 0..`stockLength + kerf`, item arc 의 폭 = `length + kerf`.
+  capacity 를 `stock + kerf` 로 확장해 첫 cut 가장자리 kerf를 잘못 과금하지 않는다.
 - **GCD 압축**: stockLength, itemLength, kerf의 GCD로 노드 수 축소
 - **Multi-stock**: stock 길이별 sub-graph, 단일 MIP
 - **Time limit**: 30s 내부 한도 (`MipTimeLimitMs` 상수)
@@ -52,6 +56,19 @@ Arc Flow 네트워크 + OR-Tools SCIP MIP.
 
 distinct length가 많거나 kerf 때문에 GCD가 작아지면 MIP 그래프가 폭증해 30s 한도에 도달할 수 있다.
 실무 입력(고정된 표준 길이 팔레트, 큰 quantity)에서는 빠르게 최적해를 찾는다.
+
+## 성공 결과 검증
+
+세 솔버는 `Success=true` 를 반환하기 직전 `SolverUtils.ValidateSuccessfulResult` 를 통과해야 한다.
+검증 항목은 다음과 같다.
+
+- 각 plan의 소비 길이 = `Σ cuts + (cuts.Count - 1) * kerf` 가 stock 길이를 넘지 않음
+- `Leftover` 가 `SolverUtils.ComputeLeftover` 결과와 일치
+- 비-용접 cut과 용접 group 합계가 입력 demand를 정확히 충족
+- 용접 group은 2개 이상 조각이고 각 조각 길이가 `Delta` 이상
+- 실제 stock length별 사용량이 입력 inventory를 초과하지 않음
+
+검증 실패 시 해당 solver 결과는 실패로 바뀌며 `ErrorMessage` 에 원인이 들어간다.
 
 ## 파라미터
 
