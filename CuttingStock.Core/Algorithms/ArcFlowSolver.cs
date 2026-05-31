@@ -82,6 +82,11 @@ namespace CuttingStock.Core.Algorithms
                 result.Success = unfulfilled == 0;
                 if (!result.Success)
                     result.ErrorMessage = $"Failed to process {unfulfilled} order(s). MIP solver could not find a feasible solution.";
+                else if (SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = validationError;
+                }
 
                 progress?.Report(100);
             }

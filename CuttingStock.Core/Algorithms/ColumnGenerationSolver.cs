@@ -80,6 +80,13 @@ namespace CuttingStock.Core.Algorithms
                     result.Success = true;
                 }
 
+                if (result.Success &&
+                    SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = validationError;
+                }
+
                 SolverUtils.CalculateResults(result, options);
                 progress?.Report(100.0);
             }

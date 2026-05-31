@@ -3,6 +3,19 @@
 `docs/archive/` 에 흩어져 있던 PHASE 노트들을 시간순으로 압축한 변경 이력.
 원본은 git history 에 보존되어 있다 (`git log -- docs/archive/`).
 
+## 2026-06-01 — Solver 성공 결과 validator 보강
+
+- **1D 성공 결과 공통 검증** — Greedy / ColumnGeneration / ArcFlow가
+  `Success=true` 반환 전 재고 사용량, kerf-aware leftover, demand exact coverage,
+  unknown cut, 용접 그룹 합계와 `Delta` 제약을 검증하도록 추가.
+- **2D 성공 결과 공통 검증** — Shelf / CG2D / StagedMip가 시트 재고, exact demand,
+  trim bounds, kerf-aware overlap, 회전 허용 여부, guillotine compliance를 통과한
+  결과만 성공으로 반환하도록 추가.
+- **validator 회귀 테스트** — 1D over-pack / over-production / welded order 합계,
+  2D overlap / illegal rotation / valid kerf pattern 검증 케이스 추가.
+
+1개 commit (`현재`).
+
 ## 2026-05-31 — 알고리즘 kerf / 수요 불변식 보강
 
 - **1D ArcFlow kerf 모델 정정** — arc 길이는 `length + kerf` 를 쓰되 stock capacity를

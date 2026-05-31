@@ -69,6 +69,11 @@ namespace CuttingStock.Core.Algorithms
                 {
                     SolverUtils.SetRemainingOrdersError(result, sortedOrders.Count);
                 }
+                else if (SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = validationError;
+                }
             }
             catch (Exception ex)
             {

@@ -126,6 +126,12 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 }
 
                 result.Patterns = integerPatterns;
+                if (result.Success &&
+                    SolverUtils2D.ValidateSuccessfulResult(sheets, orders, options, result) is { } validationError)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = validationError;
+                }
             }
             catch (Exception ex)
             {
