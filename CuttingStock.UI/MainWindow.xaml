@@ -130,13 +130,11 @@
 
                     <!-- 알고리즘 선택 -->
                     <TextBlock Text="알고리즘 선택:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="5"/>
-                    <ComboBox x:Name="algorithmComboBox" Grid.Row="0" Grid.Column="1" Margin="5"
+                    <ComboBox Grid.Row="0" Grid.Column="1" Margin="5"
+                              ItemsSource="{Binding SolverDescriptors}"
+                              DisplayMemberPath="DisplayName"
                               SelectedIndex="{Binding AlgorithmIndex}"
-                              SelectionChanged="AlgorithmComboBox_SelectionChanged">
-                        <ComboBoxItem Content="Greedy Knapsack DP (근최적, 빠름)"/>
-                        <ComboBoxItem Content="Column Generation LP (전역 최적화)"/>
-                        <ComboBoxItem Content="Arc Flow MIP (정확 최적, OR-Tools)"/>
-                    </ComboBox>
+                              ToolTip="선택한 알고리즘에 맞춰 아래 옵션의 적용 여부가 바뀝니다."/>
 
                     <!-- 파라미터 설정 -->
                     <TextBlock Text="파라미터 설정:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="5,10,5,5"/>
@@ -209,8 +207,11 @@
                     <!-- 알고리즘별 고급 옵션 -->
                     <TextBlock Text="고급 옵션:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Top" Margin="5,10,5,5"/>
                     <Border Grid.Row="2" Grid.Column="1" Margin="5,10,5,5" BorderBrush="LightGray" BorderThickness="1" Padding="5">
-                        <StackPanel x:Name="advancedOptionsPanel">
-                            <TextBlock Text="(알고리즘을 선택하면 고급 옵션이 표시됩니다)" Foreground="Gray" FontStyle="Italic"/>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedSolverDescription}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding SelectedSolverCapabilityText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding SelectedSolverAdvancedNotes}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       Foreground="Gray" FontStyle="Italic"/>
                         </StackPanel>
                     </Border>
 
@@ -219,8 +220,9 @@
                     <CheckBox Grid.Row="3" Grid.Column="1"
                               Content="용접 활성화 (긴 주문을 여러 조각으로 분할)"
                               IsChecked="{Binding EnableWelding}"
+                              IsEnabled="{Binding CanConfigureWelding}"
                               Margin="5" VerticalAlignment="Center"
-                              ToolTip="체크하면 재고 길이를 초과하는 주문을 Delta 이상의 조각들로 분할해 용접"/>
+                              ToolTip="{Binding WeldingOptionTip}"/>
 
                     <!-- 실행 버튼 -->
                     <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,5">

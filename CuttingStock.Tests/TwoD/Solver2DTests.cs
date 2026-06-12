@@ -10,8 +10,8 @@ using CuttingStock.Core.TwoD.Models;
 namespace CuttingStock.Tests.TwoD
 {
     /// <summary>
-    /// End-to-end tests for the three 2D solvers: ShelfGuillotine, ColumnGeneration2D,
-    /// and StagedMipGuillotine. Verifies coverage, no-overlap, sheet bounds, guillotine
+    /// End-to-end tests for the 2D solvers: ShelfGuillotine, TwoStageShelf,
+    /// ColumnGeneration2D, and StagedMipGuillotine. Verifies coverage, no-overlap, sheet bounds, guillotine
     /// validity, and basic efficiency.
     /// </summary>
     [TestFixture]
@@ -20,6 +20,7 @@ namespace CuttingStock.Tests.TwoD
         private static IEnumerable<ICuttingSolver2D> AllSolvers()
         {
             yield return new ShelfGuillotineSolver();
+            yield return new TwoStageShelfGuillotineSolver();
             yield return new ColumnGeneration2DSolver();
             yield return new StagedMipGuillotineSolver();
         }

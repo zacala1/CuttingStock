@@ -40,7 +40,6 @@ namespace CuttingStock
             _vm.PropertyChanged += Vm_PropertyChanged;
             _vm.ScenarioSaved  += (_, path) => OnScenarioPathUsed(path);
             _vm.ScenarioLoaded += (_, path) => OnScenarioPathUsed(path);
-            UpdateAdvancedOptions();
         }
 
         /// <summary>Push a recently-touched scenario path into the MRU list and persist.</summary>
@@ -73,8 +72,7 @@ namespace CuttingStock
             }
 
             topTabControl.SelectedIndex = Math.Clamp(_prefs.LastTopTabIndex, 0, 1);
-            _vm.AlgorithmIndex = Math.Clamp(_prefs.LastAlgorithm1D, 0, 2);
-            UpdateAdvancedOptions();
+            _vm.AlgorithmIndex = Math.Clamp(_prefs.LastAlgorithm1D, 0, _vm.SolverDescriptors.Count - 1);
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -412,30 +410,6 @@ namespace CuttingStock
         {
             if (DecimalRegex.IsMatch(e.Text)) { e.Handled = true; return; }
             if (e.Text == "." && sender is TextBox tb && tb.Text.Contains('.')) e.Handled = true;
-        }
-
-        // ─── Algorithm advanced-options description ──────────────────
-
-        private void AlgorithmComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
-            UpdateAdvancedOptions();
-
-        private void UpdateAdvancedOptions()
-        {
-            if (advancedOptionsPanel == null) return;
-            advancedOptionsPanel.Children.Clear();
-            string text = algorithmComboBox?.SelectedIndex switch
-            {
-                0 => "• DP 기반 최적 조합 탐색 (Multi-Pass)\n• 자투리 최소화 우선\n• 용접 지원",
-                1 => "• Linear Programming 기반 전역 최적화\n• Floor-then-Residual 정수 라운딩\n• 대규모 입력 시 느릴 수 있음",
-                2 => "• Arc Flow 네트워크 모델 + MIP 솔버\n• 수학적으로 증명된 최적해\n• Kerf 자연 지원\n• 30초 시간 제한",
-                _ => string.Empty,
-            };
-            advancedOptionsPanel.Children.Add(new TextBlock
-            {
-                Text = text,
-                FontStyle = FontStyles.Italic,
-                Foreground = System.Windows.Media.Brushes.DarkGray,
-            });
         }
 
         // ─── Keyboard shortcuts ──────────────────────────────────────

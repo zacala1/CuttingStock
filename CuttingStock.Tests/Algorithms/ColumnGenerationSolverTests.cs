@@ -125,5 +125,124 @@ namespace CuttingStock.Tests.Algorithms
             _optimizer.Name.Should().Contain("Column Generation");
             _optimizer.TimeComplexity.Should().Contain("exp");
         }
+
+        [Test]
+        [Category("Algorithm")]
+        public void StabilizedVariant_SimpleCase_ShouldReturnValidSolution()
+        {
+            var stock = new List<RebarStock> { new RebarStock(12000, 100) };
+            var orders = new List<Order>
+            {
+                new Order(5000, 8),
+                new Order(3000, 10),
+                new Order(2000, 6),
+            };
+
+            var result = new StabilizedColumnGenerationSolver().Solve(stock, orders, _defaultParams);
+
+            result.Success.Should().BeTrue(result.ErrorMessage);
+            result.CuttingPlans.Should().NotBeEmpty();
+            result.MaterialEfficiency.Should().BeGreaterThan(80.0);
+        }
+
+        [Test]
+        [Category("Properties")]
+        public void StabilizedVariant_Properties_ShouldIdentifyVariant()
+        {
+            var solver = new StabilizedColumnGenerationSolver();
+
+            solver.Name.Should().Be("Column Generation (Stabilized LP)");
+            solver.Description.Should().Contain("dual");
+        }
+
+        [Test]
+        [Category("Algorithm")]
+        public void MultiColumnVariant_SimpleCase_ShouldReturnValidSolution()
+        {
+            var stock = new List<RebarStock> { new RebarStock(12000, 100) };
+            var orders = new List<Order>
+            {
+                new Order(5000, 8),
+                new Order(3000, 10),
+                new Order(2000, 6),
+            };
+
+            var result = new MultiColumnGenerationSolver().Solve(stock, orders, _defaultParams);
+
+            result.Success.Should().BeTrue(result.ErrorMessage);
+            result.CuttingPlans.Should().NotBeEmpty();
+            result.MaterialEfficiency.Should().BeGreaterThan(80.0);
+        }
+
+        [Test]
+        [Category("Properties")]
+        public void MultiColumnVariant_Properties_ShouldIdentifyVariant()
+        {
+            var solver = new MultiColumnGenerationSolver();
+
+            solver.Name.Should().Be("Column Generation (Multi-column LP)");
+            solver.Description.Should().Contain("multiple");
+        }
+
+        [Test]
+        [Category("Algorithm")]
+        public void IntegerMasterVariant_SimpleCase_ShouldReturnValidSolution()
+        {
+            var stock = new List<RebarStock> { new RebarStock(10000, 100) };
+            var orders = new List<Order>
+            {
+                new Order(3000, 7),
+                new Order(7000, 3)
+            };
+
+            var result = new IntegerMasterColumnGenerationSolver().Solve(stock, orders, _defaultParams);
+
+            result.Success.Should().BeTrue(result.ErrorMessage);
+            result.CuttingPlans.Should().HaveCountLessThanOrEqualTo(5);
+        }
+
+        [Test]
+        [Category("Properties")]
+        public void IntegerMasterVariant_Properties_ShouldIdentifyVariant()
+        {
+            var solver = new IntegerMasterColumnGenerationSolver();
+
+            solver.Name.Should().Be("Column Generation (Integer Master)");
+            solver.Description.Should().Contain("integer master");
+        }
+
+        [Test]
+        [Category("Algorithm")]
+        public void GlobalStockVariant_MultipleStockLengths_ShouldChooseGlobalBestStock()
+        {
+            var stock = new List<RebarStock>
+            {
+                new RebarStock(10000, 10),
+                new RebarStock(6000, 10),
+            };
+            var orders = new List<Order> { new Order(3000, 2) };
+            var options = new SolverOptions
+            {
+                UsageOrder = StockUsageOrder.LargeToSmall,
+                Kerf = 0,
+            };
+
+            var result = new GlobalStockColumnGenerationSolver().Solve(stock, orders, options);
+
+            result.Success.Should().BeTrue(result.ErrorMessage);
+            result.CuttingPlans.Should().ContainSingle();
+            result.CuttingPlans[0].StockLength.Should().Be(6000);
+            result.WasteLength.Should().Be(0);
+        }
+
+        [Test]
+        [Category("Properties")]
+        public void GlobalStockVariant_Properties_ShouldIdentifyVariant()
+        {
+            var solver = new GlobalStockColumnGenerationSolver();
+
+            solver.Name.Should().Be("Global Stock Column Generation");
+            solver.Description.Should().Contain("Variable-stock");
+        }
     }
 }
