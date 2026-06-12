@@ -28,6 +28,10 @@ public interface ICuttingSolver
 | `ColumnGenerationSolver` | Gilmore-Gomory CG + 커스텀 Simplex + knapsack 가격 매김 (kerf-aware) | Poly/iter, exp 최악 |
 | `ArcFlowSolver` | DAG 네트워크 + OR-Tools SCIP MIP | Exact (30s 시간 제한) |
 
+모든 1D 솔버는 `Success=true` 반환 전 `SolverUtils.ValidateSuccessfulResult` 를 통과한다.
+따라서 성공 결과는 stock inventory, kerf-aware leftover, exact demand coverage, 용접 group
+구조와 `Delta` 제약을 만족해야 한다.
+
 ### 도메인 타입
 
 ```csharp
@@ -129,6 +133,11 @@ public interface ICuttingSolver2D
 
 **모든 2D 솔버는 입력 즉시 `SolverUtils2D.AggregateByDims`를 호출** — 동일 (Width, Height) 시트 행을 합산한다. `Sheet.Equals`가 구조적이므로 분산된 행은 `Dictionary<Sheet, _>` 키 충돌로 인벤토리 절반을 잃는다.
 
+성공 결과는 `SolverUtils2D.ValidateSuccessfulResult` 로 재검증한다. 검증 항목은 sheet
+inventory, pattern multiplicity, trim bounds, kerf-aware overlap, guillotine compliance,
+order index, 치수/회전 플래그, exact demand coverage다. CG2D / Staged MIP는 결과
+materialization 뒤 `TrimToDemand` 로 과생산 배치를 제거한 다음 이 validator를 통과해야 한다.
+
 ### 도메인 타입
 
 ```csharp
@@ -218,8 +227,8 @@ public static class ScenarioService
 
 | 클래스 | 용도 |
 |---|---|
-| `SolverUtils` | 1D 검증, 정렬, kerf-aware 잔여 계산, 2-opt 후처리, 용접 그룹 카운트 |
-| `SolverUtils2D` | 2D 입력 검증, sheet 정렬, **`AggregateByDims`**, item 확장, 겹침/경계 체크 |
+| `SolverUtils` | 1D 입력 검증, 동일 길이 stock/order 합산, 정렬, `ComputeLeftover`, 성공 결과 validator, 2-opt 후처리, 용접 그룹 카운트 |
+| `SolverUtils2D` | 2D 입력 검증, sheet 정렬, **`AggregateByDims`**, item 확장, `TrimToDemand`, 성공 결과 validator, 겹침/경계 체크 |
 | `GuillotineValidator` | Beasley 1985 재귀 분리 테스트 + 트리 구조 검증 |
 | `GuillotineKnapsackDp` | 2D 정규 컷 DP — CG 가격 매김 sub-problem |
 | `PatternPool` | CG 인프라: 컬럼 dedup, LP 마스터, multi-pricing |

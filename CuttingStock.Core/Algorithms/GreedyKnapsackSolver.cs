@@ -39,8 +39,10 @@ namespace CuttingStock.Core.Algorithms
                     return result;
                 }
 
-                var sortedStock = SolverUtils.SortStock(stock, options.UsageOrder);
-                var sortedOrders = SolverUtils.SortOrdersByScarcity(orders);
+                var normalizedStock = SolverUtils.AggregateStockByLength(stock);
+                var normalizedOrders = SolverUtils.AggregateOrdersByLength(orders);
+                var sortedStock = SolverUtils.SortStock(normalizedStock, options.UsageOrder);
+                var sortedOrders = SolverUtils.SortOrdersByScarcity(normalizedOrders);
 
                 var totalStockCount = sortedStock.Sum(s => s.Quantity);
                 var allLeftovers = new List<int>();
@@ -66,6 +68,11 @@ namespace CuttingStock.Core.Algorithms
                 if (!result.Success)
                 {
                     SolverUtils.SetRemainingOrdersError(result, sortedOrders.Count);
+                }
+                else if (SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = validationError;
                 }
             }
             catch (Exception ex)
@@ -454,6 +461,13 @@ namespace CuttingStock.Core.Algorithms
                             stockUsage[si]++;
                             availableStocks--;
                         }
+                        else if (neededLength < options.Delta &&
+                                 TryAppendAdjustedWeldTail(pieces, neededLength, stockItem.Length, options.Delta))
+                        {
+                            neededLength = 0;
+                            stockUsage[si]++;
+                            availableStocks--;
+                        }
                         else
                         {
                             break;
@@ -533,6 +547,31 @@ namespace CuttingStock.Core.Algorithms
                     break;
                 }
             }
+        }
+
+        private static bool TryAppendAdjustedWeldTail(
+            List<(int length, int stockLength)> pieces,
+            int shortTailLength,
+            int tailStockLength,
+            int delta)
+        {
+            if (shortTailLength <= 0 || shortTailLength >= delta || tailStockLength < delta)
+                return false;
+
+            int reduction = delta - shortTailLength;
+            for (int i = pieces.Count - 1; i >= 0; i--)
+            {
+                var prior = pieces[i];
+                int adjustedPriorLength = prior.length - reduction;
+                if (adjustedPriorLength < delta)
+                    continue;
+
+                pieces[i] = (adjustedPriorLength, prior.stockLength);
+                pieces.Add((delta, tailStockLength));
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>

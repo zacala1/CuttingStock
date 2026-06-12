@@ -185,6 +185,108 @@ namespace CuttingStock.Tests
             result.WeldCount.Should().Be(2);
         }
 
+        // ----- ValidateSuccessfulResult -----
+
+        [Test]
+        public void ValidateSuccessfulResult_ValidPlan_ReturnsNull()
+        {
+            var stock = new List<RebarStock> { new(205, 1) };
+            var orders = new List<Order> { new(100, 2) };
+            var options = new SolverOptions { Kerf = 5 };
+            var cuts = new List<Cut> { new() { Length = 100 }, new() { Length = 100 } };
+            var result = new SolverResult
+            {
+                CuttingPlans = new List<CuttingPlan>
+                {
+                    new() { StockLength = 205, Cuts = cuts, Leftover = 0 },
+                },
+            };
+
+            SolverUtils.ValidateSuccessfulResult(stock, orders, options, result).Should().BeNull();
+        }
+
+        [Test]
+        public void ValidateSuccessfulResult_OverPackedPlan_ReturnsError()
+        {
+            var stock = new List<RebarStock> { new(200, 1) };
+            var orders = new List<Order> { new(100, 2) };
+            var options = new SolverOptions { Kerf = 5 };
+            var result = new SolverResult
+            {
+                CuttingPlans = new List<CuttingPlan>
+                {
+                    new()
+                    {
+                        StockLength = 200,
+                        Cuts = new List<Cut> { new() { Length = 100 }, new() { Length = 100 } },
+                        Leftover = 0,
+                    },
+                },
+            };
+
+            SolverUtils.ValidateSuccessfulResult(stock, orders, options, result)
+                .Should().Contain("consumes");
+        }
+
+        [Test]
+        public void ValidateSuccessfulResult_OverProducesDemand_ReturnsError()
+        {
+            var stock = new List<RebarStock> { new(1000, 2) };
+            var orders = new List<Order> { new(100, 1) };
+            var result = new SolverResult
+            {
+                CuttingPlans = new List<CuttingPlan>
+                {
+                    new()
+                    {
+                        StockLength = 1000,
+                        Cuts = new List<Cut> { new() { Length = 100 }, new() { Length = 100 } },
+                        Leftover = 800,
+                    },
+                },
+            };
+
+            SolverUtils.ValidateSuccessfulResult(stock, orders, new SolverOptions(), result)
+                .Should().Contain("produced 2, expected 1");
+        }
+
+        [Test]
+        public void ValidateSuccessfulResult_WeldGroupCountsAsOriginalOrderLength()
+        {
+            var stock = new List<RebarStock> { new(6000, 3) };
+            var orders = new List<Order> { new(15000, 1) };
+            var result = new SolverResult
+            {
+                CuttingPlans = new List<CuttingPlan>
+                {
+                    new()
+                    {
+                        StockLength = 6000,
+                        Cuts = new List<Cut> { new() { Length = 6000, RequiresWelding = true, WeldGroupId = 1 } },
+                        Leftover = 0,
+                    },
+                    new()
+                    {
+                        StockLength = 6000,
+                        Cuts = new List<Cut> { new() { Length = 6000, RequiresWelding = true, WeldGroupId = 1 } },
+                        Leftover = 0,
+                    },
+                    new()
+                    {
+                        StockLength = 6000,
+                        Cuts = new List<Cut> { new() { Length = 3000, RequiresWelding = true, WeldGroupId = 1 } },
+                        Leftover = 3000,
+                    },
+                },
+            };
+
+            SolverUtils.ValidateSuccessfulResult(
+                stock,
+                orders,
+                new SolverOptions { Delta = 1000, EnableWelding = true },
+                result).Should().BeNull();
+        }
+
         // ----- UpdateOrders -----
 
         [Test]

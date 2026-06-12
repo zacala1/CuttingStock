@@ -66,6 +66,26 @@ namespace CuttingStock.Tests.Algorithms
 
         [Test]
         [Category("Optimization")]
+        public void DuplicateOrderRowsSameLength_ShouldAggregateBeforeDp()
+        {
+            var stock = new List<RebarStock> { new RebarStock(10000, 1) };
+            var orders = new List<Order>
+            {
+                new Order(5000, 1),
+                new Order(5000, 1),
+            };
+
+            var result = _solver.Solve(stock, orders, _defaultOptions);
+
+            result.Success.Should().BeTrue();
+            result.StockUsed.Should().Be(1);
+            result.CuttingPlans.Should().ContainSingle();
+            result.CuttingPlans[0].Cuts.Should().HaveCount(2);
+            result.CuttingPlans[0].Leftover.Should().Be(0);
+        }
+
+        [Test]
+        [Category("Optimization")]
         public void UpdateOrders_BatchRemoval_ShouldMaintainOrderIntegrity()
         {
             // 여러 주문이 한 번에 제거될 때 인덱스 무결성 유지 검증

@@ -37,6 +37,24 @@ namespace CuttingStock.UI.ViewModels
             CompareRows = new ObservableCollection<ComparisonResult2D>();
         }
 
+        public IReadOnlyList<SolverDescriptor2D> SolverDescriptors => SolverCatalog2D.All;
+        public SolverDescriptor2D SelectedSolverDescriptor => SolverCatalog2D.GetByIndex(AlgorithmIndex);
+        public string SelectedSolverDescription => SelectedSolverDescriptor.Description;
+        public string SelectedSolverCapabilityText => SelectedSolverDescriptor.CapabilitySummary;
+        public string SelectedSolverAdvancedNotes => SelectedSolverDescriptor.AdvancedNotes;
+        public bool CanConfigureTimeLimit => SelectedSolverDescriptor.Supports(SolverCapability.TimeLimit);
+        public bool CanConfigureStage =>
+            SelectedSolverDescriptor.Supports(SolverCapability.EnforcedStage) &&
+            SelectedSolverDescriptor.SupportedStages.Count > 1;
+        public string TimeLimitOptionTip => CanConfigureTimeLimit
+            ? "CG/MIP 솔버 wall-clock 제한 (ms)"
+            : $"{SelectedSolverDescriptor.Name}은(는) 시간 제한을 사용하지 않습니다.";
+        public string StageOptionTip => CanConfigureStage
+            ? "선택한 stage 수를 절단 패턴 제약으로 강제합니다."
+            : SelectedSolverDescriptor.Supports(SolverCapability.EnforcedStage)
+                ? $"{SelectedSolverDescriptor.Name}은(는) {string.Join("/", SelectedSolverDescriptor.SupportedStages)}-stage로 고정됩니다."
+                : "현재 선택한 solver는 Stage 값을 강제하지 않습니다. 패턴은 unrestricted guillotine입니다.";
+
         // ─── Input collections ───────────────────────────────────────
 
         public ObservableCollection<SheetRow> Sheets { get; }
@@ -56,6 +74,18 @@ namespace CuttingStock.UI.ViewModels
         [ObservableProperty] private int _usageOrderIndex = 1;
         /// <summary>0 = Shelf, 1 = CG2D, 2 = StagedMip.</summary>
         [ObservableProperty] private int _algorithmIndex;
+
+        partial void OnAlgorithmIndexChanged(int value)
+        {
+            CoerceUnsupportedOptions();
+            RefreshSelectedSolverProperties();
+        }
+
+        partial void OnStageIndexChanged(int value)
+        {
+            if (value != 0 && !CanConfigureStage)
+                StageIndex = 0;
+        }
 
         // ─── UI feedback / result state ──────────────────────────────
 
@@ -231,7 +261,7 @@ namespace CuttingStock.UI.ViewModels
             var orderSnapshot = BuildOrders();
             if (sheetSnapshot.Count == 0 || orderSnapshot.Count == 0)
             { _dialog.ShowWarning("입력 오류", "유효한 시트/주문이 없습니다."); return; }
-            var solver = BuildSolver(AlgorithmIndex);
+            var solver = SelectedSolverDescriptor.CreateSolver();
 
             int runId = ++_currentRunId;
             _currentCts?.Dispose();
@@ -305,12 +335,7 @@ namespace CuttingStock.UI.ViewModels
                 ProgressIndeterminate = true;
                 ProgressText = "비교 중...";
 
-                ICuttingSolver2D[] solvers =
-                {
-                    new ShelfGuillotineSolver(),
-                    new ColumnGeneration2DSolver(),
-                    new StagedMipGuillotineSolver(),
-                };
+                var descriptors = SolverDescriptors;
 
                 var rows = new List<ComparisonResult2D>();
                 var details = new StringBuilder();
@@ -318,19 +343,20 @@ namespace CuttingStock.UI.ViewModels
                 ICuttingSolver2D? bestSolver = null;
                 long bestSheets = long.MaxValue;
 
-                for (int i = 0; i < solvers.Length; i++)
+                for (int i = 0; i < descriptors.Count; i++)
                 {
                     if (runId != _currentRunId) return;
-                    var s = solvers[i];
+                    var descriptor = descriptors[i];
+                    var s = descriptor.CreateSolver();
                     int solverIdx = i;
-                    ProgressText = $"비교 중... ({i + 1}/{solvers.Length} — {s.Name})";
+                    ProgressText = $"비교 중... ({i + 1}/{descriptors.Count} — {s.Name})";
                     ProgressIndeterminate = false;
 
                     var sliceProgress = new Progress<double>(pct =>
                     {
                         if (runId != _currentRunId) return;
                         double frac = pct <= 1.0 ? pct : pct / 100.0;
-                        double overall = (solverIdx + Math.Clamp(frac, 0, 1)) / solvers.Length * 100.0;
+                        double overall = (solverIdx + Math.Clamp(frac, 0, 1)) / descriptors.Count * 100.0;
                         ProgressPercent = Math.Clamp(overall, 0, 100);
                     });
 
@@ -359,7 +385,7 @@ namespace CuttingStock.UI.ViewModels
                 }
 
                 int rank = 1;
-                foreach (var r in rows.OrderBy(r => r.TotalCost).ThenBy(r => r.SheetsUsed))
+                foreach (var r in rows.Where(r => r.Success).OrderBy(r => r.TotalCost).ThenBy(r => r.SheetsUsed))
                     r.Rank = rank++;
 
                 CompareRows.Clear();
@@ -517,12 +543,25 @@ namespace CuttingStock.UI.ViewModels
             };
         }
 
-        private static ICuttingSolver2D BuildSolver(int idx) => idx switch
+        private void CoerceUnsupportedOptions()
         {
-            0 => new ShelfGuillotineSolver(),
-            1 => new ColumnGeneration2DSolver(),
-            2 => new StagedMipGuillotineSolver(),
-            _ => new ShelfGuillotineSolver(),
-        };
+            int selectedStage = StageIndex == 1 ? 3 : 2;
+            if (!SelectedSolverDescriptor.SupportedStages.Contains(selectedStage))
+                StageIndex = SelectedSolverDescriptor.SupportedStages.Contains(2) ? 0 : 1;
+            else if (!CanConfigureStage)
+                StageIndex = 0;
+        }
+
+        private void RefreshSelectedSolverProperties()
+        {
+            OnPropertyChanged(nameof(SelectedSolverDescriptor));
+            OnPropertyChanged(nameof(SelectedSolverDescription));
+            OnPropertyChanged(nameof(SelectedSolverCapabilityText));
+            OnPropertyChanged(nameof(SelectedSolverAdvancedNotes));
+            OnPropertyChanged(nameof(CanConfigureTimeLimit));
+            OnPropertyChanged(nameof(CanConfigureStage));
+            OnPropertyChanged(nameof(TimeLimitOptionTip));
+            OnPropertyChanged(nameof(StageOptionTip));
+        }
     }
 }

@@ -82,6 +82,11 @@ namespace CuttingStock.Core.Algorithms
                 result.Success = unfulfilled == 0;
                 if (!result.Success)
                     result.ErrorMessage = $"Failed to process {unfulfilled} order(s). MIP solver could not find a feasible solution.";
+                else if (SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = validationError;
+                }
 
                 progress?.Report(100);
             }
@@ -131,7 +136,10 @@ namespace CuttingStock.Core.Algorithms
             foreach (int sLen in stockLengths)
             {
                 int maxBars = stockByLength[sLen];
-                int capacity = sLen / gcd; // scaled capacity
+                // Item arcs carry (length + kerf). Expanding the stock capacity by
+                // one kerf makes a path with n cuts consume sum(lengths) + n*kerf
+                // <= stock + kerf, which is equivalent to kerf only between cuts.
+                int capacity = (sLen + kerf) / gcd; // scaled expanded capacity
 
                 zVars[sLen] = solver.MakeIntVar(0, maxBars, $"z_{sLen}");
 
@@ -282,7 +290,7 @@ namespace CuttingStock.Core.Algorithms
                 int barsUsed = (int)Math.Round(zVars[sLen].SolutionValue());
                 if (barsUsed == 0) continue;
 
-                int capacity = sLen / gcd;
+                int capacity = (sLen + kerf) / gcd;
 
                 var flowValues = new Dictionary<(int itemLen, int u), int>();
                 foreach (int itemLen in itemLengths)

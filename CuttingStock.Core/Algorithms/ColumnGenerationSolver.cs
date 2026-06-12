@@ -5,6 +5,7 @@ using CuttingStock.Core.Algorithms;
 using CuttingStock.Core.Domain;
 using CuttingStock.Core.Models;
 using CuttingStock.Core.Algorithms.Utilities;
+using Google.OrTools.LinearSolver;
 
 namespace CuttingStock.Core.Algorithms
 {
@@ -17,9 +18,53 @@ namespace CuttingStock.Core.Algorithms
     {
         // Column is profitable if its reduced cost exceeds this threshold.
         private const double ReducedCostThreshold = 1.00001;
+        private readonly string _name;
+        private readonly string _description;
+        private readonly bool _useDualStabilization;
+        private readonly double _dualSmoothingFactor;
+        private readonly int _maxColumnsPerIteration;
+        private readonly bool _useIntegerMaster;
+        private readonly long _integerMasterTimeLimitMs;
 
-        public string Name => "Column Generation (LP)";
-        public string Description => "CG with Simplex master + knapsack DP pricing.";
+        public ColumnGenerationSolver()
+            : this(
+                name: "Column Generation (LP)",
+                description: "CG with Simplex master + knapsack DP pricing.",
+                useDualStabilization: false,
+                dualSmoothingFactor: 1.0,
+                maxColumnsPerIteration: 1,
+                useIntegerMaster: false,
+                integerMasterTimeLimitMs: 0)
+        {
+        }
+
+        protected ColumnGenerationSolver(
+            string name,
+            string description,
+            bool useDualStabilization,
+            double dualSmoothingFactor,
+            int maxColumnsPerIteration,
+            bool useIntegerMaster,
+            long integerMasterTimeLimitMs)
+        {
+            if (dualSmoothingFactor <= 0.0 || dualSmoothingFactor > 1.0)
+                throw new ArgumentOutOfRangeException(nameof(dualSmoothingFactor));
+            if (maxColumnsPerIteration <= 0)
+                throw new ArgumentOutOfRangeException(nameof(maxColumnsPerIteration));
+            if (integerMasterTimeLimitMs < 0)
+                throw new ArgumentOutOfRangeException(nameof(integerMasterTimeLimitMs));
+
+            _name = name;
+            _description = description;
+            _useDualStabilization = useDualStabilization;
+            _dualSmoothingFactor = dualSmoothingFactor;
+            _maxColumnsPerIteration = maxColumnsPerIteration;
+            _useIntegerMaster = useIntegerMaster;
+            _integerMasterTimeLimitMs = integerMasterTimeLimitMs;
+        }
+
+        public string Name => _name;
+        public string Description => _description;
         public string TimeComplexity => "Poly/iter, exp worst-case";
 
         /// <inheritdoc/>
@@ -78,6 +123,13 @@ namespace CuttingStock.Core.Algorithms
                 else
                 {
                     result.Success = true;
+                }
+
+                if (result.Success &&
+                    SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = validationError;
                 }
 
                 SolverUtils.CalculateResults(result, options);
@@ -244,6 +296,7 @@ namespace CuttingStock.Core.Algorithms
             bool improved = true;
             int maxIterations = 100; // Prevent infinite loop
             int iter = 0;
+            List<double>? previousDuals = null;
 
             while (improved && iter < maxIterations)
             {
@@ -270,49 +323,252 @@ namespace CuttingStock.Core.Algorithms
                 }
                 if (!dualsValid) break;
 
-                var knapsackItems = new List<KnapsackItem>();
-                for (int i = 0; i < numConstraints; i++)
+                var pricingDuals = GetPricingDuals(simplexResult.Duals, previousDuals);
+                var newPatterns = PriceCandidatePatterns(
+                    pricingDuals, simplexResult.Duals, distinctLengths, stockLength, kerf);
+
+                if (newPatterns.Count == 0 && _useDualStabilization)
                 {
-                    knapsackItems.Add(new KnapsackItem
-                    {
-                        Length = distinctLengths[i],
-                        Value = simplexResult.Duals[i],
-                        Index = i
-                    });
+                    // Stabilized pricing can occasionally point at a column that is
+                    // attractive for the smoothed dual but not for the current RMP.
+                    // Fall back to the raw dual before declaring convergence.
+                    newPatterns = PriceCandidatePatterns(
+                        simplexResult.Duals, simplexResult.Duals, distinctLengths, stockLength, kerf);
                 }
 
-                var newPattern = SolveKnapsack(knapsackItems, stockLength, kerf);
+                previousDuals = simplexResult.Duals.ToList();
 
-                // Check if new column improves the solution
-                if (newPattern.TotalValue > ReducedCostThreshold)
+                bool anyAdded = false;
+                foreach (var newPattern in newPatterns)
                 {
-                    var col = new CuttingPatternColumn(numConstraints);
-                    foreach (var item in newPattern.Items)
-                    {
-                        col.Counts[item.Index]++;
-                    }
+                    var col = CreateColumn(newPattern, numConstraints);
+                    if (patterns.Any(p => p.Equals(col))) continue;
 
-                    if (!patterns.Any(p => p.Equals(col)))
-                    {
-                        patterns.Add(col);
-                    }
-                    else
-                    {
-                        improved = false;
-                    }
+                    patterns.Add(col);
+                    anyAdded = true;
                 }
-                else
-                {
-                    improved = false;
-                }
+
+                if (!anyAdded) improved = false;
             }
 
             // 5. Final LP solve to get primal values for floor-then-residual rounding
             var finalSolver = new SimplexSolver();
             var finalResult = finalSolver.SolveRelaxed(patterns, demand, distinctLengths);
 
+            if (_useIntegerMaster &&
+                TryGenerateSolutionIntegerMaster(
+                    result, patterns, demand, distinctLengths, stockLength, maxStockCount, kerf))
+            {
+                return;
+            }
+
             GenerateSolutionFloorResidual(result, patterns, finalResult.Primals,
                                           demand, distinctLengths, stockLength, maxStockCount, kerf);
+        }
+
+        private List<double> GetPricingDuals(List<double> currentDuals, List<double>? previousDuals)
+        {
+            if (!_useDualStabilization || previousDuals == null || previousDuals.Count != currentDuals.Count)
+                return currentDuals;
+
+            var stabilized = new List<double>(currentDuals.Count);
+            for (int i = 0; i < currentDuals.Count; i++)
+            {
+                double blended = _dualSmoothingFactor * currentDuals[i] +
+                                 (1.0 - _dualSmoothingFactor) * previousDuals[i];
+                stabilized.Add(blended);
+            }
+            return stabilized;
+        }
+
+        private KnapsackResult PricePattern(List<double> duals, List<int> distinctLengths, int stockLength, int kerf)
+        {
+            var knapsackItems = new List<KnapsackItem>();
+            for (int i = 0; i < distinctLengths.Count; i++)
+            {
+                knapsackItems.Add(new KnapsackItem
+                {
+                    Length = distinctLengths[i],
+                    Value = duals[i],
+                    Index = i
+                });
+            }
+
+            return SolveKnapsack(knapsackItems, stockLength, kerf);
+        }
+
+        private List<KnapsackResult> PriceCandidatePatterns(
+            List<double> pricingDuals,
+            List<double> actualDuals,
+            List<int> distinctLengths,
+            int stockLength,
+            int kerf)
+        {
+            var candidates = new List<KnapsackResult>();
+            var signatures = new HashSet<string>();
+
+            void AddIfImproving(KnapsackResult candidate)
+            {
+                if (candidate.Items.Count == 0) return;
+                if (ComputePatternDualValue(candidate, actualDuals) <= ReducedCostThreshold) return;
+
+                var counts = new int[distinctLengths.Count];
+                foreach (var item in candidate.Items) counts[item.Index]++;
+                string signature = string.Join(",", counts);
+                if (!signatures.Add(signature)) return;
+
+                candidates.Add(candidate);
+            }
+
+            var best = PricePattern(pricingDuals, distinctLengths, stockLength, kerf);
+            AddIfImproving(best);
+
+            if (_maxColumnsPerIteration == 1 || best.Items.Count == 0)
+                return candidates;
+
+            var usedIndices = best.Items
+                .GroupBy(i => i.Index)
+                .OrderByDescending(g => g.Count())
+                .ThenByDescending(g => pricingDuals[g.Key])
+                .Select(g => g.Key)
+                .ToList();
+
+            foreach (int excludedIndex in usedIndices)
+            {
+                if (candidates.Count >= _maxColumnsPerIteration) break;
+
+                var diversifiedDuals = pricingDuals.ToList();
+                diversifiedDuals[excludedIndex] = 0.0;
+                AddIfImproving(PricePattern(diversifiedDuals, distinctLengths, stockLength, kerf));
+            }
+
+            return candidates;
+        }
+
+        private static CuttingPatternColumn CreateColumn(KnapsackResult pattern, int numConstraints)
+        {
+            var col = new CuttingPatternColumn(numConstraints);
+            foreach (var item in pattern.Items)
+                col.Counts[item.Index]++;
+            return col;
+        }
+
+        private bool TryGenerateSolutionIntegerMaster(
+            SolverResult result,
+            List<CuttingPatternColumn> patterns,
+            Dictionary<int, int> demand,
+            List<int> lengths,
+            int stockLength,
+            int maxStockCount,
+            int kerf)
+        {
+            var solver = Solver.CreateSolver("CBC");
+            if (solver == null) return false;
+            if (_integerMasterTimeLimitMs > 0)
+                solver.SetTimeLimit(_integerMasterTimeLimitMs);
+
+            int patternCount = patterns.Count;
+            var vars = new Variable[patternCount];
+            for (int p = 0; p < patternCount; p++)
+            {
+                int ub = maxStockCount;
+                for (int i = 0; i < lengths.Count; i++)
+                {
+                    int count = patterns[p].Counts[i];
+                    if (count > 0)
+                        ub = Math.Min(ub, demand[lengths[i]] / count);
+                }
+                vars[p] = solver.MakeIntVar(0, ub, $"x{p}");
+            }
+
+            for (int i = 0; i < lengths.Count; i++)
+            {
+                var c = solver.MakeConstraint(demand[lengths[i]], demand[lengths[i]], $"d{i}");
+                for (int p = 0; p < patternCount; p++)
+                {
+                    int count = patterns[p].Counts[i];
+                    if (count != 0)
+                        c.SetCoefficient(vars[p], count);
+                }
+            }
+
+            var stockLimit = solver.MakeConstraint(0, maxStockCount, "stock_limit");
+            for (int p = 0; p < patternCount; p++)
+                stockLimit.SetCoefficient(vars[p], 1);
+
+            var obj = solver.Objective();
+            for (int p = 0; p < patternCount; p++)
+                obj.SetCoefficient(vars[p], ComputePatternWaste(patterns[p], lengths, stockLength, kerf));
+            obj.SetMinimization();
+
+            var status = solver.Solve();
+            if (status != Solver.ResultStatus.OPTIMAL && status != Solver.ResultStatus.FEASIBLE)
+                return false;
+
+            var currentDemand = new Dictionary<int, int>(demand);
+            var plans = new List<CuttingPlan>();
+            int usedStockCount = 0;
+
+            for (int p = 0; p < patternCount; p++)
+            {
+                int useCount = (int)Math.Round(vars[p].SolutionValue());
+                if (useCount <= 0) continue;
+
+                for (int use = 0; use < useCount; use++)
+                {
+                    if (usedStockCount >= maxStockCount) return false;
+
+                    var plan = new CuttingPlan { StockLength = stockLength, Cuts = new List<Cut>() };
+                    for (int i = 0; i < lengths.Count; i++)
+                    {
+                        int len = lengths[i];
+                        for (int k = 0; k < patterns[p].Counts[i]; k++)
+                        {
+                            if (currentDemand[len] <= 0) return false;
+                            plan.Cuts.Add(new Cut { Length = len });
+                            currentDemand[len]--;
+                        }
+                    }
+
+                    plan.Leftover = SolverUtils.ComputeLeftover(stockLength, plan.Cuts, kerf);
+                    if (plan.Leftover < 0) return false;
+                    plans.Add(plan);
+                    usedStockCount++;
+                }
+            }
+
+            if (currentDemand.Any(kv => kv.Value != 0))
+                return false;
+
+            result.CuttingPlans.AddRange(plans);
+            return true;
+        }
+
+        private static long ComputePatternWaste(
+            CuttingPatternColumn pattern,
+            List<int> lengths,
+            int stockLength,
+            int kerf)
+        {
+            long cutCount = 0;
+            long usedLength = 0;
+            for (int i = 0; i < lengths.Count; i++)
+            {
+                int count = pattern.Counts[i];
+                cutCount += count;
+                usedLength += (long)count * lengths[i];
+            }
+
+            long kerfLoss = cutCount > 0 ? (cutCount - 1) * (long)kerf : 0;
+            return stockLength - usedLength - kerfLoss;
+        }
+
+        private static double ComputePatternDualValue(KnapsackResult pattern, List<double> duals)
+        {
+            double value = 0.0;
+            foreach (var item in pattern.Items)
+                value += duals[item.Index];
+            return value;
         }
 
         private KnapsackResult SolveKnapsack(List<KnapsackItem> items, int capacity, int kerf)

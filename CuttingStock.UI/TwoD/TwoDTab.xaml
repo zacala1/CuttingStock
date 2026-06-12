@@ -105,15 +105,15 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Text="알고리즘 선택:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="5"/>
                     <ComboBox Grid.Row="0" Grid.Column="1" Margin="5"
-                              SelectedIndex="{Binding AlgorithmIndex}">
-                        <ComboBoxItem Content="Shelf Guillotine (NFDH/FFDH/BFDH, 빠름)"/>
-                        <ComboBoxItem Content="Column Generation 2D (Gilmore-Gomory)"/>
-                        <ComboBoxItem Content="Staged MIP Guillotine (CBC, 정확)"/>
-                    </ComboBox>
+                              ItemsSource="{Binding SolverDescriptors}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedIndex="{Binding AlgorithmIndex}"
+                              ToolTip="선택한 알고리즘에 맞춰 아래 옵션의 적용 여부가 바뀝니다."/>
 
                     <TextBlock Text="파라미터:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" Margin="5,10,5,5"/>
                     <Grid Grid.Row="1" Grid.Column="1" Margin="5,10,5,5">
@@ -143,9 +143,12 @@
                                  PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
 
                         <TextBlock Text="Stage:" Grid.Row="0" Grid.Column="4" VerticalAlignment="Center" Margin="10,5,0,5"
-                                   ToolTip="길로틴 단계 수. 산업용 패널 톱은 보통 2-stage"/>
+                                   IsEnabled="{Binding CanConfigureStage}"
+                                   ToolTip="{Binding StageOptionTip}"/>
                         <ComboBox Grid.Row="0" Grid.Column="5" Margin="5"
-                                  SelectedIndex="{Binding StageIndex}">
+                                  SelectedIndex="{Binding StageIndex}"
+                                  IsEnabled="{Binding CanConfigureStage}"
+                                  ToolTip="{Binding StageOptionTip}">
                             <ComboBoxItem Content="2-stage"/>
                             <ComboBoxItem Content="3-stage"/>
                         </ComboBox>
@@ -157,9 +160,12 @@
                                  PreviewTextInput="DecimalTextBox_PreviewTextInput"/>
 
                         <TextBlock Text="시간 제한(ms):" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="10,5,0,5"
-                                   ToolTip="CG/MIP 솔버 wall-clock 제한 (ms)"/>
+                                   IsEnabled="{Binding CanConfigureTimeLimit}"
+                                   ToolTip="{Binding TimeLimitOptionTip}"/>
                         <TextBox Grid.Row="1" Grid.Column="3" Margin="5"
                                  Text="{Binding TimeLimitText, UpdateSourceTrigger=PropertyChanged}"
+                                 IsEnabled="{Binding CanConfigureTimeLimit}"
+                                 ToolTip="{Binding TimeLimitOptionTip}"
                                  PreviewTextInput="IntegerTextBox_PreviewTextInput"/>
 
                         <CheckBox Grid.Row="1" Grid.Column="4" Grid.ColumnSpan="2"
@@ -177,13 +183,23 @@
                         <ComboBoxItem Content="큰 것부터 (Large to Small)"/>
                     </ComboBox>
 
-                    <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5">
+                    <TextBlock Text="적용 옵션:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Top" Margin="5,4,5,5"/>
+                    <Border Grid.Row="3" Grid.Column="1" Margin="5,4,5,5" BorderBrush="LightGray" BorderThickness="1" Padding="5">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedSolverDescription}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding SelectedSolverCapabilityText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding SelectedSolverAdvancedNotes}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       Foreground="Gray" FontStyle="Italic"/>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5">
                         <Button Content="최적화 실행" Command="{Binding CalculateCommand}" Width="120" Height="35" Margin="0,0,10,0" FontWeight="Bold"/>
                         <Button Content="알고리즘 비교" Command="{Binding CompareCommand}" Width="120" Height="35" FontWeight="Bold"/>
                     </StackPanel>
 
                     <!-- 진행 상태 오버레이 -->
-                    <Grid Grid.Row="0" Grid.RowSpan="4" Grid.ColumnSpan="2"
+                    <Grid Grid.Row="0" Grid.RowSpan="5" Grid.ColumnSpan="2"
                           Background="#80FFFFFF"
                           Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">

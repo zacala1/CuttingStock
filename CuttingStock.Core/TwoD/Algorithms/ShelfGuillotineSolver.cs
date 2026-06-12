@@ -93,6 +93,11 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 else
                 {
                     result.Patterns = bestPatterns;
+                    if (SolverUtils2D.ValidateSuccessfulResult(sheets!, orders!, options, result) is { } validationError)
+                    {
+                        result.Success = false;
+                        result.ErrorMessage = validationError;
+                    }
                 }
             }
             catch (Exception ex)

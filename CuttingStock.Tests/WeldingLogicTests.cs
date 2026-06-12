@@ -147,6 +147,40 @@ namespace CuttingStock.Tests
             weldGroups.First().Should().HaveCount(3, "3조각이 하나의 그룹");
         }
 
+        [Test]
+        public void WeldingEnabled_ShortResidualTail_ShouldRebalancePreviousPiece()
+        {
+            var stock = new List<RebarStock>
+            {
+                new RebarStock(5000, 3)
+            };
+
+            var orders = new List<Order>
+            {
+                new Order(10100, 1)
+            };
+
+            var parameters = new SolverOptions
+            {
+                Delta = 1000,
+                EnableWelding = true
+            };
+
+            var result = new GreedyKnapsackSolver().Solve(stock, orders, parameters);
+
+            result.Success.Should().BeTrue("10100mm can be split as 5000 + 4100 + 1000");
+
+            var weldedCuts = result.CuttingPlans
+                .SelectMany(p => p.Cuts)
+                .Where(c => c.WeldGroupId.HasValue)
+                .ToList();
+
+            weldedCuts.Should().HaveCount(3);
+            weldedCuts.Sum(c => c.Length).Should().Be(10100);
+            weldedCuts.Should().OnlyContain(c => c.Length >= parameters.Delta);
+            weldedCuts.Select(c => c.Length).Should().BeEquivalentTo(new[] { 5000, 4100, 1000 });
+        }
+
         // /// <summary>
         // /// FFD 알고리즘에서 용접 테스트
         // /// </summary>

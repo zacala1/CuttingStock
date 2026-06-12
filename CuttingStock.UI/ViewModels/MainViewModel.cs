@@ -34,6 +34,17 @@ namespace CuttingStock.UI.ViewModels
             ComparisonResults = new ObservableCollection<ComparisonResult>();
         }
 
+        public IReadOnlyList<SolverDescriptor> SolverDescriptors => SolverCatalog.All;
+        public SolverDescriptor SelectedSolverDescriptor => SolverCatalog.GetByIndex(AlgorithmIndex);
+        public string SelectedSolverDescription => SelectedSolverDescriptor.Description;
+        public string SelectedSolverTimeComplexity => SelectedSolverDescriptor.TimeComplexity;
+        public string SelectedSolverCapabilityText => SelectedSolverDescriptor.CapabilitySummary;
+        public string SelectedSolverAdvancedNotes => SelectedSolverDescriptor.AdvancedNotes;
+        public bool CanConfigureWelding => SelectedSolverDescriptor.Supports(SolverCapability.Welding);
+        public string WeldingOptionTip => CanConfigureWelding
+            ? "체크하면 재고 길이를 초과하는 주문을 Delta 이상의 조각들로 분할해 용접"
+            : $"{SelectedSolverDescriptor.Name}은(는) 용접 옵션을 지원하지 않습니다.";
+
         // ─── Input collections ───────────────────────────────────────
 
         public ObservableCollection<StockRow> Stocks { get; }
@@ -55,6 +66,18 @@ namespace CuttingStock.UI.ViewModels
         [ObservableProperty] private int _algorithmIndex;
 
         [ObservableProperty] private bool _enableWelding;
+
+        partial void OnAlgorithmIndexChanged(int value)
+        {
+            CoerceUnsupportedOptions();
+            RefreshSelectedSolverProperties();
+        }
+
+        partial void OnEnableWeldingChanged(bool value)
+        {
+            if (value && !CanConfigureWelding)
+                EnableWelding = false;
+        }
 
         // ─── Result / UI feedback state ──────────────────────────────
 
@@ -243,9 +266,16 @@ namespace CuttingStock.UI.ViewModels
             }
             var parameters = TryParseOptions();
             if (parameters == null) return;
+            var descriptor = SelectedSolverDescriptor;
+            var unsupportedReason = descriptor.GetUnsupportedReason(parameters);
+            if (unsupportedReason != null)
+            {
+                _dialog.ShowWarning("지원하지 않는 옵션", $"{descriptor.Name}: {unsupportedReason}");
+                return;
+            }
             var stockSnapshot = Stocks.Select(s => new RebarStock(s.Length, s.Quantity)).ToList();
             var ordersSnapshot = Orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
-            var optimizer = BuildOptimizer();
+            var optimizer = descriptor.CreateSolver();
 
             int runId = ++_currentRunId;
             // Dispose any leftover CTS from a previous run before allocating a new one
@@ -351,12 +381,7 @@ namespace CuttingStock.UI.ViewModels
                 ProgressIndeterminate = true;
                 ProgressText = "알고리즘 비교 중...";
 
-                var optimizers = new List<ICuttingSolver>
-                {
-                    new GreedyKnapsackSolver(),
-                    new ColumnGenerationSolver(),
-                    new ArcFlowSolver(),
-                };
+                var descriptors = SolverDescriptors;
                 var rows = new List<ComparisonResult>();
                 var reports = new System.Text.StringBuilder();
                 reports.AppendLine("═══════════════════════════════════════════════════")
@@ -364,13 +389,32 @@ namespace CuttingStock.UI.ViewModels
                        .AppendLine("═══════════════════════════════════════════════════")
                        .AppendLine();
 
-                for (int i = 0; i < optimizers.Count; i++)
+                for (int i = 0; i < descriptors.Count; i++)
                 {
                     if (runId != _currentRunId) return;  // cancelled mid-loop
-                    var optimizer = optimizers[i];
-                    ProgressText = $"비교 중... ({i + 1}/{optimizers.Count} — {optimizer.Name})";
+                    var descriptor = descriptors[i];
+                    ProgressText = $"비교 중... ({i + 1}/{descriptors.Count} — {descriptor.Name})";
                     ProgressIndeterminate = false;
-                    ProgressPercent = i * 100.0 / optimizers.Count;
+                    ProgressPercent = i * 100.0 / descriptors.Count;
+
+                    var unsupportedReason = descriptor.GetUnsupportedReason(parameters);
+                    if (unsupportedReason != null)
+                    {
+                        rows.Add(new ComparisonResult
+                        {
+                            AlgorithmName = descriptor.Name,
+                            Success = false,
+                        });
+                        reports.AppendLine("┌─────────────────────────────────────────────────")
+                               .AppendLine($"│ {descriptor.Name}")
+                               .AppendLine("└─────────────────────────────────────────────────")
+                               .AppendLine($"실행 안 함: {unsupportedReason}")
+                               .AppendLine()
+                               .AppendLine();
+                        continue;
+                    }
+
+                    var optimizer = descriptor.CreateSolver();
 
                     var ordersCopy = orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
                     var result = await Task.Run(() => optimizer.Solve(stockSnapshot, ordersCopy, parameters));
@@ -562,12 +606,21 @@ namespace CuttingStock.UI.ViewModels
             };
         }
 
-        private ICuttingSolver BuildOptimizer() => AlgorithmIndex switch
+        private void CoerceUnsupportedOptions()
         {
-            0 => new GreedyKnapsackSolver(),
-            1 => new ColumnGenerationSolver(),
-            2 => new ArcFlowSolver(),
-            _ => new GreedyKnapsackSolver(),
-        };
+            if (!CanConfigureWelding)
+                EnableWelding = false;
+        }
+
+        private void RefreshSelectedSolverProperties()
+        {
+            OnPropertyChanged(nameof(SelectedSolverDescriptor));
+            OnPropertyChanged(nameof(SelectedSolverDescription));
+            OnPropertyChanged(nameof(SelectedSolverTimeComplexity));
+            OnPropertyChanged(nameof(SelectedSolverCapabilityText));
+            OnPropertyChanged(nameof(SelectedSolverAdvancedNotes));
+            OnPropertyChanged(nameof(CanConfigureWelding));
+            OnPropertyChanged(nameof(WeldingOptionTip));
+        }
     }
 }

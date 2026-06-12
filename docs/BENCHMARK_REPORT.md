@@ -8,7 +8,7 @@
 | OS | Windows 11 (10.0.26200) |
 | Runtime | .NET 10.0, RyuJIT x86-64-v3 |
 | 측정 | BenchmarkDotNet v0.15.5 (DefaultJob) |
-| 테스트 | 615개 통과 (NUnit 4.4.0 + FluentAssertions 8.8.0) |
+| 테스트 | Core 638개 + UI 40개 통과 (NUnit 4.4.0 + FluentAssertions 8.8.0) |
 
 ---
 
@@ -125,18 +125,9 @@
 
 | 분류 | 테스트 수 |
 |---|---:|
-| 1D 도메인/모델/알고리즘 (단위 + 통합) | 350+ |
-| 1D 불변식 매트릭스 (15 seeds × 3 솔버) | 45 |
-| 1D 견고성 (adversarial / 큰 kerf / 극단 α-β / 빈 입력) | 16 |
-| 1D 품질 비교 (cross-solver smoke) | 5 |
-| 1D 성능 budget (wall-clock × 3 솔버 × 3 사이즈) | 8 |
-| 1D 스트레스 (`[Category("Stress")]`) | 5 |
-| 2D 도메인/모델 + 유틸 | 80+ |
-| 2D 솔버 (Shelf / CG2D / MIP) + 일관성 | 30+ |
-| 2D 불변식 퍼징 (30 seeds × 3 솔버) | 90 |
-| 2D 성능 budget | 8 |
-| ScenarioService 라운드트립 | 4 |
-| **합계** | **615** |
+| `CuttingStock.Tests` Core suite | 638 |
+| `CuttingStock.UI.Tests` WPF ViewModel/service suite | 40 |
+| **합계** | **678** |
 
 불변식 테스트(fuzzing)가 검증하는 속성:
 1. 수요 정확 충족 (과생산/미달 0)
@@ -148,10 +139,11 @@
 7. 비용 일관성 (`WasteLength × Alpha + WeldCount × Beta`)
 8. 시트/스톡 재고 준수
 9. 1D: kerf-aware Leftover 공식 (`stockLen − Σcuts − (n−1)·kerf`)
+10. 1D/2D: `Success=true` 결과의 공통 validator 통과
 
 성능 budget 테스트는 BenchmarkDotNet 측정치의 3~5배를 상한으로 — 알고리즘 회귀
 (예: 후처리에 우연한 O(N²) 추가)는 잡되 CI 노이즈는 흘려보내는 폭으로 잡았다.
 
 ---
 
-*Last measured: 2026-04-12 · CuttingStock 1D + 2D + MVVM*
+*Benchmarks last measured: 2026-04-12 · test snapshot updated: 2026-06-01 · CuttingStock 1D + 2D + MVVM*

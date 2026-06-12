@@ -191,6 +191,108 @@ namespace CuttingStock.Tests.TwoD
             counts[1].Should().Be(3);
         }
 
+        [Test]
+        public void TrimToDemand_RemovesOverproductionAcrossMultiplicity()
+        {
+            var sheet = new Sheet(100, 100, 5);
+            var pattern = new CuttingPattern2D
+            {
+                Sheet = sheet,
+                Multiplicity = 2,
+                Placements = new List<Placement>
+                {
+                    Make(0, 0, 0, 20, 20),
+                    Make(1, 20, 0, 20, 20),
+                },
+            };
+
+            var trimmed = SolverUtils2D.TrimToDemand(
+                new List<CuttingPattern2D> { pattern },
+                new[] { 1, 2 },
+                out var produced);
+
+            produced.Should().Equal(1, 2);
+            SolverUtils2D.CountPlaced(trimmed, orderCount: 2).Should().Equal(1, 2);
+            trimmed.Should().HaveCount(2);
+            trimmed.Should().OnlyContain(p => p.Multiplicity == 1);
+            trimmed[0].Placements.Select(p => p.OrderIndex).Should().Equal(0, 1);
+            trimmed[1].Placements.Select(p => p.OrderIndex).Should().Equal(1);
+        }
+
+        [Test]
+        public void ValidateSuccessfulResult_ValidPattern_ReturnsNull()
+        {
+            var sheets = new List<Sheet> { new(105, 100, 1) };
+            var orders = new List<RectOrder> { new(50, 100, 2) };
+            var options = new SolverOptions2D { Kerf = 5 };
+            var result = new SolverResult2D
+            {
+                Patterns = new List<CuttingPattern2D>
+                {
+                    new()
+                    {
+                        Sheet = sheets[0],
+                        Placements = new List<Placement>
+                        {
+                            Make(0, 0, 0, 50, 100),
+                            Make(0, 55, 0, 50, 100),
+                        },
+                    },
+                },
+            };
+
+            SolverUtils2D.ValidateSuccessfulResult(sheets, orders, options, result).Should().BeNull();
+        }
+
+        [Test]
+        public void ValidateSuccessfulResult_Overlap_ReturnsError()
+        {
+            var sheets = new List<Sheet> { new(120, 100, 1) };
+            var orders = new List<RectOrder> { new(60, 100, 2) };
+            var result = new SolverResult2D
+            {
+                Patterns = new List<CuttingPattern2D>
+                {
+                    new()
+                    {
+                        Sheet = sheets[0],
+                        Placements = new List<Placement>
+                        {
+                            Make(0, 0, 0, 60, 100),
+                            Make(0, 40, 0, 60, 100),
+                        },
+                    },
+                },
+            };
+
+            SolverUtils2D.ValidateSuccessfulResult(sheets, orders, new SolverOptions2D(), result)
+                .Should().Contain("overlapping");
+        }
+
+        [Test]
+        public void ValidateSuccessfulResult_IllegalRotation_ReturnsError()
+        {
+            var sheets = new List<Sheet> { new(100, 200, 1) };
+            var orders = new List<RectOrder> { new(100, 50, 1, allowRotation: false) };
+            var result = new SolverResult2D
+            {
+                Patterns = new List<CuttingPattern2D>
+                {
+                    new()
+                    {
+                        Sheet = sheets[0],
+                        Placements = new List<Placement>
+                        {
+                            new() { OrderIndex = 0, X = 0, Y = 0, Width = 50, Height = 100, Rotated = true },
+                        },
+                    },
+                },
+            };
+
+            SolverUtils2D.ValidateSuccessfulResult(sheets, orders, new SolverOptions2D(), result)
+                .Should().Contain("illegally rotates");
+        }
+
         // ----- helpers -----
 
         private static Placement Make(int oi, int x, int y, int w, int h) =>

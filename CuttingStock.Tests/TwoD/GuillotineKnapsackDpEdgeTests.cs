@@ -135,6 +135,24 @@ namespace CuttingStock.Tests.TwoD
             withKerf.Profit.Should().Be(1.0);
         }
 
+        [Test]
+        public void KerfAwareNormalSet_AllowsInteriorKerfExtents()
+        {
+            // Three 50mm strips fit exactly in width 160 with two 5mm kerfs:
+            // 50 + 5 + 50 + 5 + 50 = 160. The normal set must include the
+            // intermediate 105mm extent (50 + 5 + 50), not just raw item sums.
+            var items = new List<GuillotineKnapsackDp.Item>
+            {
+                new() { OrderIndex = 0, W = 50, H = 100, Profit = 1 },
+            };
+
+            var res = new GuillotineKnapsackDp(160, 100, items, kerf: 5).Solve();
+
+            res.Profit.Should().Be(3.0);
+            res.Placements.Should().HaveCount(3);
+            res.Placements.Select(p => p.X).Should().BeEquivalentTo(new[] { 0, 55, 110 });
+        }
+
         // ----- reconstruction round-trip -----
 
         [Test]
