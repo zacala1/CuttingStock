@@ -1,6 +1,7 @@
 using CuttingStock.Core.Algorithms;
 using CuttingStock.Core.Domain;
 using CuttingStock.Core.TwoD.Algorithms;
+using CuttingStock.Core.TwoD.Domain;
 using FluentAssertions;
 using NUnit.Framework;
 
@@ -30,6 +31,13 @@ namespace CuttingStock.Tests
                 .Select(d => d.Key);
 
             weldingSolvers.Should().Equal("greedy-knapsack");
+        }
+
+        [Test]
+        public void OneDimensionalCatalog_ShouldExposeCommonDescriptorContract()
+        {
+            SolverCatalog.All.Should().OnlyContain(
+                d => d is ISolverDescriptor<ICuttingSolver, SolverOptions>);
         }
 
         [Test]
@@ -101,6 +109,22 @@ namespace CuttingStock.Tests
                 .Select(d => d.Key);
 
             timedSolvers.Should().Equal("column-generation-2d", "staged-mip-guillotine");
+        }
+
+        [Test]
+        public void TwoDimensionalCatalog_ShouldExposeCommonDescriptorContract()
+        {
+            SolverCatalog2D.All.Should().OnlyContain(
+                d => d is ISolverDescriptor<ICuttingSolver2D, SolverOptions2D>);
+        }
+
+        [Test]
+        public void TwoDimensionalDescriptor_ShouldRejectUnsupportedEnforcedStage()
+        {
+            var descriptor = SolverCatalog2D.All.Single(d => d.Key == "two-stage-shelf-guillotine");
+            var options = new SolverOptions2D { Stage = 3 };
+
+            descriptor.GetUnsupportedReason(options).Should().Be("3-stage 옵션을 지원하지 않습니다.");
         }
     }
 }

@@ -3,6 +3,20 @@
 `docs/archive/` 에 흩어져 있던 PHASE 노트들을 시간순으로 압축한 변경 이력.
 원본은 git history 에 보존되어 있다 (`git log -- docs/archive/`).
 
+## 2026-06-13 — Solver capability catalog + 선택형 CG 강화 variants
+
+- **Solver capability catalog** — 1D/2D solver별 실제 지원 옵션을 Core catalog로
+  명시하고, UI가 catalog를 기준으로 알고리즘 목록과 옵션 활성화 상태를 결정하도록 변경.
+- **1D Column Generation variants** — stabilized dual pricing, multi-column pricing,
+  generated-column integer master, global variable-stock master solver를 별도 선택형
+  알고리즘으로 추가.
+- **2D enforced 2-stage solver** — shelf heuristic을 명시적 2-stage guillotine solver로
+  노출하고 결과 패턴의 shelf-stage 형태를 검증.
+- **회귀 테스트** — solver catalog 계약, CG variant smoke/quality, global stock 선택,
+  2D solver matrix에 TwoStage solver를 추가.
+
+1개 commit (`ac2278f`).
+
 ## 2026-06-01 — Solver 성공 결과 validator 보강
 
 - **1D 성공 결과 공통 검증** — Greedy / ColumnGeneration / ArcFlow가

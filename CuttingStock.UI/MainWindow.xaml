@@ -15,7 +15,8 @@
         Drop="MainWindow_Drop"
         DragOver="MainWindow_DragOver"
         Loaded="MainWindow_Loaded"
-        Closing="MainWindow_Closing">
+        Closing="MainWindow_Closing"
+        Closed="MainWindow_Closed">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
         <svc:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
@@ -464,7 +465,7 @@
     </Grid>
     </TabItem>
     <TabItem Header="2D 절단 (Sheet)">
-        <twod:TwoDTab/>
+        <twod:TwoDTab x:Name="twoDTab"/>
     </TabItem>
     </TabControl>
     </DockPanel>

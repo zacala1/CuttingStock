@@ -22,7 +22,7 @@ namespace CuttingStock.UI.TwoD
     /// View는 Canvas 직접 렌더링, DataGrid SelectedItems 위임, LiveCharts 시리즈
     /// 갱신, 클립보드 paste만 처리한다.
     /// </summary>
-    public partial class TwoDTab : UserControl
+    public partial class TwoDTab : UserControl, IDisposable
     {
         private readonly TwoDViewModel _vm;
         private static readonly Regex IntegerRegex = new("[^0-9]+", RegexOptions.Compiled);
@@ -47,6 +47,11 @@ namespace CuttingStock.UI.TwoD
             DataContext = _vm;
             _vm.SingleResultReady  += (_, _) => Dispatcher.Invoke(() => RenderPatterns(_vm.LastResult!, _vm.LastOptions!));
             _vm.CompareResultReady += (_, _) => Dispatcher.Invoke(() => { UpdateCompareCharts(); if (_vm.LastResult != null) RenderPatterns(_vm.LastResult, _vm.LastOptions!); });
+        }
+
+        public void Dispose()
+        {
+            _vm.Dispose();
         }
 
         // ─── DataGrid: selection delete / paste / validation ─────────
