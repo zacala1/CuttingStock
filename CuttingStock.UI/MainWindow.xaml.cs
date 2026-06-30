@@ -90,6 +90,12 @@ namespace CuttingStock
             UserPreferencesStore.Save(_prefs);
         }
 
+        private void MainWindow_Closed(object? sender, EventArgs e)
+        {
+            _vm.Dispose();
+            twoDTab.Dispose();
+        }
+
         // ─── Recent scenarios dropdown ────────────────────────────────
 
         private void Recent1D_Click(object sender, RoutedEventArgs e)

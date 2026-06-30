@@ -23,6 +23,12 @@ namespace CuttingStock.UI.Tests
             _vm = new TwoDViewModel(_dialog);
         }
 
+        [TearDown]
+        public void TearDown()
+        {
+            _vm.Dispose();
+        }
+
         // ─── Re-entrancy gate ───────────────────────────────────────
 
         [Test]

@@ -14,7 +14,16 @@ namespace CuttingStock.Core.TwoD.Domain
         string AdvancedNotes,
         IReadOnlyList<int> SupportedStages,
         Func<ICuttingSolver2D> CreateSolver)
+        : ISolverDescriptor<ICuttingSolver2D, SolverOptions2D>
     {
         public bool Supports(SolverCapability capability) => (Capabilities & capability) == capability;
+
+        public string? GetUnsupportedReason(SolverOptions2D options)
+        {
+            if (Supports(SolverCapability.EnforcedStage) && !SupportedStages.Contains(options.Stage))
+                return $"{options.Stage}-stage 옵션을 지원하지 않습니다.";
+
+            return null;
+        }
     }
 }

@@ -11,6 +11,7 @@ namespace CuttingStock.Core.Domain
         string CapabilitySummary,
         string AdvancedNotes,
         Func<ICuttingSolver> CreateSolver)
+        : ISolverDescriptor<ICuttingSolver, SolverOptions>
     {
         public bool Supports(SolverCapability capability) => (Capabilities & capability) == capability;
 
