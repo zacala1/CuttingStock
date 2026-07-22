@@ -104,7 +104,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
 ## TODOs
 
-- [ ] 1. Capture Architecture Baseline And Guardrail Map
+- [x] 1. Capture Architecture Baseline And Guardrail Map
 
   **What to do**: Create a concise architecture map that names every enforced rule before refactoring. Include Core/UI dependency boundaries, solver invariants, UI shell responsibilities, benchmark/test separation, and current exceptions. Put it in `docs/ARCHITECTURE_GUARDRAILS.md` or a clearly named docs file.
   **Must NOT do**: Do not create per-phase docs under `docs/archive/`; do not edit source behavior.
@@ -118,8 +118,8 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Pattern: `CuttingStock.UI.Tests/CuttingStock.UI.Tests.csproj` - WPF-targeted tests.
 
   **Acceptance Criteria**:
-  - [ ] Guardrail document exists and lists 1D kerf, welding, 2D aggregation, 2D deadline, stage policy, Core/UI boundary, UI visual boundary, benchmark/test boundary.
-  - [ ] `dotnet build CuttingStock.slnx -c Release` succeeds.
+  - [x] Guardrail document exists and lists 1D kerf, welding, 2D aggregation, 2D deadline, stage policy, Core/UI boundary, UI visual boundary, benchmark/test boundary.
+  - [x] `dotnet build CuttingStock.slnx -c Release` succeeds.
 
   **QA Scenarios**:
   ```text

@@ -14,6 +14,7 @@
 | [API_REFERENCE.md](API_REFERENCE.md) | 1D + 2D 공개 타입과 인터페이스 | ~20분 |
 | [2D_API_REFERENCE.md](2D_API_REFERENCE.md) | 2D 전용 API 상세 + Quick Start | ~15분 |
 | [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) | BenchmarkDotNet 측정치 + 테스트 커버리지 요약 | ~10분 |
+| [ARCHITECTURE_GUARDRAILS.md](ARCHITECTURE_GUARDRAILS.md) | 리팩터링 중 보존해야 할 Core/UI/solver/UI/test 경계 | ~10분 |
 | [CHANGELOG.md](../CHANGELOG.md) | 시간순 변경 이력 — 이전 PHASE 노트는 이리로 압축됨 | ~5분 |
 
 ## 빠른 시작 가이드
@@ -25,6 +26,7 @@
 | "어떤 솔버를 골라야 하지?" | [BENCHMARK_REPORT.md § 알고리즘 선택 가이드](BENCHMARK_REPORT.md) |
 | "코드에서 어떻게 호출해?" | [API_REFERENCE.md § Quick Start](API_REFERENCE.md) |
 | "에이전트로 이 프로젝트 작업해야 함" | [CLAUDE.md](../CLAUDE.md) |
+| "리팩터링할 때 뭘 깨면 안 돼?" | [ARCHITECTURE_GUARDRAILS.md](ARCHITECTURE_GUARDRAILS.md) |
 
 ## 프로젝트 구조
 
