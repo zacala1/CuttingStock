@@ -245,7 +245,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(core): centralize 1d result finalization` | Files: `CuttingStock.Core/**`, `CuttingStock.Tests/**`
 
-- [ ] 5. Introduce 2D Solver Pre/Post Pipeline
+- [x] 5. Introduce 2D Solver Pre/Post Pipeline
 
   **What to do**: Add focused Core services for 2D solver entry and exit: input preprocessing, result finalization, result validation, and placement math. Start by routing existing `SolverUtils2D` methods through these services to keep compatibility, then route all 2D solvers through the same pre/post path.
   **Must NOT do**: Do not remove `SolverUtils2D` immediately; keep it as a stable facade until callers are migrated.
@@ -259,10 +259,10 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Solver entries: `ShelfGuillotineSolver.cs`, `ColumnGeneration2DSolver.cs`, `StagedMipGuillotineSolver.cs`
 
   **Acceptance Criteria**:
-  - [ ] New service names make responsibilities explicit, for example `TwoDInputPreprocessor`, `TwoDResultValidator`, `TwoDResultFinalizer`, `TwoDPlacementMath`.
-  - [ ] Every 2D solver entry uses the same preprocessing path before dictionary/pattern work.
-  - [ ] Every successful 2D result uses the same validation/finalization path.
-  - [ ] Existing tests plus Task 3 architecture tests pass.
+  - [x] New service names make responsibilities explicit, for example `TwoDInputPreprocessor`, `TwoDResultValidator`, `TwoDResultFinalizer`, `TwoDPlacementMath`.
+  - [x] Every 2D solver entry uses the same preprocessing path before dictionary/pattern work.
+  - [x] Every successful 2D result uses the same validation/finalization path.
+  - [x] Existing tests plus Task 3 architecture tests pass.
 
   **QA Scenarios**:
   ```text

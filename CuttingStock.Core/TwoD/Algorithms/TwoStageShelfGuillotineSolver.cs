@@ -46,11 +46,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 return result;
             }
 
-            if (SolverUtils2D.ValidateSuccessfulResult(sheets, orders, forced, result) is { } validationError)
-            {
-                result.Success = false;
-                result.ErrorMessage = validationError;
-            }
+            TwoDResultFinalizer.FinalizeAndValidate(sheets, orders, forced, result);
 
             return result;
         }

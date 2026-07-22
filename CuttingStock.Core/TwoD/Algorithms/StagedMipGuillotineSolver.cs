@@ -37,19 +37,18 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             try
             {
-                if (SolverUtils2D.ValidateInputs(sheets, orders, result))
+                var input = TwoDInputPreprocessor.Preprocess(sheets, orders, result);
+                if (input.ShouldReturn)
                 {
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;
                 }
 
-                int n = orders!.Count;
+                sheets = input.Sheets;
+                orders = input.Orders;
+                int n = orders.Count;
                 int[] demand = orders.Select(o => o.Quantity).ToArray();
-
-                // Sheet equality is structural — duplicate-dim rows must be merged
-                // before any downstream Dictionary<Sheet,_> usage.
-                sheets = SolverUtils2D.AggregateByDims(sheets!);
 
                 // 1) Bootstrap pool with shelf heuristic.
                 var heur = new ShelfGuillotineSolver().Solve(sheets, orders, options);
@@ -126,12 +125,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 }
 
                 result.Patterns = outPatterns;
-                if (result.Success &&
-                    SolverUtils2D.ValidateSuccessfulResult(sheets, orders, options, result) is { } validationError)
-                {
-                    result.Success = false;
-                    result.ErrorMessage = validationError;
-                }
+                TwoDResultFinalizer.FinalizeAndValidate(sheets, orders, options, result);
                 progress?.Report(1.0);
             }
             catch (Exception ex)
@@ -142,7 +136,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             sw.Stop();
             result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
-            SolverUtils2D.Finalize(result, options);
+            TwoDResultFinalizer.FinalizeResult(result, options);
             return result;
         }
 

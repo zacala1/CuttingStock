@@ -31,18 +31,16 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             try
             {
-                if (SolverUtils2D.ValidateInputs(sheets, orders, result))
+                var input = TwoDInputPreprocessor.Preprocess(sheets, orders, result);
+                if (input.ShouldReturn)
                 {
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;
                 }
 
-                // Collapse duplicate-dim Sheet rows up front; downstream code keys
-                // Dictionaries on Sheet equality, so unaggregated rows would collide.
-                var aggregated = SolverUtils2D.AggregateByDims(sheets!);
-                var orderedSheets = SolverUtils2D.OrderSheets(aggregated, options);
-                var items = SolverUtils2D.ExpandOrders(orders, options.AllowRotation);
+                var orderedSheets = TwoDInputPreprocessor.OrderSheets(input.Sheets, options);
+                var items = TwoDInputPreprocessor.ExpandOrders(input.Orders, options.AllowRotation);
 
                 // Try every (order rule × shelf strategy) combo and keep the best.
                 var orderingRules = new (string Name, Func<List<Item>, List<Item>> Sort)[]
@@ -93,11 +91,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 else
                 {
                     result.Patterns = bestPatterns;
-                    if (SolverUtils2D.ValidateSuccessfulResult(sheets!, orders!, options, result) is { } validationError)
-                    {
-                        result.Success = false;
-                        result.ErrorMessage = validationError;
-                    }
+                    TwoDResultFinalizer.FinalizeAndValidate(input.Sheets, input.Orders, options, result);
                 }
             }
             catch (Exception ex)
@@ -108,7 +102,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             sw.Stop();
             result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
-            SolverUtils2D.Finalize(result, options);
+            TwoDResultFinalizer.FinalizeResult(result, options);
             return result;
         }
 
