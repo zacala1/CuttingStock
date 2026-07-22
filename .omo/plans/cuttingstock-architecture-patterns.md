@@ -281,7 +281,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(core): add 2d solver prepost pipeline` | Files: `CuttingStock.Core/TwoD/**`, `CuttingStock.Tests/TwoD/**`
 
-- [ ] 6. Centralize 2D Deadline Policy
+- [x] 6. Centralize 2D Deadline Policy
 
   **What to do**: Add a small helper that models absolute wall-clock deadlines from solver start. Use it in `ColumnGeneration2DSolver` and `StagedMipGuillotineSolver` while preserving their existing warm-start accounting and pricing/master split behavior.
   **Must NOT do**: Do not reset the deadline after warm-start; do not make `TimeLimitMs` mean remaining time.
@@ -294,9 +294,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Policy doc: `AGENTS.md` TimeLimitMs section.
 
   **Acceptance Criteria**:
-  - [ ] Helper exposes elapsed, remaining, and stop checks without hiding `Stopwatch` semantics.
-  - [ ] CG and MIP continue to count warm-start/bootstrap time toward the same total budget.
-  - [ ] Deadline tests use a deterministic/fake clock where practical; otherwise use small bounded cases.
+  - [x] Helper exposes elapsed, remaining, and stop checks without hiding `Stopwatch` semantics.
+  - [x] CG and MIP continue to count warm-start/bootstrap time toward the same total budget.
+  - [x] Deadline tests use a deterministic/fake clock where practical; otherwise use small bounded cases.
 
   **QA Scenarios**:
   ```text

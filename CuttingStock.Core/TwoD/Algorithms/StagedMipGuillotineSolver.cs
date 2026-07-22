@@ -69,20 +69,18 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 // 2) Enrich pool with multi-pricing column generation. Half the time budget
                 //    goes to CG, the other half to the integer master. Every iteration adds
                 //    one improving column per sheet type.
-                // TimeLimitMs is the total wall-clock budget; bootstrap already consumed
-                // some of it, so the deadlines are from session start.
-                long deadline = options.TimeLimitMs;
-                long pricingEnd = options.TimeLimitMs / 2;
+                var deadline = TwoDDeadline.FromStopwatch(sw, options.TimeLimitMs);
+                long pricingEnd = deadline.PhaseEndMilliseconds(1, 2);
 
                 for (int iter = 0; iter < MaxCgIterations; iter++)
                 {
-                    if (sw.ElapsedMilliseconds > pricingEnd) break;
+                    if (deadline.IsPast(pricingEnd)) break;
                     if (!PatternPool.SolveLpMaster(columns, demand, out _, out var pi)) break;
 
                     bool anyAdded = false;
                     foreach (var newCol in PatternPool.PriceImprovingColumns(
                                  sheets, orders, pi, options, n,
-                                 cancel: () => sw.ElapsedMilliseconds > pricingEnd))
+                                 cancel: () => deadline.IsPast(pricingEnd)))
                     {
                         if (PatternPool.AddIfNew(columns, signatures, newCol))
                             anyAdded = true;
@@ -92,10 +90,10 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 }
 
                 // 3) Diversification: a few rounds of perturbed pricing to enrich the pool.
-                AddDiversifiedColumns(columns, signatures, sheets, orders, demand, options, sw, deadline, n);
+                AddDiversifiedColumns(columns, signatures, sheets, orders, demand, options, deadline, n);
 
                 // 4) Integer master MIP with hard time limit on remaining budget.
-                long remaining = Math.Max(1000, deadline - sw.ElapsedMilliseconds);
+                long remaining = deadline.RemainingMillisecondsWithFloor(1000);
                 bool ipSolved = SolveIntegerMaster(columns, demand, sheets, remaining, out var xInt);
 
                 List<CuttingPattern2D> outPatterns;
@@ -149,8 +147,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
             List<RectOrder> orders,
             int[] demand,
             SolverOptions2D options,
-            Stopwatch sw,
-            long deadline,
+            TwoDDeadline deadline,
             int n)
         {
             var rng = new Random(RngSeed);
@@ -158,7 +155,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             for (int r = 0; r < DiversificationRounds; r++)
             {
-                if (sw.ElapsedMilliseconds > deadline - 1000) break;
+                if (deadline.HasLessThanReserve(1000)) break;
 
                 // Synthetic duals: demand * area gives a base priority proportional to
                 // how much total material the order needs; jitter (0.7..1.3x) produces
@@ -174,7 +171,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 // negative columns).
                 foreach (var sheet in sheets)
                 {
-                    if (sw.ElapsedMilliseconds > deadline - 1000) break;
+                    if (deadline.HasLessThanReserve(1000)) break;
                     var dpItems = PatternPool.BuildDpItems(orders, pi, options);
                     if (dpItems.Count == 0) continue;
 

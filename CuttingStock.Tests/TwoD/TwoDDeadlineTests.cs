@@ -1,0 +1,80 @@
+using CuttingStock.Core.TwoD.Algorithms.Utilities;
+using FluentAssertions;
+using NUnit.Framework;
+
+namespace CuttingStock.Tests.TwoD
+{
+    [TestFixture]
+    [Category("Architecture")]
+    public class TwoDDeadlineTests
+    {
+        [Test]
+        public void Deadline_RemainingMilliseconds_UsesElapsedFromSolverStart()
+        {
+            long elapsed = 250;
+            var deadline = TwoDDeadline.FromElapsedProvider(1000, () => elapsed);
+
+            deadline.ElapsedMilliseconds.Should().Be(250);
+            deadline.RemainingMilliseconds.Should().Be(750);
+
+            elapsed = 900;
+            deadline.RemainingMilliseconds.Should().Be(100);
+        }
+
+        [Test]
+        public void Deadline_IsExpired_DoesNotResetAfterWarmStart()
+        {
+            long elapsed = 1001;
+            var deadline = TwoDDeadline.FromElapsedProvider(1000, () => elapsed);
+
+            deadline.IsExpired.Should().BeTrue();
+            deadline.RemainingMilliseconds.Should().Be(0);
+        }
+
+        [Test]
+        public void Deadline_PhaseEndMilliseconds_SplitsAbsoluteBudget()
+        {
+            var deadline = TwoDDeadline.FromElapsedProvider(9000, () => 0);
+
+            deadline.PhaseEndMilliseconds(1, 2).Should().Be(4500);
+            deadline.PhaseEndMilliseconds(2, 3).Should().Be(6000);
+        }
+
+        [Test]
+        public void Deadline_IsPast_UsesAbsolutePhaseEnd()
+        {
+            long elapsed = 4999;
+            var deadline = TwoDDeadline.FromElapsedProvider(10000, () => elapsed);
+            long pricingEnd = deadline.PhaseEndMilliseconds(1, 2);
+
+            deadline.IsPast(pricingEnd).Should().BeFalse();
+
+            elapsed = 5001;
+            deadline.IsPast(pricingEnd).Should().BeTrue();
+        }
+
+        [Test]
+        public void Deadline_RemainingMillisecondsWithFloor_PreservesMinimumMipBudget()
+        {
+            long elapsed = 9500;
+            var deadline = TwoDDeadline.FromElapsedProvider(10000, () => elapsed);
+
+            deadline.RemainingMillisecondsWithFloor(1000).Should().Be(1000);
+
+            elapsed = 2000;
+            deadline.RemainingMillisecondsWithFloor(1000).Should().Be(8000);
+        }
+
+        [Test]
+        public void Deadline_HasLessThanReserve_ModelsDiversificationTailStop()
+        {
+            long elapsed = 9000;
+            var deadline = TwoDDeadline.FromElapsedProvider(10000, () => elapsed);
+
+            deadline.HasLessThanReserve(1000).Should().BeFalse();
+
+            elapsed = 9001;
+            deadline.HasLessThanReserve(1000).Should().BeTrue();
+        }
+    }
+}

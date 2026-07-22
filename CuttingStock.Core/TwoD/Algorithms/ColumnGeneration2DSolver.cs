@@ -68,12 +68,10 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 // 2) Column generation loop with multi-pricing: every iteration picks ALL
                 //    improving columns (one per sheet type), not just the best one. Empirically
                 //    this shrinks the iteration count by 2–4× on multi-sheet inputs.
-                // TimeLimitMs is the total wall-clock budget; warm start already consumed
-                // some of it, so the deadline is from session start, not from "now".
-                long deadline = options.TimeLimitMs;
+                var deadline = TwoDDeadline.FromStopwatch(sw, options.TimeLimitMs);
                 for (int iter = 0; iter < MaxCgIterations; iter++)
                 {
-                    if (sw.ElapsedMilliseconds > deadline) break;
+                    if (deadline.IsExpired) break;
 
                     if (!PatternPool.SolveLpMaster(columns, demand, out _, out var pi))
                     {
@@ -88,7 +86,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     bool anyAdded = false;
                     foreach (var newCol in PatternPool.PriceImprovingColumns(
                                  sheets, orders, pi, options, n,
-                                 cancel: () => sw.ElapsedMilliseconds > deadline))
+                                 cancel: () => deadline.IsExpired))
                     {
                         if (PatternPool.AddIfNew(columns, signatures, newCol))
                             anyAdded = true;
