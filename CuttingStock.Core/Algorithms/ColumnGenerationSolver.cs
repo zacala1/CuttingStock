@@ -125,14 +125,7 @@ namespace CuttingStock.Core.Algorithms
                     result.Success = true;
                 }
 
-                if (result.Success &&
-                    SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
-                {
-                    result.Success = false;
-                    result.ErrorMessage = validationError;
-                }
-
-                SolverUtils.CalculateResults(result, options);
+                SolverResultFinalizer.FinalizeAndValidate(stock, orders, options, result);
                 progress?.Report(100.0);
             }
             catch (Exception ex)

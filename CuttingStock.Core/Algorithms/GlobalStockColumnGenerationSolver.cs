@@ -92,13 +92,7 @@ namespace CuttingStock.Core.Algorithms
                 result.CuttingPlans.AddRange(plans);
                 result.Success = true;
 
-                if (SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
-                {
-                    result.Success = false;
-                    result.ErrorMessage = validationError;
-                }
-
-                SolverUtils.CalculateResults(result, options);
+                SolverResultFinalizer.FinalizeAndValidate(stock, orders, options, result);
                 progress?.Report(100.0);
                 return result;
             }

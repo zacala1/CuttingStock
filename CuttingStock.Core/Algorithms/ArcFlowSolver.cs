@@ -65,8 +65,6 @@ namespace CuttingStock.Core.Algorithms
                 // Build and solve the model
                 SolveArcFlow(result, stockByLength, sortedStockLengths, demand, itemLengths, kerf, gcd, options, progress);
 
-                SolverUtils.CalculateResults(result, options);
-
                 // Verify fulfillment
                 var remainingDemand = new Dictionary<int, int>(demand);
                 foreach (var plan in result.CuttingPlans)
@@ -82,11 +80,8 @@ namespace CuttingStock.Core.Algorithms
                 result.Success = unfulfilled == 0;
                 if (!result.Success)
                     result.ErrorMessage = $"Failed to process {unfulfilled} order(s). MIP solver could not find a feasible solution.";
-                else if (SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
-                {
-                    result.Success = false;
-                    result.ErrorMessage = validationError;
-                }
+
+                SolverResultFinalizer.FinalizeAndValidate(stock, orders, options, result);
 
                 progress?.Report(100);
             }

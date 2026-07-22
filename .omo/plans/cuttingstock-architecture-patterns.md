@@ -209,7 +209,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `test(core): add 2d solver entry policy contracts` | Files: `CuttingStock.Tests/**`
 
-- [ ] 4. Introduce 1D Result Finalizer And Validator Facade
+- [x] 4. Introduce 1D Result Finalizer And Validator Facade
 
   **What to do**: Extract 1D result finalization and validation into explicit Core services while preserving `SolverUtils` compatibility. The facade must own reusable leftovers, waste, weld count, total cost, leftover recomputation, demand coverage checks, and welded-plan structural validation. Route solvers through the facade after existing post-processing.
   **Must NOT do**: Do not change `ICuttingSolver` signature or make `SolverResult` immutable in this pass.
@@ -223,10 +223,10 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Models: `CuttingStock.Core/Domain/SolverModels.cs:64`
 
   **Acceptance Criteria**:
-  - [ ] Public solver behavior and tests remain unchanged.
-  - [ ] Existing `SolverUtils` methods either delegate to the new service or remain as compatibility wrappers.
-  - [ ] Every 1D solver calls the same finalization/validation path.
-  - [ ] `dotnet test CuttingStock.Tests/CuttingStock.Tests.csproj -c Release --filter "Category=Architecture|Invariant|Welding"` succeeds.
+  - [x] Public solver behavior and tests remain unchanged.
+  - [x] Existing `SolverUtils` methods either delegate to the new service or remain as compatibility wrappers.
+  - [x] Every 1D solver calls the same finalization/validation path.
+  - [x] `dotnet test CuttingStock.Tests/CuttingStock.Tests.csproj -c Release --filter "Category=Architecture|Invariant|Welding"` succeeds.
 
   **QA Scenarios**:
   ```text
