@@ -173,7 +173,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `test(core): add 1d solver contract harness` | Files: `CuttingStock.Tests/**`
 
-- [ ] 3. Add 2D Solver Entry And Policy Contract Tests
+- [x] 3. Add 2D Solver Entry And Policy Contract Tests
 
   **What to do**: Add parameterized tests driven by `SolverCatalog2D.All`. Assert duplicate same-dimension sheets are aggregated by every solver, time-limit metadata matches behavior for CG/MIP, stage policy matches descriptors, every successful output validates through `SolverUtils2D.ValidateSuccessfulResult`, and only `TwoStageShelfGuillotineSolver` advertises enforced stage semantics.
   **Must NOT do**: Do not enforce 3-stage behavior; current policy is advisory for non-two-stage solvers.
@@ -187,10 +187,10 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Policy: `CuttingStock.Core/TwoD/Domain/SolverOptions2D.cs:39` - advisory stage note.
 
   **Acceptance Criteria**:
-  - [ ] New tests are catalog-driven.
-  - [ ] Duplicate-dim inventory regression is covered for every 2D solver descriptor.
-  - [ ] Stage descriptor tests distinguish `AdvisoryStage` from `EnforcedStage`.
-  - [ ] `dotnet test CuttingStock.Tests/CuttingStock.Tests.csproj -c Release --filter "Category=Architecture"` succeeds.
+  - [x] New tests are catalog-driven.
+  - [x] Duplicate-dim inventory regression is covered for every 2D solver descriptor.
+  - [x] Stage descriptor tests distinguish `AdvisoryStage` from `EnforcedStage`.
+  - [x] `dotnet test CuttingStock.Tests/CuttingStock.Tests.csproj -c Release --filter "Category=Architecture"` succeeds.
 
   **QA Scenarios**:
   ```text
