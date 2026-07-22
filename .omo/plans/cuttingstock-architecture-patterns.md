@@ -138,7 +138,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `docs(architecture): capture cutting stock guardrails` | Files: `docs/ARCHITECTURE_GUARDRAILS.md`
 
-- [ ] 2. Add 1D Solver Contract Test Harness
+- [x] 2. Add 1D Solver Contract Test Harness
 
   **What to do**: Add parameterized tests driven by `SolverCatalog.All`. Tests must instantiate each descriptor, run small deterministic inputs, and assert common contracts: success/failure model, demand coverage, `ComputeLeftover` consistency, stock inventory limits, cost formula, and welded-plan structural invariant where supported.
   **Must NOT do**: Do not duplicate solver-specific behavior tests; this is a catalog-wide contract suite.
@@ -152,9 +152,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Test pattern: `CuttingStock.Tests/Algorithms/InvariantTests1D.cs` - existing invariant style.
 
   **Acceptance Criteria**:
-  - [ ] New tests enumerate `SolverCatalog.All`, not hard-coded solver arrays.
-  - [ ] Tests cover unsupported welding behavior through `SolverDescriptor.GetUnsupportedReason`.
-  - [ ] `dotnet test CuttingStock.Tests/CuttingStock.Tests.csproj -c Release --filter "Category=Architecture"` succeeds.
+  - [x] New tests enumerate `SolverCatalog.All`, not hard-coded solver arrays.
+  - [x] Tests cover unsupported welding behavior through `SolverDescriptor.GetUnsupportedReason`.
+  - [x] `dotnet test CuttingStock.Tests/CuttingStock.Tests.csproj -c Release --filter "Category=Architecture"` succeeds.
 
   **QA Scenarios**:
   ```text
