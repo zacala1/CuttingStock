@@ -4,16 +4,25 @@ using CuttingStock.Core.TwoD.Models;
 
 namespace CuttingStock.Core.TwoD.Domain
 {
-    /// <summary>One cutting pattern: a sheet plus the items placed on it.</summary>
+    /// <summary>
+    /// One public 2D cutting pattern for a sheet.
+    /// <see cref="Placements"/> is the canonical solver output; consumers should
+    /// treat <see cref="Root"/> as optional derived data.
+    /// </summary>
     public sealed class CuttingPattern2D
     {
         public Sheet Sheet { get; init; } = null!;
         public int Multiplicity { get; init; } = 1;
+        /// <summary>
+        /// Canonical public placement list. UI, export, validation, and solver
+        /// contracts consume this flat geometry even when <see cref="Root"/> is null.
+        /// </summary>
         public List<Placement> Placements { get; init; } = new();
 
         /// <summary>
-        /// Optional guillotine cut tree. Null when the solver only outputs flat placements;
-        /// <c>PatternBuilder</c> can reconstruct it from <see cref="Placements"/>.
+        /// Optional guillotine cut tree derived from <see cref="Placements"/>.
+        /// Solvers may leave this null; callers that need a tree can reconstruct one
+        /// with <c>PatternBuilder</c> after validating guillotine compliance.
         /// </summary>
         public GuillotineNode? Root { get; init; }
 

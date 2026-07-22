@@ -315,7 +315,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(core): centralize 2d deadline policy` | Files: `CuttingStock.Core/TwoD/**`, `CuttingStock.Tests/TwoD/**`
 
-- [ ] 7. Normalize 2D Pattern Contract Without Breaking Placements
+- [x] 7. Normalize 2D Pattern Contract Without Breaking Placements
 
   **What to do**: Document and test that `CuttingPattern2D.Placements` are the canonical public output for now. Keep `Root` optional and derived. Add compatibility tests proving `PatternBuilder` can reconstruct supported guillotine trees from flat placements and `GuillotineValidator` remains the acceptance gate.
   **Must NOT do**: Do not make `Root` mandatory in this pass; that would be a breaking contract change for current solvers.
@@ -329,9 +329,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Validator: `CuttingStock.Core/TwoD/Algorithms/Utilities/GuillotineValidator.cs:9`
 
   **Acceptance Criteria**:
-  - [ ] Pattern contract is documented in Core XML docs and architecture guardrails.
-  - [ ] Tests cover flat-placement validation, optional root compatibility, and reconstruction for representative patterns.
-  - [ ] UI/export still consume placements successfully.
+  - [x] Pattern contract is documented in Core XML docs and architecture guardrails.
+  - [x] Tests cover flat-placement validation, optional root compatibility, and reconstruction for representative patterns.
+  - [x] UI/export still consume placements successfully.
 
   **QA Scenarios**:
   ```text

@@ -99,6 +99,10 @@ validate through placement geometry and guillotine compliance:
 - Placement dimensions and rotation flags match the source `RectOrder`.
 - Multiplicity respects sheet inventory.
 - Pattern geometry is accepted by `GuillotineValidator`.
+- UI, export, and tests must consume `Placements`; do not require `Root` to be
+  non-null in this architecture pass.
+- If a tree is needed, derive it from `Placements` with `PatternBuilder` and
+  keep `GuillotineValidator` as the acceptance gate.
 
 ## UI Guardrails
 
