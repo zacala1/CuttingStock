@@ -383,7 +383,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(core): split 2d solver utilities` | Files: `CuttingStock.Core/TwoD/**`, `CuttingStock.Tests/TwoD/**`
 
-- [ ] 9. Replace 1D CG Thin Subclasses With Profiles Internally
+- [x] 9. Replace 1D CG Thin Subclasses With Profiles Internally
 
   **What to do**: Introduce a `ColumnGenerationProfile` or equivalent immutable configuration object that names the variant behavior: display name, dual stabilization, smoothing factor if exposed, max columns per iteration, integer-master use, and integer-master time limit. Keep current subclasses as compatibility wrappers that pass predefined profiles. Update `SolverCatalog` to reference profile-backed constructors.
   **Must NOT do**: Do not remove public solver classes in this pass.
@@ -396,9 +396,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Catalog: `CuttingStock.Core/Algorithms/SolverCatalog.cs:25`
 
   **Acceptance Criteria**:
-  - [ ] Constructor boolean/long knobs are replaced or wrapped by a named profile internally.
-  - [ ] Existing solver names and catalog ordering remain unchanged.
-  - [ ] Column generation tests pass with no quality regression.
+  - [x] Constructor boolean/long knobs are replaced or wrapped by a named profile internally.
+  - [x] Existing solver names and catalog ordering remain unchanged.
+  - [x] Column generation tests pass with no quality regression.
 
   **QA Scenarios**:
   ```text

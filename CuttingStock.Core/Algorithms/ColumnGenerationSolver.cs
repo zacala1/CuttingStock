@@ -18,24 +18,16 @@ namespace CuttingStock.Core.Algorithms
     {
         // Column is profitable if its reduced cost exceeds this threshold.
         private const double ReducedCostThreshold = 1.00001;
-        private readonly string _name;
-        private readonly string _description;
-        private readonly bool _useDualStabilization;
-        private readonly double _dualSmoothingFactor;
-        private readonly int _maxColumnsPerIteration;
-        private readonly bool _useIntegerMaster;
-        private readonly long _integerMasterTimeLimitMs;
+        private readonly ColumnGenerationProfile _profile;
 
         public ColumnGenerationSolver()
-            : this(
-                name: "Column Generation (LP)",
-                description: "CG with Simplex master + knapsack DP pricing.",
-                useDualStabilization: false,
-                dualSmoothingFactor: 1.0,
-                maxColumnsPerIteration: 1,
-                useIntegerMaster: false,
-                integerMasterTimeLimitMs: 0)
+            : this(ColumnGenerationProfile.Standard)
         {
+        }
+
+        private protected ColumnGenerationSolver(ColumnGenerationProfile profile)
+        {
+            _profile = profile ?? throw new ArgumentNullException(nameof(profile));
         }
 
         protected ColumnGenerationSolver(
@@ -46,25 +38,20 @@ namespace CuttingStock.Core.Algorithms
             int maxColumnsPerIteration,
             bool useIntegerMaster,
             long integerMasterTimeLimitMs)
+            : this(new ColumnGenerationProfile(
+                name,
+                description,
+                useDualStabilization,
+                dualSmoothingFactor,
+                maxColumnsPerIteration,
+                useIntegerMaster,
+                integerMasterTimeLimitMs))
         {
-            if (dualSmoothingFactor <= 0.0 || dualSmoothingFactor > 1.0)
-                throw new ArgumentOutOfRangeException(nameof(dualSmoothingFactor));
-            if (maxColumnsPerIteration <= 0)
-                throw new ArgumentOutOfRangeException(nameof(maxColumnsPerIteration));
-            if (integerMasterTimeLimitMs < 0)
-                throw new ArgumentOutOfRangeException(nameof(integerMasterTimeLimitMs));
-
-            _name = name;
-            _description = description;
-            _useDualStabilization = useDualStabilization;
-            _dualSmoothingFactor = dualSmoothingFactor;
-            _maxColumnsPerIteration = maxColumnsPerIteration;
-            _useIntegerMaster = useIntegerMaster;
-            _integerMasterTimeLimitMs = integerMasterTimeLimitMs;
         }
 
-        public string Name => _name;
-        public string Description => _description;
+        internal ColumnGenerationProfile Profile => _profile;
+        public string Name => _profile.Name;
+        public string Description => _profile.Description;
         public string TimeComplexity => "Poly/iter, exp worst-case";
 
         /// <inheritdoc/>
@@ -320,7 +307,7 @@ namespace CuttingStock.Core.Algorithms
                 var newPatterns = PriceCandidatePatterns(
                     pricingDuals, simplexResult.Duals, distinctLengths, stockLength, kerf);
 
-                if (newPatterns.Count == 0 && _useDualStabilization)
+                if (newPatterns.Count == 0 && _profile.UseDualStabilization)
                 {
                     // Stabilized pricing can occasionally point at a column that is
                     // attractive for the smoothed dual but not for the current RMP.
@@ -348,7 +335,7 @@ namespace CuttingStock.Core.Algorithms
             var finalSolver = new SimplexSolver();
             var finalResult = finalSolver.SolveRelaxed(patterns, demand, distinctLengths);
 
-            if (_useIntegerMaster &&
+            if (_profile.UseIntegerMaster &&
                 TryGenerateSolutionIntegerMaster(
                     result, patterns, demand, distinctLengths, stockLength, maxStockCount, kerf))
             {
@@ -361,14 +348,14 @@ namespace CuttingStock.Core.Algorithms
 
         private List<double> GetPricingDuals(List<double> currentDuals, List<double>? previousDuals)
         {
-            if (!_useDualStabilization || previousDuals == null || previousDuals.Count != currentDuals.Count)
+            if (!_profile.UseDualStabilization || previousDuals == null || previousDuals.Count != currentDuals.Count)
                 return currentDuals;
 
             var stabilized = new List<double>(currentDuals.Count);
             for (int i = 0; i < currentDuals.Count; i++)
             {
-                double blended = _dualSmoothingFactor * currentDuals[i] +
-                                 (1.0 - _dualSmoothingFactor) * previousDuals[i];
+                double blended = _profile.DualSmoothingFactor * currentDuals[i] +
+                                 (1.0 - _profile.DualSmoothingFactor) * previousDuals[i];
                 stabilized.Add(blended);
             }
             return stabilized;
@@ -416,7 +403,7 @@ namespace CuttingStock.Core.Algorithms
             var best = PricePattern(pricingDuals, distinctLengths, stockLength, kerf);
             AddIfImproving(best);
 
-            if (_maxColumnsPerIteration == 1 || best.Items.Count == 0)
+            if (_profile.MaxColumnsPerIteration == 1 || best.Items.Count == 0)
                 return candidates;
 
             var usedIndices = best.Items
@@ -428,7 +415,7 @@ namespace CuttingStock.Core.Algorithms
 
             foreach (int excludedIndex in usedIndices)
             {
-                if (candidates.Count >= _maxColumnsPerIteration) break;
+                if (candidates.Count >= _profile.MaxColumnsPerIteration) break;
 
                 var diversifiedDuals = pricingDuals.ToList();
                 diversifiedDuals[excludedIndex] = 0.0;
@@ -457,8 +444,8 @@ namespace CuttingStock.Core.Algorithms
         {
             var solver = Solver.CreateSolver("CBC");
             if (solver == null) return false;
-            if (_integerMasterTimeLimitMs > 0)
-                solver.SetTimeLimit(_integerMasterTimeLimitMs);
+            if (_profile.IntegerMasterTimeLimitMs > 0)
+                solver.SetTimeLimit(_profile.IntegerMasterTimeLimitMs);
 
             int patternCount = patterns.Count;
             var vars = new Variable[patternCount];
