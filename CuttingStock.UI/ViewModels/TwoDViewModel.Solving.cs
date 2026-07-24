@@ -1,5 +1,4 @@
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using CuttingStock.Core.TwoD.Domain;
@@ -113,38 +112,31 @@ namespace CuttingStock.UI.ViewModels
                             : $"실패: {result.ErrorMessage}");
                     if (!comparison.Completed) return;
 
-                    var details = new StringBuilder();
-                    foreach (var outcome in comparison.Outcomes)
-                    {
-                        details.AppendLine($"=== {outcome.AlgorithmName} ===")
-                               .AppendLine(outcome.Detail)
-                               .AppendLine();
-                    }
-
-                    int rank = 1;
-                    foreach (var row in comparison.Outcomes.Select(o => o.Row)
-                                 .Where(r => r.Success)
-                                 .OrderBy(r => r.TotalCost)
-                                 .ThenBy(r => r.SheetsUsed))
-                        row.Rank = rank++;
+                    var summary = ComparisonWorkflow.Complete(
+                        comparison,
+                        row => row.Success,
+                        row => new ComparisonRankKey(row.TotalCost, row.SheetsUsed),
+                        (row, rank) => row.Rank = rank,
+                        string.Empty,
+                        outcome =>
+                            $"=== {outcome.AlgorithmName} ==={Environment.NewLine}" +
+                            $"{outcome.Detail}{Environment.NewLine}{Environment.NewLine}");
 
                     CompareRows.Clear();
                     foreach (var outcome in comparison.Outcomes
                                  .OrderBy(o => o.Row.Rank == 0 ? int.MaxValue : o.Row.Rank))
                         CompareRows.Add(outcome.Row);
-                    CompareText = details.ToString();
+                    CompareText = summary.Report;
 
-                    var bestRow = TwoDProjectionService.SelectBestRow(CompareRows);
-                    var bestOutcome = bestRow == null
-                        ? null
-                        : comparison.Outcomes.FirstOrDefault(outcome =>
-                            ReferenceEquals(outcome.Row, bestRow));
+                    var bestOutcome = summary.BestOutcome;
+                    var bestRow = bestOutcome?.Row;
                     if (bestOutcome is { Result: not null, Solver: not null })
                     {
                         _lastResult = bestOutcome.Result;
                         _lastOptions = options;
                         _lastSolver = bestOutcome.Solver;
                         HasSingleResult = true;
+                        ReportText = bestOutcome.Detail;
                         RenderProjection = TwoDProjectionService.BuildRender(
                             bestOutcome.AlgorithmName,
                             bestOutcome.Result,

@@ -89,26 +89,5 @@ namespace CuttingStock.UI.Tests
                 .Should().Be(TwoDChartProjection.Empty);
         }
 
-        [Test]
-        public void SelectBestRow_UsesCostBeforeSheetCount()
-        {
-            var fewerSheets = new ComparisonResult2D
-            {
-                AlgorithmName = "Fewer sheets",
-                TotalCost = 100,
-                SheetsUsed = 1,
-                Success = true,
-            };
-            var lowerCost = new ComparisonResult2D
-            {
-                AlgorithmName = "Lower cost",
-                TotalCost = 50,
-                SheetsUsed = 2,
-                Success = true,
-            };
-
-            TwoDProjectionService.SelectBestRow([fewerSheets, lowerCost])
-                .Should().BeSameAs(lowerCost);
-        }
     }
 }

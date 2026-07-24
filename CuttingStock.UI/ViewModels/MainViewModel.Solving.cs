@@ -100,7 +100,6 @@ namespace CuttingStock.UI.ViewModels
             if (parameters == null) return;
             var stockSnapshot = Stocks.Select(s => new RebarStock(s.Length, s.Quantity)).ToList();
             var orders = Orders.Select(o => new Order(o.Length, o.Quantity)).ToList();
-            _lastOptions = parameters;
 
             await RunSolverAsync(
                 initialProgressText: "알고리즘 비교 중...",
@@ -137,35 +136,25 @@ namespace CuttingStock.UI.ViewModels
                             : $"실패: {result.ErrorMessage}");
                     if (!comparison.Completed) return;
 
-                    var reports = new StringBuilder();
-                    reports.AppendLine("═══════════════════════════════════════════════════")
-                           .AppendLine("  알고리즘 상세 비교")
-                           .AppendLine("═══════════════════════════════════════════════════")
-                           .AppendLine();
-
-                    foreach (var outcome in comparison.Outcomes)
-                    {
-                        reports.AppendLine("┌─────────────────────────────────────────────────")
-                            .AppendLine($"│ {outcome.AlgorithmName}");
-                        if (outcome.Solver != null)
-                            reports.AppendLine($"│ 시간 복잡도: {outcome.Solver.TimeComplexity}");
-                        reports.AppendLine("└─────────────────────────────────────────────────")
-                            .AppendLine(outcome.Detail)
-                            .AppendLine()
-                            .AppendLine();
-                    }
+                    var summary = ComparisonWorkflow.Complete(
+                        comparison,
+                        row => row.Success,
+                        row => new ComparisonRankKey(row.TotalCost),
+                        (row, rank) => row.Rank = rank,
+                        "═══════════════════════════════════════════════════" + Environment.NewLine +
+                        "  알고리즘 상세 비교" + Environment.NewLine +
+                        "═══════════════════════════════════════════════════" + Environment.NewLine +
+                        Environment.NewLine,
+                        FormatComparisonOutcome);
 
                     ComparisonResults.Clear();
                     foreach (var outcome in comparison.Outcomes)
                         ComparisonResults.Add(outcome.Row);
 
-                    var sorted = ComparisonResults.Where(r => r.Success).OrderBy(r => r.TotalCost).ToList();
-                    for (int i = 0; i < sorted.Count; i++) sorted[i].Rank = i + 1;
-
-                    ComparisonText = reports.ToString();
+                    ComparisonText = summary.Report;
                     HasComparisonResults = true;
 
-                    var best = sorted.FirstOrDefault();
+                    var best = summary.BestOutcome?.Row;
                     if (best != null)
                     {
                         StatusText = $"비교 완료 · 최고: {best.AlgorithmName} · 효율 {best.MaterialEfficiency:F1}%";
@@ -181,6 +170,21 @@ namespace CuttingStock.UI.ViewModels
                 {
                     _dialog.ShowError("오류", $"오류 발생: {ex.Message}");
                 });
+        }
+
+        private static string FormatComparisonOutcome(
+            SolverComparisonOutcome<ICuttingSolver, SolverResult, ComparisonResult> outcome)
+        {
+            var report = new StringBuilder();
+            report.AppendLine("┌─────────────────────────────────────────────────")
+                  .AppendLine($"│ {outcome.AlgorithmName}");
+            if (outcome.Solver != null)
+                report.AppendLine($"│ 시간 복잡도: {outcome.Solver.TimeComplexity}");
+            report.AppendLine("└─────────────────────────────────────────────────")
+                  .AppendLine(outcome.Detail)
+                  .AppendLine()
+                  .AppendLine();
+            return report.ToString();
         }
     }
 }

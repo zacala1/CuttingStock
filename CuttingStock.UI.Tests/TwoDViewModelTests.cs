@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using FluentAssertions;
@@ -106,6 +108,34 @@ namespace CuttingStock.UI.Tests
             _vm.ReportText.Should().NotBeNullOrWhiteSpace();
             _vm.RenderProjection.Should().NotBeNull();
             _vm.RenderProjection!.Patterns.Should().NotBeEmpty();
+        }
+
+        [Test]
+        public async Task ExportToCsv_AfterCalculateUsesTwoDResultAndOptions()
+        {
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"cutting-stock-2d-export-{Guid.NewGuid():N}.csv");
+
+            try
+            {
+                _vm.Sheets.Add(new SheetRow { Width = 1000, Height = 1000, Quantity = 1 });
+                _vm.Orders.Add(new RectOrderRow { Width = 200, Height = 200, Quantity = 4 });
+                _vm.TrimText = "5";
+                await _vm.CalculateCommand.ExecuteAsync(null);
+                _dialog.SavePathResponses.Enqueue(path);
+
+                _vm.ExportToCsvCommand.Execute(null);
+
+                string csv = File.ReadAllText(path);
+                csv.Should().Contain("2D 절단 최적화 결과");
+                csv.Should().Contain("Trim,5");
+                csv.Should().Contain($"알고리즘,{_vm.SelectedSolverDescriptor.Name}");
+            }
+            finally
+            {
+                File.Delete(path);
+            }
         }
 
         [Test]

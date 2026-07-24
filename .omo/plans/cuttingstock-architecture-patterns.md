@@ -518,7 +518,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(ui): expose bindable solver projections` | Files: `CuttingStock.UI/**`, `CuttingStock.UI.Tests/**`
 
-- [ ] 13. Consolidate 1D And 2D Workspace Workflow Duplication
+- [x] 13. Consolidate 1D And 2D Workspace Workflow Duplication
 
   **What to do**: Extract shared ViewModel workflow helpers for calculate/compare/export/scenario patterns where the type parameters make behavior clearer. Prefer composition or a narrow template method over a large inheritance hierarchy. Keep dimension-specific parsing, DTO mapping, and rendering projection explicit.
   **Must NOT do**: Do not collapse 1D and 2D ViewModels into one generic class if readability suffers.
@@ -532,9 +532,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Export duplication: `MainViewModel.Export.cs`, `TwoDViewModel.Export.cs`
 
   **Acceptance Criteria**:
-  - [ ] Compare/rank/report flow has one tested shared implementation or helper where practical.
-  - [ ] Export command boilerplate is reduced through a helper without hiding dimension-specific export calls.
-  - [ ] Scenario save/load mapping remains explicit and tested.
+  - [x] Compare/rank/report flow has one tested shared implementation or helper where practical.
+  - [x] Export command boilerplate is reduced through a helper without hiding dimension-specific export calls.
+  - [x] Scenario save/load mapping remains explicit and tested.
 
   **QA Scenarios**:
   ```text

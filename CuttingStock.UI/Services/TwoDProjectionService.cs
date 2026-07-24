@@ -91,18 +91,6 @@ namespace CuttingStock.UI.Services
                 successful.Select(row => row.ExecutionTimeMs).ToArray().AsReadOnly());
         }
 
-        public static ComparisonResult2D? SelectBestRow(
-            IEnumerable<ComparisonResult2D> rows)
-        {
-            ArgumentNullException.ThrowIfNull(rows);
-
-            return rows
-                .Where(row => row.Success)
-                .OrderBy(row => row.TotalCost)
-                .ThenBy(row => row.SheetsUsed)
-                .FirstOrDefault();
-        }
-
         private static string AbbreviateName(string name)
         {
             int parenthesis = name.IndexOf('(');
