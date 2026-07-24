@@ -621,7 +621,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `build: centralize solution project settings` | Files: `Directory.Build.props`, `Directory.Packages.props`, `*.csproj`
 
-- [ ] 16. Separate Benchmarks From Correctness Tests
+- [x] 16. Separate Benchmarks From Correctness Tests
 
   **What to do**: Move benchmark-only code out of `CuttingStock.Tests` or explicitly reclassify it as a deterministic performance gate. Preferred target: move `LargeScaleBenchmarks.cs` into `CuttingStock.Benchmarks` and remove `BenchmarkDotNet` from `CuttingStock.Tests.csproj`. Keep correctness tests deterministic and fast by default.
   **Must NOT do**: Do not drop the large-scale coverage without relocating or replacing it.
@@ -634,9 +634,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Benchmark project: `CuttingStock.Benchmarks/CuttingStock.Benchmarks.csproj:13`
 
   **Acceptance Criteria**:
-  - [ ] `CuttingStock.Tests` no longer references `BenchmarkDotNet` unless an explicit rationale is documented.
-  - [ ] Large-scale performance scenario exists in `CuttingStock.Benchmarks` or a deliberately named perf gate.
-  - [ ] Default `dotnet test` remains correctness-focused.
+  - [x] `CuttingStock.Tests` no longer references `BenchmarkDotNet` unless an explicit rationale is documented.
+  - [x] Large-scale performance scenario exists in `CuttingStock.Benchmarks` or a deliberately named perf gate.
+  - [x] Default `dotnet test` remains correctness-focused.
 
   **QA Scenarios**:
   ```text

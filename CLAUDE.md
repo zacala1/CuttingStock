@@ -24,11 +24,11 @@ Layout:
 # Build everything
 dotnet build CuttingStock.slnx -c Release
 
-# Full test suite (skips [Explicit] LargeScale benchmark)
+# Full correctness test suite
 dotnet test CuttingStock.slnx -c Release --nologo --no-build
 
-# Run the LargeScale 1000-orders benchmark explicitly
-dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
+# Run the LargeScale 1000-orders BenchmarkDotNet workload
+dotnet run --project CuttingStock.Benchmarks -c Release -- --large
 
 # Run a focused category
 dotnet test CuttingStock.slnx --filter "Category=Welding"

@@ -168,8 +168,9 @@ remains in the corresponding view.
 
 Correctness tests should be deterministic and run in the default test command.
 Long-running or informational performance work belongs in
-`CuttingStock.Benchmarks` unless a test is deliberately marked as an explicit
-performance gate.
+`CuttingStock.Benchmarks`. The test projects deliberately do not reference
+BenchmarkDotNet; deterministic budget tests such as `PerformanceTests1D` are
+the required regression gates.
 
 Default verification remains:
 
@@ -178,7 +179,8 @@ dotnet build CuttingStock.slnx -c Release
 dotnet test CuttingStock.slnx -c Release --nologo --no-build
 ```
 
-Explicit benchmarks must not become required for ordinary correctness merges.
+BenchmarkDotNet workloads must not become required for ordinary correctness
+merges.
 
 ## Adding A Solver Safely
 

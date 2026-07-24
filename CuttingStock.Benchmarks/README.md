@@ -26,6 +26,11 @@
 - 사용 재고 수 (Stock Used)
 - 재료 효율 (Material Efficiency)
 
+### 3. LargeScaleBenchmarks
+**목적**: Greedy 솔버의 1,000건 장시간 처리량과 메모리 측정
+
+정합성 회귀 테스트와 분리되어 있으며 명시적으로 실행할 때만 수행됩니다.
+
 ## 🚀 실행 방법
 
 ### 기본 실행
@@ -36,24 +41,19 @@ dotnet run -c Release
 
 ### 특정 벤치마크만 실행
 ```bash
-# 알고리즘 성능 벤치마크
-dotnet run -c Release --filter "*AlgorithmBenchmarks*"
-
 # 품질 비교 벤치마크
-dotnet run -c Release --filter "*QualityBenchmarks*"
+dotnet run -c Release -- --quality
+
+# 1,000건 장시간 벤치마크
+dotnet run -c Release -- --large
+
+# 모든 벤치마크
+dotnet run -c Release -- --all
 ```
 
 ### 결과 내보내기
-```bash
-# HTML 리포트 생성
-dotnet run -c Release --exporters html
-
-# CSV 파일 생성
-dotnet run -c Release --exporters csv
-
-# Markdown 표 생성
-dotnet run -c Release --exporters markdown
-```
+BenchmarkDotNet 결과는 기본 HTML, CSV, Markdown 형식으로
+`BenchmarkDotNet.Artifacts/results/`에 생성됩니다.
 
 ## 📈 예상 결과
 

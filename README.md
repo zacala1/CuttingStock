@@ -111,9 +111,9 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 |---|---:|---|
 | `CuttingStock.Tests` (Core) | 638 | 1D/2D 솔버, 도메인, persistence, invariant, robustness, performance/stress |
 | `CuttingStock.UI.Tests` | 40 | 1D/2D ViewModel command/state, dialog flow, visualization service |
-| **합계** | **678** | Release 전체 통과, `[Explicit]` LargeScale benchmark 1개는 기본 실행 제외 |
+| **합계** | **678** | Release 전체 통과 |
 
-`Benchmark_LargeScale_1000_Orders`는 `[Explicit]`로 디폴트 실행에서 제외, 별도 호출 시 ~7초.
+장시간 성능 측정은 정합성 테스트와 분리된 `CuttingStock.Benchmarks`에서 실행한다.
 
 ## 의존성
 
@@ -130,14 +130,14 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 # 전체 빌드 (Release)
 dotnet build CuttingStock.slnx -c Release
 
-# 전체 테스트 ([Explicit] LargeScale 제외)
+# 전체 정합성 테스트
 dotnet test CuttingStock.slnx -c Release --nologo
 
 # 특정 카테고리
 dotnet test CuttingStock.slnx -c Release --filter "Category=Welding"
 
-# Explicit LargeScale 1000-orders benchmark
-dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
+# LargeScale 1000-orders BenchmarkDotNet 측정
+dotnet run --project CuttingStock.Benchmarks -c Release -- --large
 
 # WPF 앱 실행
 dotnet run --project CuttingStock.UI

@@ -74,14 +74,14 @@ CuttingStock/
 # 전체 빌드
 dotnet build CuttingStock.slnx -c Release
 
-# 전체 테스트 ([Explicit] LargeScale 제외, 현재 678 passed)
+# 전체 정합성 테스트
 dotnet test CuttingStock.slnx -c Release --nologo
 
 # 특정 카테고리
 dotnet test CuttingStock.slnx -c Release --filter "Category=Welding"
 
-# Explicit LargeScale 벤치마크
-dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
+# LargeScale 1000-orders BenchmarkDotNet 측정
+dotnet run --project CuttingStock.Benchmarks -c Release -- --large
 
 # WPF 앱 실행
 dotnet run --project CuttingStock.UI
