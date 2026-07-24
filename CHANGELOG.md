@@ -3,6 +3,34 @@
 `docs/archive/` 에 흩어져 있던 PHASE 노트들을 시간순으로 압축한 변경 이력.
 원본은 git history 에 보존되어 있다 (`git log -- docs/archive/`).
 
+## 2026-07-24 — Architecture and pattern hardening
+
+- **아키텍처 계약과 검증 하네스** — Core/UI/benchmark 경계, 1D/2D solver
+  생명주기, 2D placement/stage 계약을 문서화하고 카탈로그 기반 공통 계약
+  테스트를 추가 (`2666f71`, `3828fce`, `12f865a`, `8288bde`, `3c898ea`,
+  `0bb8817`).
+- **공통 생명주기와 정책 소유권** — 1D 결과 finalization, 2D 전처리/후처리,
+  절대 deadline, 2D utility facade를 단일 경로로 정리하고 검토에서 발견된
+  invariant 및 one-way dependency 위반을 수정 (`abbd492`, `03729e1`,
+  `4bb50db`, `83e8aee`, `65e03be`, `2c22042`).
+- **변형과 패턴 서비스 구성** — Column Generation 변형을 profile로 모델링하고
+  2D pattern pool 생성/정규화/중복 제거 책임을 분리 (`22fc172`, `f06c52b`).
+- **UI shell과 projection 경계** — 창 shell workflow, plain projection DTO,
+  비교/내보내기 workflow를 서비스로 추출하고 1D/2D 사용자 기능 parity 정책을
+  고정했다. 활성 작업공간 기준 단축키 라우팅을 회귀 테스트로 보호하고 상태
+  표시도 선택된 탭을 따르도록 수정했다 (`1d1d328`, `bccc8cf`, `02296a3`,
+  `86963f5`, `e7469c2`).
+- **빌드와 검증 거버넌스** — 공통 MSBuild/package 설정, 정합성 테스트와
+  BenchmarkDotNet 분리, Windows .NET 10 CI 및 테스트 수 단일 출처 정책을 추가
+  (`dce4002`, `7cba20e`, `1e7adb3`).
+- **최종 계약 하드닝** — 취소된 worker가 종료되기 전 재진입을 차단하고,
+  비교 차트 stale state를 제거했다. 2D 절대 deadline을 확장·정렬·선반 탐색까지
+  전달하고 OR-Tools 수명을 명시했으며, 1D 재사용 잔재의 출처·재고·효율 계약과
+  benchmark 품질 비교 출력을 회귀 테스트로 고정했다 (`98c3a18`).
+
+이 작업은 기존 공개 solver 인터페이스와 호환 클래스 이름을 유지하는
+source-compatible 리팩터링이다.
+
 ## 2026-06-30 — Solver lifecycle architecture 정리
 
 - **Solver descriptor 공통 계약** — 1D/2D solver catalog가 같은 descriptor

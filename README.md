@@ -6,7 +6,8 @@
 
 - **CuttingStock.Core** — 알고리즘, 도메인 모델, OR-Tools 통합, JSON 시나리오 영속화 (`Persistence/`)
 - **CuttingStock.UI** — WPF + MVVM(CommunityToolkit.Mvvm) UI. ViewModels / Services 분리
-- **CuttingStock.Tests** — NUnit + FluentAssertions 기반 Core/UI 정합성 검증
+- **CuttingStock.Tests** — NUnit + FluentAssertions 기반 Core 알고리즘/도메인 정합성 검증
+- **CuttingStock.UI.Tests** — `net10.0-windows` 기반 WPF ViewModel/View/service 검증
 - **CuttingStock.Benchmarks** — BenchmarkDotNet 성능 측정 (인포메이셔널)
 
 ## 1D 솔버 (`ICuttingSolver`)
@@ -115,6 +116,23 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 장시간 성능 측정은 정합성 테스트와 분리된 `CuttingStock.Benchmarks`에서 실행한다.
 현재 테스트 개수와 통과 여부의 단일 기준은 GitHub Actions `CI` 실행 결과이며,
 변동되는 개수는 문서에 하드코딩하지 않는다.
+
+## 아키텍처 기여 규칙
+
+- 기존 공개 solver 인터페이스와 호환 클래스는 source-compatible하게 유지한다.
+- 2D 결과의 기준 데이터는 `CuttingPattern2D.Placements`이며 `Root`는 선택적
+  파생 데이터다.
+- `Stage=3`은 아직 강제 제약이 아니고, `TwoStageShelfGuillotineSolver`만
+  2-stage 구조를 검증한다.
+- 재사용 잔재를 다시 절단하는 1D 계획은
+  `ReusableLeftoverSourcePlanIndex`로 출처 계획을 명시한다. 원재고 사용량,
+  재료 효율, 최종 재사용 잔재는 이 provenance를 기준으로 계산한다.
+- 2D ViewModel은 plain placement/chart projection을 노출하고 LiveCharts/WPF
+  `Canvas` 객체 생성은 View 경계에 둔다. 1D `VisualizationRow`는 WPF 전용
+  projection이며 `Brush`를 포함한다.
+
+새 솔버 추가 절차와 전체 불변식은
+[`docs/ARCHITECTURE_GUARDRAILS.md`](docs/ARCHITECTURE_GUARDRAILS.md)를 따른다.
 
 ## 의존성
 

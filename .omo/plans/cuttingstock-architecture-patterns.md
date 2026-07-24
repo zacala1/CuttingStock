@@ -690,7 +690,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `ci: add build test governance` | Files: `.github/workflows/**`, `README.md`, `docs/**`, `CLAUDE.md`
 
-- [ ] 18. Final Architecture Documentation And Changelog Update
+- [x] 18. Final Architecture Documentation And Changelog Update
 
   **What to do**: Update `CHANGELOG.md` with a dated block and produced commit SHAs. Update architecture guardrails and README/docs to reflect final decisions: no API break, placements canonical for 2D, stage policy, UI visual boundary, benchmark separation, CI policy, and how to add a new solver safely.
   **Must NOT do**: Do not introduce per-phase markdown files.
@@ -703,10 +703,10 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Docs index: `docs/README.md`
 
   **Acceptance Criteria**:
-  - [ ] `CHANGELOG.md` has a new top entry with date and commit SHAs.
-  - [ ] Docs describe how to add 1D and 2D solvers without skipping contract tests.
-  - [ ] Docs describe UI shell/service boundaries.
-  - [ ] Full build and tests pass.
+  - [x] `CHANGELOG.md` has a new top entry with date and commit SHAs.
+  - [x] Docs describe how to add 1D and 2D solvers without skipping contract tests.
+  - [x] Docs describe UI shell/service boundaries.
+  - [x] Full build and tests pass.
 
   **QA Scenarios**:
   ```text
@@ -728,20 +728,20 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 ## Final Verification Wave
 > ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 
-- [ ] F1. Plan Compliance Audit
+- [x] F1. Plan Compliance Audit
   - Verify every task acceptance criterion has evidence in `.omo/evidence/`.
   - Verify no task violated Core/UI boundary or public API compatibility.
 
-- [ ] F2. Code Quality Review
+- [x] F2. Code Quality Review
   - Review changed Core abstractions for unnecessary inheritance, stateful services, and hidden behavior changes.
   - Review UI changes for WPF visual types leaking into Core or ViewModels beyond current project patterns.
 
-- [ ] F3. Real Manual QA
+- [x] F3. Real Manual QA
   - Launch WPF app with `dotnet run --project CuttingStock.UI`.
   - Exercise 1D and 2D examples, calculate, compare, cancel, export prompt open/cancel, scenario save/load, and any parity changes.
   - Capture screenshots or notes under `.omo/evidence/f3-manual-qa.md`.
 
-- [ ] F4. Scope Fidelity Check
+- [x] F4. Scope Fidelity Check
   - Confirm no solver quality/cost behavior changed except through documented refactors with passing regression tests.
   - Confirm no unrelated untracked files were staged.
   - Confirm docs and changelog are updated exactly once.

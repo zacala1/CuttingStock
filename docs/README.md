@@ -27,6 +27,7 @@
 | "코드에서 어떻게 호출해?" | [API_REFERENCE.md § Quick Start](API_REFERENCE.md) |
 | "에이전트로 이 프로젝트 작업해야 함" | [CLAUDE.md](../CLAUDE.md) |
 | "리팩터링할 때 뭘 깨면 안 돼?" | [ARCHITECTURE_GUARDRAILS.md](ARCHITECTURE_GUARDRAILS.md) |
+| "새 1D/2D 솔버를 어떻게 추가해?" | [ARCHITECTURE_GUARDRAILS.md § Adding A Solver Safely](ARCHITECTURE_GUARDRAILS.md#adding-a-solver-safely) |
 
 ## 프로젝트 구조
 
@@ -46,10 +47,10 @@ CuttingStock/
 │   ├── ViewModels/                   # MainViewModel, TwoDViewModel + row DTOs
 │   └── Services/                     # DialogService, ExportService, VisualizationService
 ├── CuttingStock.Tests/               # NUnit + FluentAssertions Core tests
-├── CuttingStock.UI.Tests/            # WPF ViewModel/service tests
 │   ├── Algorithms/                   # Greedy/CG/ArcFlow 단위 + Quality/Robustness/Stress/Perf
 │   ├── TwoD/                         # 2D 솔버 + Invariant 매트릭스 (90 fuzz runs)
 │   └── Persistence/                  # ScenarioService 라운드트립
+├── CuttingStock.UI.Tests/            # WPF ViewModel/service tests
 ├── CuttingStock.Benchmarks/          # BenchmarkDotNet (인포메이셔널)
 ├── docs/                             # ← 지금 보고 있는 디렉터리
 ├── CLAUDE.md                         # 에이전트 컨벤션
