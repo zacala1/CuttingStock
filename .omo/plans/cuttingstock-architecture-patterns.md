@@ -417,7 +417,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(core): model column generation variants as profiles` | Files: `CuttingStock.Core/Algorithms/**`, `CuttingStock.Tests/**`
 
-- [ ] 10. Split 2D PatternPool Into Column, Master, And Pricing Services
+- [x] 10. Split 2D PatternPool Into Column, Master, And Pricing Services
 
   **What to do**: Refactor `PatternPool` into explicit pieces: pure pattern-column model/signature, LP master solve, DP pricing, and materialization helpers. Keep current behavior and thresholds unchanged. Route CG2D and StagedMip through the new names.
   **Must NOT do**: Do not tune reduced-cost thresholds, objective policy, or pattern generation quality in this task.
@@ -429,9 +429,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Consumers: `ColumnGeneration2DSolver.cs`, `StagedMipGuillotineSolver.cs`
 
   **Acceptance Criteria**:
-  - [ ] Pattern column, master solve, and pricing responsibilities are separated.
-  - [ ] CG2D and StagedMip outputs remain valid on existing tests.
-  - [ ] New tests cover signature dedup and pricing/master behavior at service level.
+  - [x] Pattern column, master solve, and pricing responsibilities are separated.
+  - [x] CG2D and StagedMip outputs remain valid on existing tests.
+  - [x] New tests cover signature dedup and pricing/master behavior at service level.
 
   **QA Scenarios**:
   ```text

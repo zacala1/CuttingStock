@@ -62,10 +62,13 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     return result;
                 }
 
-                var columns = new List<PatternPool.Column>();
+                var columns = new List<PatternColumn>();
                 var signatures = new HashSet<long>();
                 foreach (var p in heur.Patterns)
-                    PatternPool.AddIfNew(columns, signatures, PatternPool.FromPattern(p, n));
+                    PatternColumnPool.AddIfNew(
+                        columns,
+                        signatures,
+                        PatternMaterializer.FromPattern(p, n));
 
                 // 2) Enrich pool with multi-pricing column generation. Half the time budget
                 //    goes to CG, the other half to the integer master. Every iteration adds
@@ -76,14 +79,14 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 for (int iter = 0; iter < MaxCgIterations; iter++)
                 {
                     if (deadline.IsPast(pricingEnd)) break;
-                    if (!PatternPool.SolveLpMaster(columns, demand, out _, out var pi)) break;
+                    if (!PatternMasterLp.Solve(columns, demand, out _, out var pi)) break;
 
                     bool anyAdded = false;
-                    foreach (var newCol in PatternPool.PriceImprovingColumns(
+                    foreach (var newCol in PatternPricing.PriceImprovingColumns(
                                  sheets, orders, pi, options, n,
                                  cancel: () => deadline.IsPast(pricingEnd)))
                     {
-                        if (PatternPool.AddIfNew(columns, signatures, newCol))
+                        if (PatternColumnPool.AddIfNew(columns, signatures, newCol))
                             anyAdded = true;
                     }
                     if (!anyAdded) break;
@@ -102,7 +105,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 List<CuttingPattern2D> outPatterns;
                 if (ipSolved && xInt != null)
                 {
-                    outPatterns = MaterializeMipSolution(columns, xInt);
+                    outPatterns = PatternMaterializer.ToPatterns(columns, xInt);
 
                     // Sanity: every order must be covered.
                     var produced = new int[n];
@@ -153,7 +156,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
         // ---- diversification ----
 
         private static void AddDiversifiedColumns(
-            List<PatternPool.Column> columns,
+            List<PatternColumn> columns,
             HashSet<long> signatures,
             List<Sheet> sheets,
             List<RectOrder> orders,
@@ -184,7 +187,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 foreach (var sheet in sheets)
                 {
                     if (deadline.HasLessThanReserve(1000)) break;
-                    var dpItems = PatternPool.BuildDpItems(orders, pi, options);
+                    var dpItems = PatternPricing.BuildDpItems(orders, pi, options);
                     if (dpItems.Count == 0) continue;
 
                     int Wu = sheet.Width  - 2 * options.Trim;
@@ -193,9 +196,9 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
                     var dp = new GuillotineKnapsackDp(Wu, Hu, dpItems, options.Kerf);
                     var dpRes = dp.Solve();
-                    var col = PatternPool.FromDpResult(sheet, dpRes, n, options.Trim);
+                    var col = PatternMaterializer.FromDpResult(sheet, dpRes, n, options.Trim);
                     if (col.Counts.Sum() == 0) continue;
-                    PatternPool.AddIfNew(columns, signatures, col);
+                    PatternColumnPool.AddIfNew(columns, signatures, col);
                 }
             }
         }
@@ -203,7 +206,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
         // ---- integer master MIP via CBC ----
 
         private static bool SolveIntegerMaster(
-            List<PatternPool.Column> columns, int[] demand, List<Sheet> sheets, long timeLimitMs, out int[]? xInt)
+            List<PatternColumn> columns, int[] demand, List<Sheet> sheets, long timeLimitMs, out int[]? xInt)
         {
             xInt = null;
             var solver = Solver.CreateSolver("CBC");
@@ -288,22 +291,5 @@ namespace CuttingStock.Core.TwoD.Algorithms
             return true;
         }
 
-        private static List<CuttingPattern2D> MaterializeMipSolution(List<PatternPool.Column> columns, int[] xInt)
-        {
-            var patterns = new List<CuttingPattern2D>();
-            for (int p = 0; p < columns.Count; p++)
-            {
-                int k = xInt[p];
-                if (k <= 0) continue;
-                var col = columns[p];
-                patterns.Add(new CuttingPattern2D
-                {
-                    Sheet = col.Sheet,
-                    Multiplicity = k,
-                    Placements = col.Placements.Select(PatternPool.ClonePlacement).ToList(),
-                });
-            }
-            return patterns;
-        }
     }
 }

@@ -58,12 +58,12 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     return result;
                 }
 
-                var columns = new List<PatternPool.Column>();
+                var columns = new List<PatternColumn>();
                 var signatures = new HashSet<long>();
                 foreach (var p in warm.Patterns)
                 {
-                    var col = PatternPool.FromPattern(p, n);
-                    PatternPool.AddIfNew(columns, signatures, col);
+                    var col = PatternMaterializer.FromPattern(p, n);
+                    PatternColumnPool.AddIfNew(columns, signatures, col);
                 }
 
                 // 2) Column generation loop with multi-pricing: every iteration picks ALL
@@ -74,7 +74,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 {
                     if (deadline.IsExpired) break;
 
-                    if (!PatternPool.SolveLpMaster(columns, demand, out _, out var pi))
+                    if (!PatternMasterLp.Solve(columns, demand, out _, out var pi))
                     {
                         // LP infeasible — fall back to warm start.
                         result.Patterns = warm.Patterns;
@@ -85,11 +85,11 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     }
 
                     bool anyAdded = false;
-                    foreach (var newCol in PatternPool.PriceImprovingColumns(
+                    foreach (var newCol in PatternPricing.PriceImprovingColumns(
                                  sheets, orders, pi, options, n,
                                  cancel: () => deadline.IsExpired))
                     {
-                        if (PatternPool.AddIfNew(columns, signatures, newCol))
+                        if (PatternColumnPool.AddIfNew(columns, signatures, newCol))
                             anyAdded = true;
                     }
 
@@ -98,7 +98,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 }
 
                 // 3) Final LP, then floor to integer multiplicities and mop up the residual.
-                if (!PatternPool.SolveLpMaster(columns, demand, out var xFinal, out _))
+                if (!PatternMasterLp.Solve(columns, demand, out var xFinal, out _))
                 {
                     result.Patterns = warm.Patterns;
                     TwoDResultFinalizer.FinalizeAndValidate(sheets, orders, options, result);
@@ -146,7 +146,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
         /// and per-sheet usage to drive the residual mop-up.
         /// </summary>
         private static List<CuttingPattern2D> RoundDownAndMaterialize(
-            List<PatternPool.Column> columns,
+            List<PatternColumn> columns,
             double[] xFinal,
             List<Sheet> sheets,
             int n,
@@ -173,12 +173,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 if (k <= 0) continue;
                 sheetUsage[idx] += k;
 
-                patterns.Add(new CuttingPattern2D
-                {
-                    Sheet = col.Sheet,
-                    Multiplicity = k,
-                    Placements = col.Placements.Select(PatternPool.ClonePlacement).ToList(),
-                });
+                patterns.Add(PatternMaterializer.ToPattern(col, k));
                 for (int i = 0; i < n; i++) produced[i] += k * col.Counts[i];
             }
             return patterns;

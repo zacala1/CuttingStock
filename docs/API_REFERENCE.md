@@ -237,7 +237,10 @@ public static class ScenarioService
 | `SolverUtils2D` | 기존 호출자를 위한 source-compatible 파사드 |
 | `GuillotineValidator` | Beasley 1985 재귀 분리 테스트 + 트리 구조 검증 |
 | `GuillotineKnapsackDp` | 2D 정규 컷 DP — CG 가격 매김 sub-problem |
-| `PatternPool` | CG 인프라: 컬럼 dedup, LP 마스터, multi-pricing |
+| `PatternColumn` / `PatternColumnPool` | CG 컬럼 모델과 `(sheet dims, counts)` 식별·중복 제거 |
+| `PatternMasterLp` | GLOP restricted master LP와 primal/dual 추출 |
+| `PatternPricing` | dual 기반 DP item 구성과 multi-pricing |
+| `PatternMaterializer` | public pattern·DP 결과·master column 간 변환과 placement 복제 |
 | `PatternBuilder` | flat placement → 길로틴 컷 트리 (1-rect 비-corner 케이스 포함) |
 
 ---
