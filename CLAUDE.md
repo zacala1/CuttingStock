@@ -6,8 +6,8 @@ Authoritative: this file overrides general advice when there's a conflict.
 ## What this project is
 
 A .NET 10 WPF desktop app that solves 1D (rebar/bar) and 2D (sheet/plate)
-Cutting Stock problems. Each dimension has three solvers — a fast
-heuristic, a Column Generation LP, and an exact MIP via OR-Tools.
+Cutting Stock problems. The catalogs currently expose seven 1D variants
+and four 2D solvers across heuristic, LP, and MIP families.
 
 Layout:
 - `CuttingStock.Core/` — pure algorithms + domain models. No WPF.
@@ -58,21 +58,22 @@ cuts carries a `WeldGroupId`. LocalSearchOptimize, RedistributeCuts
 and FindHostPlanForWeld all check this invariant — keep it intact when
 adding new post-processing.
 
-**Sheets aggregate by (Width, Height).** All 2D solvers call
-`SolverUtils2D.AggregateByDims` at entry. `Sheet.Equals` is structural,
-so unaggregated duplicate-dim rows collide as the same key in
-`Dictionary<Sheet, _>` and silently hide half the inventory. Never
-remove the aggregation call.
+**Sheets aggregate by (Width, Height).** All 2D solvers enter through
+`TwoDInputPreprocessor`, which owns the aggregation implementation.
+`SolverUtils2D.AggregateByDims` remains a one-way source-compatible facade
+for legacy callers. `Sheet.Equals` is structural, so unaggregated
+duplicate-dim rows collide as the same key in `Dictionary<Sheet, _>` and
+silently hide half the inventory.
 
 **TimeLimitMs is an absolute wall-clock deadline** from solver start,
 not "time remaining after warm-start". 2D solvers compare against
 `sw.ElapsedMilliseconds` directly; the warm-start / bootstrap time
 counts toward the budget.
 
-**Stage option is advisory.** `SolverOptions2D.Stage` accepts 2 or 3
-but no solver currently enforces 3-stage cuts. The UI shows it as
-"2-stage" / "3-stage" but the patterns produced are unrestricted
-guillotine. Reserved for future enforcement.
+**Stage policy is descriptor-specific.** `TwoStageShelfGuillotineSolver`
+enforces 2-stage shelf patterns. `ShelfGuillotineSolver`, CG2D, and
+Staged MIP treat `SolverOptions2D.Stage` as advisory. No solver currently
+enforces 3-stage cuts.
 
 ## Things that look broken but aren't
 

@@ -7,14 +7,7 @@ namespace CuttingStock.Core.Algorithms
     public sealed class MultiColumnGenerationSolver : ColumnGenerationSolver
     {
         public MultiColumnGenerationSolver()
-            : base(
-                name: "Column Generation (Multi-column LP)",
-                description: "CG that adds multiple improving knapsack pricing columns per iteration.",
-                useDualStabilization: false,
-                dualSmoothingFactor: 1.0,
-                maxColumnsPerIteration: 4,
-                useIntegerMaster: false,
-                integerMasterTimeLimitMs: 0)
+            : base(ColumnGenerationProfile.MultiColumn)
         {
         }
     }

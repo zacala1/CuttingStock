@@ -48,6 +48,50 @@ namespace CuttingStock.Tests.TwoD
             SolverUtils2D.ExpandOrders(new List<RectOrder>(), true).Should().BeEmpty();
         }
 
+        [Test]
+        public void ValidateInputs_NoSheets_MarksResultFailedAndReturnsTrue()
+        {
+            var result = new SolverResult2D();
+
+            SolverUtils2D.ValidateInputs(new List<Sheet>(), new List<RectOrder> { new(100, 100, 1) }, result)
+                .Should().BeTrue();
+
+            result.Success.Should().BeFalse();
+            result.ErrorMessage.Should().Be("At least one sheet must be provided.");
+        }
+
+        [Test]
+        public void ValidateInputs_EmptyOrders_ReturnsTrueWithoutFailingResult()
+        {
+            var result = new SolverResult2D();
+
+            SolverUtils2D.ValidateInputs(new List<Sheet> { new(100, 100, 1) }, new List<RectOrder>(), result)
+                .Should().BeTrue();
+
+            result.Success.Should().BeTrue();
+            result.ErrorMessage.Should().BeNull();
+            result.Patterns.Should().BeEmpty();
+        }
+
+        [Test]
+        public void AggregateByDims_MergesQuantitiesByDimensions()
+        {
+            var sheets = new List<Sheet>
+            {
+                new(100, 200, 1),
+                new(100, 200, 3),
+                new(200, 100, 2),
+            };
+
+            var aggregated = SolverUtils2D.AggregateByDims(sheets);
+
+            aggregated.Should().BeEquivalentTo(new[]
+            {
+                new Sheet(100, 200, 4),
+                new Sheet(200, 100, 2),
+            });
+        }
+
         // ----- OrderSheets -----
 
         [Test]
@@ -217,6 +261,30 @@ namespace CuttingStock.Tests.TwoD
             trimmed.Should().OnlyContain(p => p.Multiplicity == 1);
             trimmed[0].Placements.Select(p => p.OrderIndex).Should().Equal(0, 1);
             trimmed[1].Placements.Select(p => p.OrderIndex).Should().Equal(1);
+        }
+
+        [Test]
+        public void Finalize_ComputesCostFromWasteArea()
+        {
+            var result = new SolverResult2D
+            {
+                Patterns = new List<CuttingPattern2D>
+                {
+                    new()
+                    {
+                        Sheet = new Sheet(100, 100, 1),
+                        Placements = new List<Placement>
+                        {
+                            Make(0, 0, 0, 40, 50),
+                        },
+                    },
+                },
+            };
+
+            SolverUtils2D.Finalize(result, new SolverOptions2D { AlphaArea = 1.5f });
+
+            result.TotalWasteArea.Should().Be(8000);
+            result.TotalCost.Should().Be(12000);
         }
 
         [Test]

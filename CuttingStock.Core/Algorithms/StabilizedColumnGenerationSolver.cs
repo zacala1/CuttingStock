@@ -9,14 +9,7 @@ namespace CuttingStock.Core.Algorithms
     public sealed class StabilizedColumnGenerationSolver : ColumnGenerationSolver
     {
         public StabilizedColumnGenerationSolver()
-            : base(
-                name: "Column Generation (Stabilized LP)",
-                description: "CG with dual-smoothed knapsack pricing and raw-dual fallback.",
-                useDualStabilization: true,
-                dualSmoothingFactor: 0.70,
-                maxColumnsPerIteration: 1,
-                useIntegerMaster: false,
-                integerMasterTimeLimitMs: 0)
+            : base(ColumnGenerationProfile.Stabilized)
         {
         }
     }

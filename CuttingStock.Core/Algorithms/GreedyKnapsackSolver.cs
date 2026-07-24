@@ -62,18 +62,13 @@ namespace CuttingStock.Core.Algorithms
                 }
 
                 SolverUtils.OptimizePostProcess(result, options);
-                SolverUtils.CalculateResults(result, options);
-
                 result.Success = !sortedOrders.Any();
                 if (!result.Success)
                 {
                     SolverUtils.SetRemainingOrdersError(result, sortedOrders.Count);
                 }
-                else if (SolverUtils.ValidateSuccessfulResult(stock, orders, options, result) is { } validationError)
-                {
-                    result.Success = false;
-                    result.ErrorMessage = validationError;
-                }
+
+                SolverResultFinalizer.FinalizeAndValidate(stock, orders, options, result);
             }
             catch (Exception ex)
             {

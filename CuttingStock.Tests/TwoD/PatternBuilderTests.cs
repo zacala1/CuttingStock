@@ -3,6 +3,7 @@ using NUnit.Framework;
 using FluentAssertions;
 using CuttingStock.Core.TwoD.Algorithms.Utilities;
 using CuttingStock.Core.TwoD.Domain;
+using CuttingStock.Core.TwoD.Models;
 
 namespace CuttingStock.Tests.TwoD
 {
@@ -66,6 +67,30 @@ namespace CuttingStock.Tests.TwoD
         }
 
         [Test]
+        public void FlatPlacementPattern_WithNullRoot_RemainsCanonicalAndReconstructable()
+        {
+            var pattern = new CuttingPattern2D
+            {
+                Sheet = new Sheet(100, 100, 1),
+                Placements = new List<Placement>
+                {
+                    P(0, 0,  0, 50, 50),
+                    P(1, 50, 0, 50, 50),
+                    P(2, 0, 50, 50, 50),
+                    P(3, 50, 50, 50, 50),
+                },
+            };
+
+            pattern.Root.Should().BeNull();
+            GuillotineValidator.IsGuillotineCompliant(pattern).Should().BeTrue();
+
+            var derived = PatternBuilder.BuildTree(pattern.Sheet.Width, pattern.Sheet.Height, pattern.Placements);
+            derived.Should().NotBeNull();
+            GuillotineValidator.IsValidTree(derived!).Should().BeTrue();
+            CountKind(derived!, NodeKind.Leaf).Should().Be(4);
+        }
+
+        [Test]
         public void PinwheelArrangement_ReturnsNull()
         {
             // Same pinwheel that GuillotineValidator rejects — PatternBuilder should not be
@@ -75,6 +100,18 @@ namespace CuttingStock.Tests.TwoD
                 P(0, 0, 0, 3, 1), P(1, 3, 0, 1, 3),
                 P(2, 1, 3, 3, 1), P(3, 0, 1, 1, 3),
             };
+            GuillotineValidator.IsGuillotineCompliant(
+                0,
+                0,
+                4,
+                4,
+                new List<(int, int, int, int)>
+                {
+                    (0, 0, 3, 1),
+                    (3, 0, 1, 3),
+                    (1, 3, 3, 1),
+                    (0, 1, 1, 3),
+                }).Should().BeFalse();
             var tree = PatternBuilder.BuildTree(4, 4, pl);
             tree.Should().BeNull();
         }

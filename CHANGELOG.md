@@ -3,6 +3,19 @@
 `docs/archive/` 에 흩어져 있던 PHASE 노트들을 시간순으로 압축한 변경 이력.
 원본은 git history 에 보존되어 있다 (`git log -- docs/archive/`).
 
+## 2026-06-30 — Solver lifecycle architecture 정리
+
+- **Solver descriptor 공통 계약** — 1D/2D solver catalog가 같은 descriptor
+  인터페이스로 지원 기능과 미지원 사유를 노출하도록 정리.
+- **실행 생명주기 표준화** — solver run 시작, 취소, progress, stale callback 차단,
+  CTS dispose를 `SolverRunLifecycle`과 공통 Workspace ViewModel로 통합.
+- **UI 관리 구조 분리** — 1D/2D ViewModel과 ExportService를 partial 파일로 역할별
+  분리하고, 창/탭 종료 시 ViewModel dispose 경로를 명시.
+- **회귀 테스트** — descriptor 계약, run lifecycle, workspace 공통 실행 흐름,
+  scenario 저장/로드 fixture를 보강.
+
+1개 implementation commit (`821de18`).
+
 ## 2026-06-13 — Solver capability catalog + 선택형 CG 강화 variants
 
 - **Solver capability catalog** — 1D/2D solver별 실제 지원 옵션을 Core catalog로

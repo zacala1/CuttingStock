@@ -1,76 +1,40 @@
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using CuttingStock.Core.TwoD.Domain;
 using CuttingStock.Core.TwoD.Models;
 
 namespace CuttingStock.Core.TwoD.Algorithms.Utilities
 {
-    /// <summary>Shared helpers: input expansion, ordering, validation, finalization.</summary>
+    /// <summary>Compatibility facade for shared 2D solver helpers.</summary>
     public static class SolverUtils2D
     {
-        /// <summary>Expands orders by quantity into flat list, preserving original index.</summary>
         public static List<(int OrderIndex, int W, int H, bool Rot)> ExpandOrders(
-            List<RectOrder> orders, bool globalAllowRotation)
+            List<RectOrder> orders,
+            bool globalAllowRotation)
         {
-            var list = new List<(int, int, int, bool)>();
-            for (int i = 0; i < orders.Count; i++)
-            {
-                var o = orders[i];
-                bool rot = globalAllowRotation && o.AllowRotation;
-                for (int k = 0; k < o.Quantity; k++)
-                    list.Add((i, o.Width, o.Height, rot));
-            }
-            return list;
+            return TwoDInputPreprocessor.ExpandOrders(orders, globalAllowRotation);
         }
 
-        /// <summary>
-        /// Validates sheets and orders for 2D solvers. Returns true if the result has
-        /// been finalized (caller should return) — either due to invalid sheets or an
-        /// empty order list (treated as trivially solved with no patterns).
-        /// </summary>
         public static bool ValidateInputs(
-            List<Sheet>? sheets, List<RectOrder>? orders, SolverResult2D result)
+            List<Sheet>? sheets,
+            List<RectOrder>? orders,
+            SolverResult2D result)
         {
-            if (sheets == null || sheets.Count == 0)
-            {
-                result.Success = false;
-                result.ErrorMessage = "At least one sheet must be provided.";
-                return true;
-            }
-            if (orders == null || orders.Count == 0)
-            {
-                // Empty demand is trivially solved with no patterns; success stays true.
-                return true;
-            }
-            return false;
+            return TwoDInputPreprocessor.ValidateInputs(sheets, orders, result);
         }
 
         public static List<Sheet> OrderSheets(List<Sheet> sheets, SolverOptions2D options)
         {
-            return options.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge
-                ? sheets.OrderBy(s => s.Area).ToList()
-                : sheets.OrderByDescending(s => s.Area).ToList();
+            return TwoDInputPreprocessor.OrderSheets(sheets, options);
         }
 
-        /// <summary>
-        /// Collapse same-dimension Sheet rows into a single row with summed Quantity.
-        /// Required by every solver because Sheet.Equals/GetHashCode are structural —
-        /// two distinct rows with the same (Width, Height, Quantity) collide as the
-        /// same key in Dictionary&lt;Sheet,_&gt;, hiding half the inventory and causing
-        /// either an ArgumentException or a silently low capacity.
-        /// </summary>
         public static List<Sheet> AggregateByDims(List<Sheet> sheets)
         {
-            return sheets
-                .GroupBy(s => (s.Width, s.Height))
-                .Select(g => new Sheet(g.Key.Width, g.Key.Height, g.Sum(s => s.Quantity)))
-                .ToList();
+            return TwoDInputPreprocessor.AggregateByDims(sheets);
         }
 
         public static void Finalize(SolverResult2D result, SolverOptions2D options)
         {
-            result.TotalCost = (long)Math.Round(result.TotalWasteArea * (double)options.AlphaArea);
+            TwoDResultFinalizer.FinalizeResult(result, options);
         }
 
         public static string? ValidateSuccessfulResult(
@@ -79,116 +43,22 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             SolverOptions2D options,
             SolverResult2D result)
         {
-            var inventory = sheets
-                .GroupBy(s => (s.Width, s.Height))
-                .ToDictionary(g => g.Key, g => g.Sum(s => s.Quantity));
-            var usedSheets = new Dictionary<(int Width, int Height), int>();
-            var produced = new int[orders.Count];
-
-            for (int patternIndex = 0; patternIndex < result.Patterns.Count; patternIndex++)
-            {
-                var pattern = result.Patterns[patternIndex];
-                if (pattern.Multiplicity <= 0)
-                    return $"Pattern {patternIndex + 1} has non-positive multiplicity {pattern.Multiplicity}.";
-
-                var sheetKey = (pattern.Sheet.Width, pattern.Sheet.Height);
-                if (!inventory.ContainsKey(sheetKey))
-                    return $"Pattern {patternIndex + 1} uses unknown sheet {pattern.Sheet.Width}x{pattern.Sheet.Height}.";
-
-                usedSheets.TryGetValue(sheetKey, out int used);
-                usedSheets[sheetKey] = used + pattern.Multiplicity;
-
-                if (pattern.UsedArea > pattern.Sheet.Area)
-                    return $"Pattern {patternIndex + 1} used area {pattern.UsedArea} exceeds sheet area {pattern.Sheet.Area}.";
-
-                if (!WithinSheet(pattern.Placements, pattern.Sheet, options.Trim))
-                    return $"Pattern {patternIndex + 1} has a placement outside the trimmed sheet.";
-
-                if (HasOverlap(pattern.Placements, options.Kerf))
-                    return $"Pattern {patternIndex + 1} has overlapping placements.";
-
-                var rects = pattern.Placements
-                    .Select(p => (p.X, p.Y, p.Width, p.Height))
-                    .ToList();
-                if (!GuillotineValidator.IsGuillotineCompliant(
-                        0, 0, pattern.Sheet.Width, pattern.Sheet.Height, rects))
-                    return $"Pattern {patternIndex + 1} is not guillotine-compliant.";
-
-                foreach (var placement in pattern.Placements)
-                {
-                    if (placement.OrderIndex < 0 || placement.OrderIndex >= orders.Count)
-                        return $"Pattern {patternIndex + 1} references unknown order index {placement.OrderIndex}.";
-
-                    var order = orders[placement.OrderIndex];
-                    bool matchesAsIs = placement.Width == order.Width && placement.Height == order.Height;
-                    bool matchesRotated = placement.Width == order.Height && placement.Height == order.Width;
-                    if (!matchesAsIs && !matchesRotated)
-                    {
-                        return $"Pattern {patternIndex + 1} placement for order {placement.OrderIndex} has dimensions {placement.Width}x{placement.Height}, expected {order.Width}x{order.Height}.";
-                    }
-
-                    if (placement.Rotated)
-                    {
-                        if (!options.AllowRotation || !order.AllowRotation || !matchesRotated)
-                            return $"Pattern {patternIndex + 1} illegally rotates order {placement.OrderIndex}.";
-                    }
-                    else if (!matchesAsIs)
-                    {
-                        return $"Pattern {patternIndex + 1} uses rotated dimensions for order {placement.OrderIndex} without marking it rotated.";
-                    }
-
-                    produced[placement.OrderIndex] += pattern.Multiplicity;
-                }
-            }
-
-            foreach (var (sheet, used) in usedSheets)
-            {
-                if (used > inventory[sheet])
-                    return $"Sheet {sheet.Width}x{sheet.Height} usage {used} exceeds inventory {inventory[sheet]}.";
-            }
-
-            for (int i = 0; i < orders.Count; i++)
-            {
-                if (produced[i] != orders[i].Quantity)
-                    return $"Order {i} produced {produced[i]}, expected {orders[i].Quantity}.";
-            }
-
-            return null;
+            return TwoDResultValidator.ValidateSuccessfulResult(sheets, orders, options, result);
         }
 
-        /// <summary>True if any two placements are closer than kerf apart on both axes.</summary>
         public static bool HasOverlap(List<Placement> placements, int kerf)
         {
-            for (int i = 0; i < placements.Count; i++)
-            {
-                var a = placements[i];
-                for (int j = i + 1; j < placements.Count; j++)
-                {
-                    var b = placements[j];
-                    bool sepX = a.Right + kerf <= b.X || b.Right + kerf <= a.X;
-                    bool sepY = a.Bottom + kerf <= b.Y || b.Bottom + kerf <= a.Y;
-                    if (!sepX && !sepY) return true;
-                }
-            }
-            return false;
+            return TwoDPlacementMath.HasOverlap(placements, kerf);
         }
 
         public static bool WithinSheet(List<Placement> placements, Sheet sheet, int trim)
         {
-            int x0 = trim, y0 = trim;
-            int x1 = sheet.Width - trim, y1 = sheet.Height - trim;
-            foreach (var p in placements)
-                if (p.X < x0 || p.Y < y0 || p.Right > x1 || p.Bottom > y1) return false;
-            return true;
+            return TwoDPlacementMath.WithinSheet(placements, sheet, trim);
         }
 
         public static int[] CountPlaced(List<CuttingPattern2D> patterns, int orderCount)
         {
-            var counts = new int[orderCount];
-            foreach (var pat in patterns)
-            foreach (var p in pat.Placements)
-                counts[p.OrderIndex] += pat.Multiplicity;
-            return counts;
+            return TwoDPlacementMath.CountPlaced(patterns, orderCount);
         }
 
         public static List<CuttingPattern2D> TrimToDemand(
@@ -196,49 +66,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             int[] demand,
             out int[] produced)
         {
-            produced = new int[demand.Length];
-            var trimmed = new List<CuttingPattern2D>();
-
-            foreach (var pattern in patterns)
-            {
-                for (int copy = 0; copy < pattern.Multiplicity; copy++)
-                {
-                    var placements = new List<Placement>();
-                    foreach (var placement in pattern.Placements)
-                    {
-                        if (placement.OrderIndex < 0 || placement.OrderIndex >= demand.Length)
-                            throw new ArgumentOutOfRangeException(nameof(patterns), "Pattern placement references an unknown order index.");
-
-                        if (produced[placement.OrderIndex] >= demand[placement.OrderIndex])
-                            continue;
-
-                        placements.Add(ClonePlacement(placement));
-                        produced[placement.OrderIndex]++;
-                    }
-
-                    if (placements.Count == 0)
-                        continue;
-
-                    trimmed.Add(new CuttingPattern2D
-                    {
-                        Sheet = pattern.Sheet,
-                        Multiplicity = 1,
-                        Placements = placements,
-                    });
-                }
-            }
-
-            return trimmed;
+            return TwoDResultFinalizer.TrimToDemand(patterns, demand, out produced);
         }
-
-        private static Placement ClonePlacement(Placement p) => new()
-        {
-            OrderIndex = p.OrderIndex,
-            X = p.X,
-            Y = p.Y,
-            Width = p.Width,
-            Height = p.Height,
-            Rotated = p.Rotated,
-        };
     }
 }

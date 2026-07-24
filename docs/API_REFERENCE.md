@@ -128,10 +128,14 @@ public interface ICuttingSolver2D
 | 클래스 | 알고리즘 | 복잡도 |
 |---|---|---|
 | `ShelfGuillotineSolver` | best-of-15 shelf 휴리스틱 (NFDH/FFDH/BFDH × 5 정렬) | O(K × N log N) |
+| `TwoStageShelfGuillotineSolver` | shelf 결과의 2-stage 구조 강제 검증 | O(K × N log N) |
 | `ColumnGeneration2DSolver` | CG + GLOP 마스터 + Beasley 1985 DP 가격 매김 | Poly/iter, exp 최악 |
 | `StagedMipGuillotineSolver` | CG 풀 + CBC 정수 마스터 + 다양화 라운드 | NP-hard, 시간 제한 |
 
-**모든 2D 솔버는 입력 즉시 `SolverUtils2D.AggregateByDims`를 호출** — 동일 (Width, Height) 시트 행을 합산한다. `Sheet.Equals`가 구조적이므로 분산된 행은 `Dictionary<Sheet, _>` 키 충돌로 인벤토리 절반을 잃는다.
+**모든 2D 솔버는 집계 구현을 소유한 `TwoDInputPreprocessor` 진입 경로에서**
+동일 (Width, Height) 시트 행을 합산한다. `SolverUtils2D.AggregateByDims`는 기존
+호출자를 위한 단방향 호환 파사드다. `Sheet.Equals`가 구조적이므로 분산된 행은
+`Dictionary<Sheet, _>` 키 충돌로 인벤토리 절반을 잃는다.
 
 성공 결과는 `SolverUtils2D.ValidateSuccessfulResult` 로 재검증한다. 검증 항목은 sheet
 inventory, pattern multiplicity, trim bounds, kerf-aware overlap, guillotine compliance,
@@ -152,7 +156,7 @@ public class SolverOptions2D
     int   Trim;           // 시트 각 변 트림 mm (>= 0)
     bool  AllowRotation;  // 글로벌 90° 회전 토글
     float AlphaArea;      // mm² 당 비용 (>= 0)
-    int   Stage;          // 2 또는 3 — *advisory only* (현 솔버는 강제 안함)
+    int   Stage;          // 2 또는 3 — TwoStageShelf만 2-stage 강제, 나머지는 advisory
     int   TimeLimitMs;    // 절대 wall-clock 시간 제한 (> 0). 솔버 시작부터 카운트
     StockUsageOrder UsageOrder;
 }
@@ -228,10 +232,15 @@ public static class ScenarioService
 | 클래스 | 용도 |
 |---|---|
 | `SolverUtils` | 1D 입력 검증, 동일 길이 stock/order 합산, 정렬, `ComputeLeftover`, 성공 결과 validator, 2-opt 후처리, 용접 그룹 카운트 |
-| `SolverUtils2D` | 2D 입력 검증, sheet 정렬, **`AggregateByDims`**, item 확장, `TrimToDemand`, 성공 결과 validator, 겹침/경계 체크 |
+| `TwoDInputPreprocessor` | 2D 입력 검증, sheet 정렬, **`AggregateByDims`**, item 확장 |
+| `TwoDResultFinalizer` / `TwoDResultValidator` / `TwoDPlacementMath` | 2D 결과 마감·검증과 placement 계산 |
+| `SolverUtils2D` | 기존 호출자를 위한 source-compatible 파사드 |
 | `GuillotineValidator` | Beasley 1985 재귀 분리 테스트 + 트리 구조 검증 |
 | `GuillotineKnapsackDp` | 2D 정규 컷 DP — CG 가격 매김 sub-problem |
-| `PatternPool` | CG 인프라: 컬럼 dedup, LP 마스터, multi-pricing |
+| `PatternColumn` / `PatternColumnPool` | CG 컬럼 모델과 `(sheet dims, counts)` 식별·중복 제거 |
+| `PatternMasterLp` | GLOP restricted master LP와 primal/dual 추출 |
+| `PatternPricing` | dual 기반 DP item 구성과 multi-pricing |
+| `PatternMaterializer` | public pattern·DP 결과·master column 간 변환과 placement 복제 |
 | `PatternBuilder` | flat placement → 길로틴 컷 트리 (1-rect 비-corner 케이스 포함) |
 
 ---

@@ -10,7 +10,8 @@ namespace CuttingStock.Core.TwoD.Algorithms
 {
     /// <summary>
     /// Shelf-based heuristic: NFDH/FFDH/BFDH x 5 sort orders, best-of-15 by waste.
-    /// Naturally 2-stage guillotine (horizontal shelf cuts, vertical item cuts).
+    /// Produces shelf-shaped 2-stage layouts, while the Stage option remains advisory;
+    /// TwoStageShelfGuillotineSolver owns explicit stage-contract enforcement.
     /// Ref: Coffman et al. 1980; Berkey &amp; Wang 1987.
     /// </summary>
     public sealed class ShelfGuillotineSolver : ICuttingSolver2D
@@ -31,18 +32,17 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             try
             {
-                if (SolverUtils2D.ValidateInputs(sheets, orders, result))
+                var input = TwoDInputPreprocessor.Preprocess(sheets, orders, result);
+                if (input.ShouldReturn)
                 {
+                    TwoDResultFinalizer.FinalizeAndValidate(input.Sheets, input.Orders, options, result);
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;
                 }
 
-                // Collapse duplicate-dim Sheet rows up front; downstream code keys
-                // Dictionaries on Sheet equality, so unaggregated rows would collide.
-                var aggregated = SolverUtils2D.AggregateByDims(sheets!);
-                var orderedSheets = SolverUtils2D.OrderSheets(aggregated, options);
-                var items = SolverUtils2D.ExpandOrders(orders, options.AllowRotation);
+                var orderedSheets = TwoDInputPreprocessor.OrderSheets(input.Sheets, options);
+                var items = TwoDInputPreprocessor.ExpandOrders(input.Orders, options.AllowRotation);
 
                 // Try every (order rule × shelf strategy) combo and keep the best.
                 var orderingRules = new (string Name, Func<List<Item>, List<Item>> Sort)[]
@@ -93,11 +93,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 else
                 {
                     result.Patterns = bestPatterns;
-                    if (SolverUtils2D.ValidateSuccessfulResult(sheets!, orders!, options, result) is { } validationError)
-                    {
-                        result.Success = false;
-                        result.ErrorMessage = validationError;
-                    }
+                    TwoDResultFinalizer.FinalizeAndValidate(input.Sheets, input.Orders, options, result);
                 }
             }
             catch (Exception ex)
@@ -108,7 +104,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             sw.Stop();
             result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
-            SolverUtils2D.Finalize(result, options);
+            TwoDResultFinalizer.FinalizeResult(result, options);
             return result;
         }
 

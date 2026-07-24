@@ -185,6 +185,68 @@ namespace CuttingStock.Tests
             result.WeldCount.Should().Be(2);
         }
 
+        [Test]
+        public void CalculateResults_WeldCountFromMultipleGroups()
+        {
+            var result = new SolverResult
+            {
+                CuttingPlans = new List<CuttingPlan>
+                {
+                    new()
+                    {
+                        StockLength = 12000,
+                        Cuts = new List<Cut>
+                        {
+                            new() { Length = 6000, WeldGroupId = 1 },
+                            new() { Length = 6000, WeldGroupId = 1 },
+                        }
+                    },
+                    new()
+                    {
+                        StockLength = 12000,
+                        Cuts = new List<Cut>
+                        {
+                            new() { Length = 4000, WeldGroupId = 2 },
+                            new() { Length = 4000, WeldGroupId = 2 },
+                            new() { Length = 4000, WeldGroupId = 2 },
+                        }
+                    }
+                }
+            };
+
+            SolverUtils.CalculateResults(result, new SolverOptions { Beta = 100 });
+
+            result.WeldCount.Should().Be(3);
+            result.TotalCost.Should().Be(300);
+        }
+
+        [Test]
+        public void CalculateResults_RecomputesLeftoversBeforeClassifying()
+        {
+            var result = new SolverResult
+            {
+                CuttingPlans = new List<CuttingPlan>
+                {
+                    new()
+                    {
+                        StockLength = 12000,
+                        Leftover = 0,
+                        Cuts = new List<Cut>
+                        {
+                            new() { Length = 4000 },
+                            new() { Length = 4000 },
+                        },
+                    },
+                },
+            };
+
+            SolverUtils.CalculateResults(result, new SolverOptions { Gamma = 1000, Kerf = 5 });
+
+            result.CuttingPlans.Single().Leftover.Should().Be(3995);
+            result.ReusableLeftovers.Should().Equal(3995);
+            result.WasteLength.Should().Be(0);
+        }
+
         // ----- ValidateSuccessfulResult -----
 
         [Test]
@@ -248,6 +310,31 @@ namespace CuttingStock.Tests
 
             SolverUtils.ValidateSuccessfulResult(stock, orders, new SolverOptions(), result)
                 .Should().Contain("produced 2, expected 1");
+        }
+
+        [Test]
+        public void ValidateSuccessfulResult_WeldingCutWithoutGroup_ReturnsError()
+        {
+            var stock = new List<RebarStock> { new(12000, 1) };
+            var orders = new List<Order> { new(6000, 1) };
+            var result = new SolverResult
+            {
+                CuttingPlans = new List<CuttingPlan>
+                {
+                    new()
+                    {
+                        StockLength = 12000,
+                        Cuts = new List<Cut>
+                        {
+                            new() { Length = 6000, RequiresWelding = true },
+                        },
+                        Leftover = 6000,
+                    },
+                },
+            };
+
+            SolverUtils.ValidateSuccessfulResult(stock, orders, new SolverOptions(), result)
+                .Should().Contain("welding cut without a weld group");
         }
 
         [Test]
