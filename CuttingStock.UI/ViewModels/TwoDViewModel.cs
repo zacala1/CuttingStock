@@ -68,6 +68,8 @@ namespace CuttingStock.UI.ViewModels
         [ObservableProperty] private string _compareText = string.Empty;
         [ObservableProperty] private bool _hasSingleResult;
         [ObservableProperty] private bool _hasComparisonResults;
+        [ObservableProperty] private TwoDRenderProjection? _renderProjection;
+        [ObservableProperty] private TwoDChartProjection _chartProjection = TwoDChartProjection.Empty;
 
         private SolverResult2D? _lastResult;
         private SolverOptions2D? _lastOptions;
@@ -75,8 +77,5 @@ namespace CuttingStock.UI.ViewModels
 
         public SolverResult2D? LastResult => _lastResult;
         public SolverOptions2D? LastOptions => _lastOptions;
-
-        public event EventHandler? SingleResultReady;
-        public event EventHandler? CompareResultReady;
     }
 }

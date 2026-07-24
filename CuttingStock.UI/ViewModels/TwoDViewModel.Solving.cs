@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using CuttingStock.Core.TwoD.Domain;
 using CuttingStock.Core.TwoD.Models;
+using CuttingStock.UI.Services;
 
 namespace CuttingStock.UI.ViewModels
 {
@@ -48,6 +49,10 @@ namespace CuttingStock.UI.ViewModels
                     _lastResult = result;
                     _lastOptions = options;
                     _lastSolver = solver;
+                    RenderProjection = TwoDProjectionService.BuildRender(
+                        solver.Name,
+                        result,
+                        options);
 
                     ReportText = result.Success
                         ? result.GetDetailedReport(options)
@@ -57,7 +62,6 @@ namespace CuttingStock.UI.ViewModels
                         StatusText = $"완료: {solver.Name} · {result.SheetsUsed} 시트 · 효율 {result.MaterialEfficiency:F1}% · {result.ExecutionTimeMs:F0}ms";
                     else
                         StatusText = $"실패: {result.ErrorMessage}";
-                    SingleResultReady?.Invoke(this, EventArgs.Empty);
                 },
                 onError: ex =>
                 {
@@ -130,24 +134,38 @@ namespace CuttingStock.UI.ViewModels
                         CompareRows.Add(outcome.Row);
                     CompareText = details.ToString();
 
-                    var bestOutcome = comparison.Outcomes
-                        .Where(o => o.Result?.Success == true && o.Solver != null)
-                        .OrderBy(o => o.Result!.SheetsUsed)
-                        .FirstOrDefault();
+                    var bestRow = TwoDProjectionService.SelectBestRow(CompareRows);
+                    var bestOutcome = bestRow == null
+                        ? null
+                        : comparison.Outcomes.FirstOrDefault(outcome =>
+                            ReferenceEquals(outcome.Row, bestRow));
                     if (bestOutcome is { Result: not null, Solver: not null })
                     {
                         _lastResult = bestOutcome.Result;
                         _lastOptions = options;
                         _lastSolver = bestOutcome.Solver;
                         HasSingleResult = true;
+                        RenderProjection = TwoDProjectionService.BuildRender(
+                            bestOutcome.AlgorithmName,
+                            bestOutcome.Result,
+                            options);
                     }
+                    else
+                    {
+                        _lastResult = null;
+                        _lastOptions = null;
+                        _lastSolver = null;
+                        ReportText = string.Empty;
+                        HasSingleResult = false;
+                        RenderProjection = null;
+                    }
+
+                    ChartProjection = TwoDProjectionService.BuildChart(CompareRows);
                     HasComparisonResults = true;
-                    var bestRow = CompareRows.FirstOrDefault(r => r.Success);
                     if (bestRow != null)
                         StatusText = $"비교 완료 · 최고: {bestRow.AlgorithmName} · 효율 {bestRow.MaterialEfficiency:F1}%";
                     else
                         StatusText = "비교 완료 (모두 실패)";
-                    CompareResultReady?.Invoke(this, EventArgs.Empty);
                 },
                 onError: ex =>
                 {

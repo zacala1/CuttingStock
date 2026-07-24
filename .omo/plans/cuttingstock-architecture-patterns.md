@@ -484,7 +484,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(ui): extract shell workflow services` | Files: `CuttingStock.UI/**`, `CuttingStock.UI.Tests/**`
 
-- [ ] 12. Replace View Events With Bindable Projection State
+- [x] 12. Replace View Events With Bindable Projection State
 
   **What to do**: Remove or reduce `SingleResultReady`/`CompareResultReady` event coupling by exposing projection state from `TwoDViewModel` and, where useful, `MainViewModel`. Create DTOs for chart data and 2D pattern render inputs. The view may still translate DTOs into LiveCharts series and Canvas shapes.
   **Must NOT do**: Do not bind WPF `Shape`, `Brush`, `ISeries`, or `Axis` objects from Core. Avoid pushing WPF visual types into Core.
@@ -497,9 +497,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - 1D projection pattern: `CuttingStock.UI/Services/VisualizationService.cs:16`
 
   **Acceptance Criteria**:
-  - [ ] `TwoDViewModel` exposes plain projection data for last result render/compare chart triggers.
-  - [ ] View code no longer needs dispatcher event subscriptions for normal result rendering.
-  - [ ] UI tests assert projection state changes after calculate/compare.
+  - [x] `TwoDViewModel` exposes plain projection data for last result render/compare chart triggers.
+  - [x] View code no longer needs dispatcher event subscriptions for normal result rendering.
+  - [x] UI tests assert projection state changes after calculate/compare.
 
   **QA Scenarios**:
   ```text

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
+using CuttingStock.UI.Services;
 
 namespace CuttingStock.UI.ViewModels
 {
@@ -21,6 +22,10 @@ namespace CuttingStock.UI.ViewModels
             HasSingleResult = false;
             HasComparisonResults = false;
             _lastResult = null;
+            _lastOptions = null;
+            _lastSolver = null;
+            RenderProjection = null;
+            ChartProjection = TwoDChartProjection.Empty;
         }
 
         [RelayCommand]
