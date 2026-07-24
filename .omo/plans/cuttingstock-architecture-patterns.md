@@ -350,7 +350,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `docs(core): define 2d pattern contract` | Files: `CuttingStock.Core/TwoD/**`, `CuttingStock.Tests/TwoD/**`, `docs/**`
 
-- [ ] 8. Split SolverUtils2D Into Focused Services
+- [x] 8. Split SolverUtils2D Into Focused Services
 
   **What to do**: After Task 5 stabilizes compatibility, move implementation out of `SolverUtils2D` into focused classes. Leave `SolverUtils2D` as a thin facade for existing call sites, then migrate internal solvers/tests to the focused names where clearer.
   **Must NOT do**: Do not create abstractions that introduce state or dependency injection into Core algorithms unless needed; prefer static/pure services consistent with current Core style.
@@ -362,9 +362,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Tests: `CuttingStock.Tests/TwoD/SolverUtils2DTests.cs`
 
   **Acceptance Criteria**:
-  - [ ] Each new class has a single responsibility.
-  - [ ] `SolverUtils2D` remains source-compatible.
-  - [ ] Existing tests are either kept or moved to the new class names with equivalent coverage.
+  - [x] Each new class has a single responsibility.
+  - [x] `SolverUtils2D` remains source-compatible.
+  - [x] Existing tests are either kept or moved to the new class names with equivalent coverage.
 
   **QA Scenarios**:
   ```text
