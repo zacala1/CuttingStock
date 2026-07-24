@@ -68,6 +68,7 @@ namespace CuttingStock.UI.ViewModels
         /// this to render the bar visualization. Null until Calculate succeeds.
         /// </summary>
         public SolverResult? LastResult => _lastResult;
+        public SolverOptions? LastOptions => _lastOptions;
 
         /// <summary>True if the last single solve succeeded with at least one plan.</summary>
         public bool HasVisualization => _lastResult is { Success: true, CuttingPlans.Count: > 0 };

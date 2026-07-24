@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -7,7 +8,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using CuttingStock.Core.TwoD.Domain;
 using CuttingStock.UI.Services;
 using CuttingStock.UI.ViewModels;
 using LiveChartsCore;
@@ -45,13 +45,28 @@ namespace CuttingStock.UI.TwoD
             InitializeComponent();
             _vm = new TwoDViewModel(new DialogService());
             DataContext = _vm;
-            _vm.SingleResultReady  += (_, _) => Dispatcher.Invoke(() => RenderPatterns(_vm.LastResult!, _vm.LastOptions!));
-            _vm.CompareResultReady += (_, _) => Dispatcher.Invoke(() => { UpdateCompareCharts(); if (_vm.LastResult != null) RenderPatterns(_vm.LastResult, _vm.LastOptions!); });
+            _vm.PropertyChanged += Vm_PropertyChanged;
         }
 
         public void Dispose()
         {
+            _vm.PropertyChanged -= Vm_PropertyChanged;
             _vm.Dispose();
+        }
+
+        private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(TwoDViewModel.RenderProjection))
+            {
+                if (_vm.RenderProjection is { } renderProjection)
+                    RenderPatterns(renderProjection);
+                else
+                    visualization2DPanel.Children.Clear();
+            }
+            else if (e.PropertyName == nameof(TwoDViewModel.ChartProjection))
+            {
+                UpdateCompareCharts(_vm.ChartProjection);
+            }
         }
 
         // ─── DataGrid: selection delete / paste / validation ─────────
@@ -72,32 +87,38 @@ namespace CuttingStock.UI.TwoD
                 var text = Clipboard.GetText();
                 if (string.IsNullOrWhiteSpace(text)) return;
 
-                int added = 0;
-                foreach (var row in text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                int added;
+                if (grid.ItemsSource == _vm.Sheets)
                 {
-                    var cols = row.Split(new[] { '\t', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (grid.ItemsSource == _vm.Sheets)
+                    var rows = ClipboardRowParser.ParseSheetRows(text);
+                    foreach (var row in rows)
                     {
-                        if (cols.Length < 3) continue;
-                        if (!int.TryParse(cols[0].Trim(), out int w) ||
-                            !int.TryParse(cols[1].Trim(), out int h) ||
-                            !int.TryParse(cols[2].Trim(), out int q) ||
-                            w <= 0 || h <= 0 || q <= 0) continue;
-                        _vm.Sheets.Add(new SheetRow { Width = w, Height = h, Quantity = q });
-                        added++;
+                        _vm.Sheets.Add(new SheetRow
+                        {
+                            Width = row.Width,
+                            Height = row.Height,
+                            Quantity = row.Quantity,
+                        });
                     }
-                    else if (grid.ItemsSource == _vm.Orders)
-                    {
-                        if (cols.Length < 3) continue;
-                        if (!int.TryParse(cols[0].Trim(), out int w) ||
-                            !int.TryParse(cols[1].Trim(), out int h) ||
-                            !int.TryParse(cols[2].Trim(), out int q) ||
-                            w <= 0 || h <= 0 || q <= 0) continue;
-                        bool rot = cols.Length < 4 || ParseBool(cols[3].Trim(), defaultValue: true);
-                        _vm.Orders.Add(new RectOrderRow { Width = w, Height = h, Quantity = q, AllowRotation = rot });
-                        added++;
-                    }
+                    added = rows.Count;
                 }
+                else if (grid.ItemsSource == _vm.Orders)
+                {
+                    var rows = ClipboardRowParser.ParseRectOrderRows(text);
+                    foreach (var row in rows)
+                    {
+                        _vm.Orders.Add(new RectOrderRow
+                        {
+                            Width = row.Width,
+                            Height = row.Height,
+                            Quantity = row.Quantity,
+                            AllowRotation = row.AllowRotation,
+                        });
+                    }
+                    added = rows.Count;
+                }
+                else return;
+
                 if (added > 0)
                     MessageBox.Show($"{added}개의 항목을 붙여넣었습니다.", "붙여넣기 성공",
                         MessageBoxButton.OK, MessageBoxImage.Information);
@@ -108,14 +129,6 @@ namespace CuttingStock.UI.TwoD
                 MessageBox.Show($"붙여넣기 중 오류가 발생했습니다: {ex.Message}", "오류",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
-        }
-
-        private static bool ParseBool(string s, bool defaultValue)
-        {
-            if (bool.TryParse(s, out var b)) return b;
-            if (s == "1" || s.Equals("yes", StringComparison.OrdinalIgnoreCase) || s.Equals("y", StringComparison.OrdinalIgnoreCase)) return true;
-            if (s == "0" || s.Equals("no", StringComparison.OrdinalIgnoreCase) || s.Equals("n", StringComparison.OrdinalIgnoreCase)) return false;
-            return defaultValue;
         }
 
         private void DataGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
@@ -159,10 +172,9 @@ namespace CuttingStock.UI.TwoD
 
         // ─── Charts (LiveCharts series construction) ─────────────────
 
-        private void UpdateCompareCharts()
+        private void UpdateCompareCharts(TwoDChartProjection projection)
         {
-            var ok = _vm.CompareRows.Where(r => r.Success).ToList();
-            if (ok.Count == 0)
+            if (projection.Labels.Count == 0)
             {
                 sheetsChart2D.Series = Array.Empty<ISeries>();
                 effChart2D.Series = Array.Empty<ISeries>();
@@ -170,27 +182,25 @@ namespace CuttingStock.UI.TwoD
                 return;
             }
 
-            string[] labels = ok.Select(r => AbbreviateName(r.AlgorithmName)).ToArray();
-
             sheetsChart2D.Series = new ISeries[]
             {
                 new ColumnSeries<double>
                 {
-                    Values = ok.Select(r => (double)r.SheetsUsed).ToArray(),
+                    Values = projection.SheetsUsed,
                     Fill = new SolidColorPaint(SKColors.CornflowerBlue),
                     DataLabelsPaint = new SolidColorPaint(SKColors.Black),
                     DataLabelsSize = 12,
                     DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
                 },
             };
-            sheetsChart2D.XAxes = new[] { new Axis { Labels = labels, LabelsRotation = -15 } };
+            sheetsChart2D.XAxes = new[] { new Axis { Labels = projection.Labels, LabelsRotation = -15 } };
             sheetsChart2D.YAxes = new[] { new Axis { Name = "시트 사용 (개)" } };
 
             effChart2D.Series = new ISeries[]
             {
                 new ColumnSeries<double>
                 {
-                    Values = ok.Select(r => r.MaterialEfficiency).ToArray(),
+                    Values = projection.MaterialEfficiency,
                     Fill = new SolidColorPaint(SKColors.MediumSeaGreen),
                     DataLabelsPaint = new SolidColorPaint(SKColors.Black),
                     DataLabelsSize = 12,
@@ -198,14 +208,14 @@ namespace CuttingStock.UI.TwoD
                     DataLabelsFormatter = pt => $"{pt.Coordinate.PrimaryValue:F1}%",
                 },
             };
-            effChart2D.XAxes = new[] { new Axis { Labels = labels, LabelsRotation = -15 } };
+            effChart2D.XAxes = new[] { new Axis { Labels = projection.Labels, LabelsRotation = -15 } };
             effChart2D.YAxes = new[] { new Axis { Name = "효율 (%)", MinLimit = 0, MaxLimit = 100 } };
 
             timeChart2D.Series = new ISeries[]
             {
                 new ColumnSeries<double>
                 {
-                    Values = ok.Select(r => r.ExecutionTimeMs).ToArray(),
+                    Values = projection.ExecutionTimeMs,
                     Fill = new SolidColorPaint(SKColors.Coral),
                     DataLabelsPaint = new SolidColorPaint(SKColors.Black),
                     DataLabelsSize = 12,
@@ -213,31 +223,23 @@ namespace CuttingStock.UI.TwoD
                     DataLabelsFormatter = pt => $"{pt.Coordinate.PrimaryValue:F1}ms",
                 },
             };
-            timeChart2D.XAxes = new[] { new Axis { Labels = labels, LabelsRotation = -15 } };
+            timeChart2D.XAxes = new[] { new Axis { Labels = projection.Labels, LabelsRotation = -15 } };
             timeChart2D.YAxes = new[] { new Axis { Name = "시간 (ms)" } };
-        }
-
-        private static string AbbreviateName(string name)
-        {
-            int paren = name.IndexOf('(');
-            if (paren > 0 && paren < name.Length - 1)
-                return name[..paren].TrimEnd() + Environment.NewLine + name[paren..];
-            return name;
         }
 
         // ─── Pattern canvas rendering ────────────────────────────────
 
-        private void RenderPatterns(SolverResult2D result, SolverOptions2D options)
+        private void RenderPatterns(TwoDRenderProjection projection)
         {
             visualization2DPanel.Children.Clear();
             const double targetMaxDim = 700.0;
 
             int patternIdx = 1;
-            foreach (var pat in result.Patterns)
+            foreach (var pat in projection.Patterns)
             {
-                double scale = targetMaxDim / Math.Max(pat.Sheet.Width, pat.Sheet.Height);
-                double cw = pat.Sheet.Width * scale;
-                double ch = pat.Sheet.Height * scale;
+                double scale = targetMaxDim / Math.Max(pat.SheetWidth, pat.SheetHeight);
+                double cw = pat.SheetWidth * scale;
+                double ch = pat.SheetHeight * scale;
 
                 var border = new Border
                 {
@@ -250,7 +252,7 @@ namespace CuttingStock.UI.TwoD
                 var stack = new StackPanel();
                 stack.Children.Add(new TextBlock
                 {
-                    Text = $"패턴 #{patternIdx} — Sheet {pat.Sheet.Width}×{pat.Sheet.Height}  ×{pat.Multiplicity}  | items={pat.Placements.Count}  | eff={pat.Efficiency:F1}%",
+                    Text = $"패턴 #{patternIdx} — Sheet {pat.SheetWidth}×{pat.SheetHeight}  ×{pat.Multiplicity}  | items={pat.Placements.Count}  | eff={pat.Efficiency:F1}%",
                     FontWeight = FontWeights.SemiBold,
                     Margin = new Thickness(0, 0, 0, 4),
                 });
@@ -266,13 +268,13 @@ namespace CuttingStock.UI.TwoD
                     Stroke = Brushes.Black, StrokeThickness = 1.2,
                     Fill = Brushes.Transparent,
                 });
-                if (options.Trim > 0)
+                if (projection.Trim > 0)
                 {
-                    double tx = options.Trim * scale;
+                    double tx = projection.Trim * scale;
                     var trimRect = new Rectangle
                     {
-                        Width = (pat.Sheet.Width - 2 * options.Trim) * scale,
-                        Height = (pat.Sheet.Height - 2 * options.Trim) * scale,
+                        Width = (pat.SheetWidth - 2 * projection.Trim) * scale,
+                        Height = (pat.SheetHeight - 2 * projection.Trim) * scale,
                         Stroke = Brushes.DarkGray, StrokeThickness = 1,
                         StrokeDashArray = new DoubleCollection { 4, 2 },
                         Fill = Brushes.Transparent,

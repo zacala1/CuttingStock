@@ -1,9 +1,9 @@
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using CuttingStock.Core.TwoD.Domain;
 using CuttingStock.Core.TwoD.Models;
+using CuttingStock.UI.Services;
 
 namespace CuttingStock.UI.ViewModels
 {
@@ -48,6 +48,10 @@ namespace CuttingStock.UI.ViewModels
                     _lastResult = result;
                     _lastOptions = options;
                     _lastSolver = solver;
+                    RenderProjection = TwoDProjectionService.BuildRender(
+                        solver.Name,
+                        result,
+                        options);
 
                     ReportText = result.Success
                         ? result.GetDetailedReport(options)
@@ -57,7 +61,6 @@ namespace CuttingStock.UI.ViewModels
                         StatusText = $"완료: {solver.Name} · {result.SheetsUsed} 시트 · 효율 {result.MaterialEfficiency:F1}% · {result.ExecutionTimeMs:F0}ms";
                     else
                         StatusText = $"실패: {result.ErrorMessage}";
-                    SingleResultReady?.Invoke(this, EventArgs.Empty);
                 },
                 onError: ex =>
                 {
@@ -109,45 +112,52 @@ namespace CuttingStock.UI.ViewModels
                             : $"실패: {result.ErrorMessage}");
                     if (!comparison.Completed) return;
 
-                    var details = new StringBuilder();
-                    foreach (var outcome in comparison.Outcomes)
-                    {
-                        details.AppendLine($"=== {outcome.AlgorithmName} ===")
-                               .AppendLine(outcome.Detail)
-                               .AppendLine();
-                    }
-
-                    int rank = 1;
-                    foreach (var row in comparison.Outcomes.Select(o => o.Row)
-                                 .Where(r => r.Success)
-                                 .OrderBy(r => r.TotalCost)
-                                 .ThenBy(r => r.SheetsUsed))
-                        row.Rank = rank++;
+                    var summary = ComparisonWorkflow.Complete(
+                        comparison,
+                        row => row.Success,
+                        row => new ComparisonRankKey(row.TotalCost, row.SheetsUsed),
+                        (row, rank) => row.Rank = rank,
+                        string.Empty,
+                        outcome =>
+                            $"=== {outcome.AlgorithmName} ==={Environment.NewLine}" +
+                            $"{outcome.Detail}{Environment.NewLine}{Environment.NewLine}");
 
                     CompareRows.Clear();
                     foreach (var outcome in comparison.Outcomes
                                  .OrderBy(o => o.Row.Rank == 0 ? int.MaxValue : o.Row.Rank))
                         CompareRows.Add(outcome.Row);
-                    CompareText = details.ToString();
+                    CompareText = summary.Report;
 
-                    var bestOutcome = comparison.Outcomes
-                        .Where(o => o.Result?.Success == true && o.Solver != null)
-                        .OrderBy(o => o.Result!.SheetsUsed)
-                        .FirstOrDefault();
+                    var bestOutcome = summary.BestOutcome;
+                    var bestRow = bestOutcome?.Row;
                     if (bestOutcome is { Result: not null, Solver: not null })
                     {
                         _lastResult = bestOutcome.Result;
                         _lastOptions = options;
                         _lastSolver = bestOutcome.Solver;
                         HasSingleResult = true;
+                        ReportText = bestOutcome.Detail;
+                        RenderProjection = TwoDProjectionService.BuildRender(
+                            bestOutcome.AlgorithmName,
+                            bestOutcome.Result,
+                            options);
                     }
+                    else
+                    {
+                        _lastResult = null;
+                        _lastOptions = null;
+                        _lastSolver = null;
+                        ReportText = string.Empty;
+                        HasSingleResult = false;
+                        RenderProjection = null;
+                    }
+
+                    ChartProjection = TwoDProjectionService.BuildChart(CompareRows);
                     HasComparisonResults = true;
-                    var bestRow = CompareRows.FirstOrDefault(r => r.Success);
                     if (bestRow != null)
                         StatusText = $"비교 완료 · 최고: {bestRow.AlgorithmName} · 효율 {bestRow.MaterialEfficiency:F1}%";
                     else
                         StatusText = "비교 완료 (모두 실패)";
-                    CompareResultReady?.Invoke(this, EventArgs.Empty);
                 },
                 onError: ex =>
                 {

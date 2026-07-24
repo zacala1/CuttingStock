@@ -7,7 +7,6 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using ClosedXML.Excel;
 using CuttingStock.Core.Models;
 using CuttingStock.Core.Persistence;
 using CuttingStock.UI.Services;
@@ -45,7 +44,7 @@ namespace CuttingStock
         /// <summary>Push a recently-touched scenario path into the MRU list and persist.</summary>
         private void OnScenarioPathUsed(string path)
         {
-            UserPreferencesStore.PushRecent(_prefs.Recent1D, path);
+            RecentScenarioService.Touch(_prefs.Recent1D, path);
             UserPreferencesStore.Save(_prefs);
         }
 
@@ -107,16 +106,15 @@ namespace CuttingStock
             }
             else
             {
-                foreach (var path in _prefs.Recent1D)
+                foreach (var entry in RecentScenarioService.BuildEntries(_prefs.Recent1D))
                 {
-                    var fileName = System.IO.Path.GetFileName(path);
                     var menuItem = new MenuItem
                     {
-                        Header = fileName,
-                        ToolTip = path,
-                        IsEnabled = System.IO.File.Exists(path),
+                        Header = entry.DisplayName,
+                        ToolTip = entry.Path,
+                        IsEnabled = entry.Exists,
                     };
-                    var capturedPath = path;
+                    var capturedPath = entry.Path;
                     menuItem.Click += (_, _) => LoadRecentScenario(capturedPath);
                     menu.Items.Add(menuItem);
                 }
@@ -124,7 +122,7 @@ namespace CuttingStock
                 var clear = new MenuItem { Header = "목록 지우기" };
                 clear.Click += (_, _) =>
                 {
-                    _prefs.Recent1D.Clear();
+                    RecentScenarioService.Clear(_prefs.Recent1D);
                     UserPreferencesStore.Save(_prefs);
                 };
                 menu.Items.Add(clear);
@@ -144,7 +142,7 @@ namespace CuttingStock
                     "파일 없음", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (choice == MessageBoxResult.Yes)
                 {
-                    _prefs.Recent1D.Remove(path);
+                    RecentScenarioService.Remove(_prefs.Recent1D, path);
                     UserPreferencesStore.Save(_prefs);
                 }
                 return;
@@ -168,7 +166,7 @@ namespace CuttingStock
                 _vm.UsageOrderIndex = p.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge ? 0 : 1;
                 _vm.EnableWelding = p.EnableWelding;
 
-                UserPreferencesStore.PushRecent(_prefs.Recent1D, path);
+                RecentScenarioService.Touch(_prefs.Recent1D, path);
                 UserPreferencesStore.Save(_prefs);
                 _vm.StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
             }
@@ -241,7 +239,7 @@ namespace CuttingStock
                 _vm.UsageOrderIndex = p.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge ? 0 : 1;
                 _vm.EnableWelding = p.EnableWelding;
 
-                UserPreferencesStore.PushRecent(_prefs.Recent1D, path);
+                RecentScenarioService.Touch(_prefs.Recent1D, path);
                 UserPreferencesStore.Save(_prefs);
                 _vm.StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
             }
@@ -290,20 +288,20 @@ namespace CuttingStock
                 var text = Clipboard.GetText();
                 if (string.IsNullOrWhiteSpace(text)) return;
 
-                int added = 0;
-                foreach (var row in text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                var rows = ClipboardRowParser.ParseLengthQuantityRows(text);
+                if (grid.ItemsSource == _vm.Stocks)
                 {
-                    var cols = row.Split(new[] { '\t', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (cols.Length < 2) continue;
-                    if (!int.TryParse(cols[0].Trim(), out int len) ||
-                        !int.TryParse(cols[1].Trim(), out int qty) ||
-                        len <= 0 || qty <= 0) continue;
-
-                    if (grid.ItemsSource == _vm.Stocks) _vm.Stocks.Add(new StockRow { Length = len, Quantity = qty });
-                    else if (grid.ItemsSource == _vm.Orders) _vm.Orders.Add(new OrderRow { Length = len, Quantity = qty });
-                    else continue;
-                    added++;
+                    foreach (var row in rows)
+                        _vm.Stocks.Add(new StockRow { Length = row.Length, Quantity = row.Quantity });
                 }
+                else if (grid.ItemsSource == _vm.Orders)
+                {
+                    foreach (var row in rows)
+                        _vm.Orders.Add(new OrderRow { Length = row.Length, Quantity = row.Quantity });
+                }
+                else return;
+
+                int added = rows.Count;
                 if (added > 0)
                     MessageBox.Show($"{added}개의 항목을 붙여넣었습니다.", "붙여넣기 성공",
                         MessageBoxButton.OK, MessageBoxImage.Information);
@@ -349,52 +347,14 @@ namespace CuttingStock
 
             try
             {
-                string ext = Path.GetExtension(dlg.FileName).ToLowerInvariant();
-                int added = 0;
-                void Add(int len, int qty)
+                var rows = ScenarioImportService.ReadLengthQuantityRows(dlg.FileName);
+                foreach (var row in rows)
                 {
-                    addStock?.Invoke(len, qty);
-                    addOrder?.Invoke(len, qty);
-                    added++;
+                    addStock?.Invoke(row.Length, row.Quantity);
+                    addOrder?.Invoke(row.Length, row.Quantity);
                 }
 
-                if (ext == ".csv")
-                {
-                    var lines = File.ReadAllLines(dlg.FileName);
-                    var data = lines.Length > 0 &&
-                               !int.TryParse(lines[0].Split(',')[0].Trim(), out _)
-                        ? lines.Skip(1) : lines;
-                    foreach (var line in data)
-                    {
-                        var p = line.Split(',');
-                        if (p.Length >= 2 &&
-                            int.TryParse(p[0].Trim(), out int len) &&
-                            int.TryParse(p[1].Trim(), out int qty) &&
-                            len > 0 && qty > 0)
-                            Add(len, qty);
-                    }
-                }
-                else if (ext == ".xlsx")
-                {
-                    using var wb = new XLWorkbook(dlg.FileName);
-                    var ws = wb.Worksheets.First();
-                    var rangeUsed = ws.RangeUsed();
-                    if (rangeUsed == null) return 0;
-
-                    var allRows = rangeUsed.RowsUsed().ToList();
-                    var dataRows = allRows.Count > 0 &&
-                                   !int.TryParse(allRows[0].Cell(1).GetValue<string>(), out _)
-                        ? allRows.Skip(1) : allRows;
-
-                    foreach (var row in dataRows)
-                    {
-                        if (int.TryParse(row.Cell(1).GetValue<string>(), out int len) &&
-                            int.TryParse(row.Cell(2).GetValue<string>(), out int qty) &&
-                            len > 0 && qty > 0)
-                            Add(len, qty);
-                    }
-                }
-                return added;
+                return rows.Count;
             }
             catch (Exception ex)
             {
@@ -494,27 +454,18 @@ namespace CuttingStock
             string haystack = resultTextBox.Text ?? string.Empty;
             if (haystack.Length == 0) { searchStatus.Text = "결과 없음"; return; }
 
-            int start = resultTextBox.SelectionStart;
-            int len   = resultTextBox.SelectionLength;
-            int idx;
-            if (forward)
-            {
-                int from = Math.Min(haystack.Length, start + Math.Max(1, len));
-                idx = haystack.IndexOf(needle, from, StringComparison.OrdinalIgnoreCase);
-                if (idx < 0) idx = haystack.IndexOf(needle, 0, StringComparison.OrdinalIgnoreCase);
-            }
-            else
-            {
-                int from = Math.Max(0, start - 1);
-                idx = haystack.LastIndexOf(needle, from, StringComparison.OrdinalIgnoreCase);
-                if (idx < 0) idx = haystack.LastIndexOf(needle, haystack.Length - 1, StringComparison.OrdinalIgnoreCase);
-            }
-            if (idx < 0) { searchStatus.Text = "찾을 수 없음"; return; }
+            TextSearchMatch match = TextSearchService.Find(
+                haystack,
+                needle,
+                resultTextBox.SelectionStart,
+                resultTextBox.SelectionLength,
+                forward);
+            if (!match.Found) { searchStatus.Text = "찾을 수 없음"; return; }
 
             resultTextBox.Focus();
-            resultTextBox.Select(idx, needle.Length);
-            resultTextBox.ScrollToLine(resultTextBox.GetLineIndexFromCharacterIndex(idx));
-            searchStatus.Text = $"{idx + 1} 위치";
+            resultTextBox.Select(match.Index, match.Length);
+            resultTextBox.ScrollToLine(resultTextBox.GetLineIndexFromCharacterIndex(match.Index));
+            searchStatus.Text = $"{match.Index + 1} 위치";
         }
 
         // ─── LiveCharts series refresh (called from PropertyChanged) ─

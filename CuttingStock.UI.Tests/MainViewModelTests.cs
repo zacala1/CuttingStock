@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using FluentAssertions;
@@ -96,6 +99,61 @@ namespace CuttingStock.UI.Tests
             _vm.LegendItems.Should().NotBeNull();
             _vm.ResultText.Should().NotBeNullOrWhiteSpace();
             _dialog.Messages.Should().Contain(m => m.Severity == "info" && m.Title == "최적화 완료");
+        }
+
+        [Test]
+        public async Task Compare_RanksSuccessfulRowsWithoutReplacingSingleResultOptions()
+        {
+            _vm.Stocks.Add(new StockRow { Length = 12000, Quantity = 3 });
+            _vm.Orders.Add(new OrderRow { Length = 4000, Quantity = 2 });
+            _vm.GammaText = "100";
+            await _vm.CalculateCommand.ExecuteAsync(null);
+            var singleResultOptions = _vm.LastOptions;
+
+            _vm.GammaText = "999";
+            await _vm.CompareAlgorithmsCommand.ExecuteAsync(null);
+
+            _vm.HasComparisonResults.Should().BeTrue();
+            var successfulByCost = _vm.ComparisonResults
+                .Where(row => row.Success)
+                .OrderBy(row => row.TotalCost)
+                .ToList();
+            successfulByCost.Select(row => row.Rank)
+                .Should().Equal(Enumerable.Range(
+                    1,
+                    successfulByCost.Count));
+            successfulByCost.First().Rank.Should().Be(1);
+            _vm.ComparisonResults.Where(row => !row.Success)
+                .Should().OnlyContain(row => row.Rank == 0);
+            _vm.LastOptions.Should().BeSameAs(singleResultOptions);
+        }
+
+        [Test]
+        public async Task ExportToCsv_AfterCalculateUsesOneDResultAndOptions()
+        {
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"cutting-stock-1d-export-{Guid.NewGuid():N}.csv");
+
+            try
+            {
+                _vm.Stocks.Add(new StockRow { Length = 12000, Quantity = 3 });
+                _vm.Orders.Add(new OrderRow { Length = 4000, Quantity = 2 });
+                _vm.GammaText = "321";
+                await _vm.CalculateCommand.ExecuteAsync(null);
+                _dialog.SavePathResponses.Enqueue(path);
+
+                _vm.ExportToCsvCommand.Execute(null);
+
+                string csv = File.ReadAllText(path);
+                csv.Should().Contain("철근 절단 최적화 결과");
+                csv.Should().Contain("Gamma (재사용 최소),321");
+                csv.Should().Contain($"알고리즘,{_vm.SelectedSolverDescriptor.Name}");
+            }
+            finally
+            {
+                File.Delete(path);
+            }
         }
 
         // ─── DeleteSelected* helpers ────────────────────────────────

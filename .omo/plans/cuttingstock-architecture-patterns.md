@@ -450,7 +450,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(core): split 2d pattern pool services` | Files: `CuttingStock.Core/TwoD/**`, `CuttingStock.Tests/TwoD/**`
 
-- [ ] 11. Extract UI Shell Services For Non-Visual Workflow
+- [x] 11. Extract UI Shell Services For Non-Visual Workflow
 
   **What to do**: Move non-visual shell workflow out of `MainWindow.xaml.cs` and `TwoDTab.xaml.cs` into testable services. Start with MRU/recent scenarios, file import parsing, clipboard import parsing, and text search. Keep actual `MessageBox`, `Clipboard`, `OpenFileDialog`, and visual tree interaction in the view or `DialogService`.
   **Must NOT do**: Do not move LiveCharts series or Canvas element creation into ViewModel/Core.
@@ -463,9 +463,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Dialog seam: `CuttingStock.UI/Services/IDialogService.cs:8`
 
   **Acceptance Criteria**:
-  - [ ] Parsing/search/history logic is unit-testable without constructing WPF windows.
-  - [ ] Views still own WPF objects and call services with plain data.
-  - [ ] UI tests cover MRU update, CSV/XLSX parse path where feasible, clipboard text parse, and search indexing.
+  - [x] Parsing/search/history logic is unit-testable without constructing WPF windows.
+  - [x] Views still own WPF objects and call services with plain data.
+  - [x] UI tests cover MRU update, CSV/XLSX parse path where feasible, clipboard text parse, and search indexing.
 
   **QA Scenarios**:
   ```text
@@ -484,7 +484,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(ui): extract shell workflow services` | Files: `CuttingStock.UI/**`, `CuttingStock.UI.Tests/**`
 
-- [ ] 12. Replace View Events With Bindable Projection State
+- [x] 12. Replace View Events With Bindable Projection State
 
   **What to do**: Remove or reduce `SingleResultReady`/`CompareResultReady` event coupling by exposing projection state from `TwoDViewModel` and, where useful, `MainViewModel`. Create DTOs for chart data and 2D pattern render inputs. The view may still translate DTOs into LiveCharts series and Canvas shapes.
   **Must NOT do**: Do not bind WPF `Shape`, `Brush`, `ISeries`, or `Axis` objects from Core. Avoid pushing WPF visual types into Core.
@@ -497,9 +497,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - 1D projection pattern: `CuttingStock.UI/Services/VisualizationService.cs:16`
 
   **Acceptance Criteria**:
-  - [ ] `TwoDViewModel` exposes plain projection data for last result render/compare chart triggers.
-  - [ ] View code no longer needs dispatcher event subscriptions for normal result rendering.
-  - [ ] UI tests assert projection state changes after calculate/compare.
+  - [x] `TwoDViewModel` exposes plain projection data for last result render/compare chart triggers.
+  - [x] View code no longer needs dispatcher event subscriptions for normal result rendering.
+  - [x] UI tests assert projection state changes after calculate/compare.
 
   **QA Scenarios**:
   ```text
@@ -518,7 +518,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(ui): expose bindable solver projections` | Files: `CuttingStock.UI/**`, `CuttingStock.UI.Tests/**`
 
-- [ ] 13. Consolidate 1D And 2D Workspace Workflow Duplication
+- [x] 13. Consolidate 1D And 2D Workspace Workflow Duplication
 
   **What to do**: Extract shared ViewModel workflow helpers for calculate/compare/export/scenario patterns where the type parameters make behavior clearer. Prefer composition or a narrow template method over a large inheritance hierarchy. Keep dimension-specific parsing, DTO mapping, and rendering projection explicit.
   **Must NOT do**: Do not collapse 1D and 2D ViewModels into one generic class if readability suffers.
@@ -532,9 +532,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Export duplication: `MainViewModel.Export.cs`, `TwoDViewModel.Export.cs`
 
   **Acceptance Criteria**:
-  - [ ] Compare/rank/report flow has one tested shared implementation or helper where practical.
-  - [ ] Export command boilerplate is reduced through a helper without hiding dimension-specific export calls.
-  - [ ] Scenario save/load mapping remains explicit and tested.
+  - [x] Compare/rank/report flow has one tested shared implementation or helper where practical.
+  - [x] Export command boilerplate is reduced through a helper without hiding dimension-specific export calls.
+  - [x] Scenario save/load mapping remains explicit and tested.
 
   **QA Scenarios**:
   ```text
