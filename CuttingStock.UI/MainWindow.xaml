@@ -23,7 +23,21 @@
     </Window.Resources>
     <DockPanel>
     <StatusBar DockPanel.Dock="Bottom" Background="#F0F0F0">
-        <StatusBarItem><TextBlock Text="{Binding StatusText, FallbackValue=준비됨}" Margin="6,0"/></StatusBarItem>
+        <StatusBarItem>
+            <TextBlock Margin="6,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Text" Value="{Binding StatusText, FallbackValue=준비됨}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ElementName=topTabControl, Path=SelectedIndex}" Value="1">
+                                <Setter Property="Text"
+                                        Value="{Binding ElementName=twoDTab, Path=DataContext.StatusText, FallbackValue=준비됨}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </StatusBarItem>
         <Separator/>
         <StatusBarItem><TextBlock Text="{Binding StatusTip, FallbackValue=Ctrl+R 실행 · Ctrl+Shift+C 비교 · F1 예제 · Esc 취소}" Foreground="Gray" Margin="6,0"/></StatusBarItem>
     </StatusBar>
