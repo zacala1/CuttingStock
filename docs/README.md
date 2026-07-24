@@ -45,8 +45,8 @@ CuttingStock/
 │   ├── TwoD/TwoDTab.xaml(.cs)        # 2D 탭 View
 │   ├── ViewModels/                   # MainViewModel, TwoDViewModel + row DTOs
 │   └── Services/                     # DialogService, ExportService, VisualizationService
-├── CuttingStock.Tests/               # NUnit + FluentAssertions (638 Core tests)
-├── CuttingStock.UI.Tests/            # WPF ViewModel/service tests (40 tests)
+├── CuttingStock.Tests/               # NUnit + FluentAssertions Core tests
+├── CuttingStock.UI.Tests/            # WPF ViewModel/service tests
 │   ├── Algorithms/                   # Greedy/CG/ArcFlow 단위 + Quality/Robustness/Stress/Perf
 │   ├── TwoD/                         # 2D 솔버 + Invariant 매트릭스 (90 fuzz runs)
 │   └── Persistence/                  # ScenarioService 라운드트립
@@ -74,14 +74,14 @@ CuttingStock/
 # 전체 빌드
 dotnet build CuttingStock.slnx -c Release
 
-# 전체 테스트 ([Explicit] LargeScale 제외, 현재 678 passed)
+# 전체 정합성 테스트
 dotnet test CuttingStock.slnx -c Release --nologo
 
 # 특정 카테고리
 dotnet test CuttingStock.slnx -c Release --filter "Category=Welding"
 
-# Explicit LargeScale 벤치마크
-dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
+# LargeScale 1000-orders BenchmarkDotNet 측정
+dotnet run --project CuttingStock.Benchmarks -c Release -- --large
 
 # WPF 앱 실행
 dotnet run --project CuttingStock.UI

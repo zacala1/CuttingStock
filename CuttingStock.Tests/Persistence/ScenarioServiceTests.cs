@@ -109,5 +109,29 @@ namespace CuttingStock.Tests.Persistence
             text.Should().Contain("cutting-stock-1d/v1"); // stable identifier
             text.Should().Contain("\n");                  // pretty-printed
         }
+
+        [Test]
+        public void DetectKind_UsesSchemaInsteadOfFileName()
+        {
+            var oneDPath = Path.Combine(_tempDir, "ambiguous-one.json");
+            var twoDPath = Path.Combine(_tempDir, "ambiguous-two.json");
+            ScenarioService.Save1D(oneDPath, new ScenarioService.Scenario1D());
+            ScenarioService.Save2D(twoDPath, new ScenarioService.Scenario2D());
+
+            ScenarioService.DetectKind(oneDPath).Should().Be(ScenarioKind.OneD);
+            ScenarioService.DetectKind(twoDPath).Should().Be(ScenarioKind.TwoD);
+        }
+
+        [Test]
+        public void DetectKind_RejectsUnknownSchema()
+        {
+            var path = Path.Combine(_tempDir, "unknown.json");
+            File.WriteAllText(path, "{\"schema\":\"other/v1\"}");
+
+            var act = () => ScenarioService.DetectKind(path);
+
+            act.Should().Throw<InvalidDataException>()
+                .WithMessage("*Unsupported scenario schema*");
+        }
     }
 }

@@ -24,11 +24,11 @@ Layout:
 # Build everything
 dotnet build CuttingStock.slnx -c Release
 
-# Full test suite (skips [Explicit] LargeScale benchmark)
+# Full correctness test suite
 dotnet test CuttingStock.slnx -c Release --nologo --no-build
 
-# Run the LargeScale 1000-orders benchmark explicitly
-dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
+# Run the LargeScale 1000-orders BenchmarkDotNet workload
+dotnet run --project CuttingStock.Benchmarks -c Release -- --large
 
 # Run a focused category
 dotnet test CuttingStock.slnx --filter "Category=Welding"
@@ -37,8 +37,9 @@ dotnet test CuttingStock.slnx --filter "Category=Welding"
 dotnet run --project CuttingStock.UI
 ```
 
-Tests currently pass 525+ in ~1m 10s. Don't merge anything that drops
-the count.
+The GitHub Actions `CI` run is authoritative for the current test count and
+status; documentation deliberately does not hard-code a changing total. Do not
+merge unless the full Release test command passes.
 
 ## Domain conventions
 

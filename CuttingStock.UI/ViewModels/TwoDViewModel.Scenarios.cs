@@ -40,6 +40,7 @@ namespace CuttingStock.UI.ViewModels
                 };
                 ScenarioService.Save2D(path, scenario);
                 StatusText = $"저장됨: {System.IO.Path.GetFileName(path)}";
+                ScenarioSaved?.Invoke(this, path);
                 _dialog.ShowInfo("저장 완료", $"시나리오를 저장했습니다.\n{path}");
             }
             catch (Exception ex) { _dialog.ShowError("오류", $"시나리오 저장 오류: {ex.Message}"); }
@@ -52,6 +53,14 @@ namespace CuttingStock.UI.ViewModels
                 "시나리오 불러오기",
                 "2D 시나리오 (*.cstock2d.json)|*.cstock2d.json|JSON (*.json)|*.json|모든 파일 (*.*)|*.*");
             if (path == null) return;
+
+            LoadScenarioFromPath(path);
+        }
+
+        public bool LoadScenarioFromPath(string path)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
             try
             {
                 var scenario = ScenarioService.Load2D(path);
@@ -71,8 +80,14 @@ namespace CuttingStock.UI.ViewModels
                 StageIndex = o2.Stage == 3 ? 1 : 0;
                 UsageOrderIndex = o2.UsageOrder == StockUsageOrder.SmallToLarge ? 0 : 1;
                 StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
+                ScenarioLoaded?.Invoke(this, path);
+                return true;
             }
-            catch (Exception ex) { _dialog.ShowError("오류", $"시나리오 불러오기 오류: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                _dialog.ShowError("오류", $"시나리오 불러오기 오류: {ex.Message}");
+                return false;
+            }
         }
     }
 }

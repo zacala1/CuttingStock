@@ -48,6 +48,32 @@ namespace CuttingStock.UI.TwoD
             _vm.PropertyChanged += Vm_PropertyChanged;
         }
 
+        public event EventHandler<string>? ScenarioSaved
+        {
+            add => _vm.ScenarioSaved += value;
+            remove => _vm.ScenarioSaved -= value;
+        }
+
+        public event EventHandler<string>? ScenarioLoaded
+        {
+            add => _vm.ScenarioLoaded += value;
+            remove => _vm.ScenarioLoaded -= value;
+        }
+
+        public event EventHandler? RecentScenariosRequested;
+
+        public FrameworkElement RecentMenuPlacementTarget => btnRecent2D;
+
+        public int AlgorithmIndex
+        {
+            get => _vm.AlgorithmIndex;
+            set => _vm.AlgorithmIndex = value;
+        }
+
+        public int SolverCount => _vm.SolverDescriptors.Count;
+
+        public bool LoadScenarioFromPath(string path) => _vm.LoadScenarioFromPath(path);
+
         public void Dispose()
         {
             _vm.PropertyChanged -= Vm_PropertyChanged;
@@ -76,6 +102,9 @@ namespace CuttingStock.UI.TwoD
 
         private void DeleteRectOrder_Click(object sender, RoutedEventArgs e) =>
             _vm.DeleteSelectedOrders(rectOrderGrid.SelectedItems.Cast<RectOrderRow>());
+
+        private void Recent2D_Click(object sender, RoutedEventArgs e) =>
+            RecentScenariosRequested?.Invoke(this, EventArgs.Empty);
 
         private void DataGrid_KeyDown(object sender, KeyEventArgs e)
         {

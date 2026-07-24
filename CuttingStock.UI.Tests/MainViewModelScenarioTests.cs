@@ -104,8 +104,7 @@ namespace CuttingStock.UI.Tests
                 string? capturedPath = null;
                 _vm.ScenarioLoaded += (_, p) => capturedPath = p;
 
-                _dialog.OpenPathResponses.Enqueue(path);
-                _vm.LoadScenarioCommand.Execute(null);
+                _vm.LoadScenarioFromPath(path).Should().BeTrue();
 
                 capturedPath.Should().Be(path);
             }

@@ -553,7 +553,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(ui): consolidate solver workspace workflows` | Files: `CuttingStock.UI/**`, `CuttingStock.UI.Tests/**`
 
-- [ ] 14. Define And Enforce 1D/2D UI Parity Matrix
+- [x] 14. Define And Enforce 1D/2D UI Parity Matrix
 
   **What to do**: Create a parity matrix for user-facing tab features: example load, add/delete, scenario save/load, recent scenarios, drag/drop, search, calculate, compare, cancel, export, visualization, and progress. For each mismatch, choose one of two outcomes: implement parity with tests or document intentional difference in architecture guardrails/tooltips/docs.
   **Must NOT do**: Do not silently add large UI features without matching tests.
@@ -566,9 +566,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Feature parity rule: `AGENTS.md` "When you add a feature".
 
   **Acceptance Criteria**:
-  - [ ] Parity matrix exists in docs or architecture guardrails.
-  - [ ] Every intentional mismatch is documented with rationale.
-  - [ ] Every implemented parity improvement has UI tests or shell service tests.
+  - [x] Parity matrix exists in docs or architecture guardrails.
+  - [x] Every intentional mismatch is documented with rationale.
+  - [x] Every implemented parity improvement has UI tests or shell service tests.
 
   **QA Scenarios**:
   ```text
@@ -587,7 +587,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `docs(ui): define tab parity matrix` | Files: `docs/**`, `CuttingStock.UI/**`, `CuttingStock.UI.Tests/**`
 
-- [ ] 15. Add Solution-Level Build And Package Governance
+- [x] 15. Add Solution-Level Build And Package Governance
 
   **What to do**: Add `Directory.Build.props` for shared project settings and, if adopted, `Directory.Packages.props` for centralized package versions. Preserve project-specific settings such as `UseWPF`, output type, package metadata, and test project markers.
   **Must NOT do**: Do not accidentally change target frameworks or package versions while centralizing.
@@ -600,9 +600,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Test target split: `CuttingStock.Tests/CuttingStock.Tests.csproj`, `CuttingStock.UI.Tests/CuttingStock.UI.Tests.csproj`
 
   **Acceptance Criteria**:
-  - [ ] Shared properties are centralized without changing effective TFM/WPF/test metadata.
-  - [ ] Build and full tests pass.
-  - [ ] Package centralization does not duplicate version declarations.
+  - [x] Shared properties are centralized without changing effective TFM/WPF/test metadata.
+  - [x] Build and full tests pass.
+  - [x] Package centralization does not duplicate version declarations.
 
   **QA Scenarios**:
   ```text
@@ -621,7 +621,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `build: centralize solution project settings` | Files: `Directory.Build.props`, `Directory.Packages.props`, `*.csproj`
 
-- [ ] 16. Separate Benchmarks From Correctness Tests
+- [x] 16. Separate Benchmarks From Correctness Tests
 
   **What to do**: Move benchmark-only code out of `CuttingStock.Tests` or explicitly reclassify it as a deterministic performance gate. Preferred target: move `LargeScaleBenchmarks.cs` into `CuttingStock.Benchmarks` and remove `BenchmarkDotNet` from `CuttingStock.Tests.csproj`. Keep correctness tests deterministic and fast by default.
   **Must NOT do**: Do not drop the large-scale coverage without relocating or replacing it.
@@ -634,9 +634,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Benchmark project: `CuttingStock.Benchmarks/CuttingStock.Benchmarks.csproj:13`
 
   **Acceptance Criteria**:
-  - [ ] `CuttingStock.Tests` no longer references `BenchmarkDotNet` unless an explicit rationale is documented.
-  - [ ] Large-scale performance scenario exists in `CuttingStock.Benchmarks` or a deliberately named perf gate.
-  - [ ] Default `dotnet test` remains correctness-focused.
+  - [x] `CuttingStock.Tests` no longer references `BenchmarkDotNet` unless an explicit rationale is documented.
+  - [x] Large-scale performance scenario exists in `CuttingStock.Benchmarks` or a deliberately named perf gate.
+  - [x] Default `dotnet test` remains correctness-focused.
 
   **QA Scenarios**:
   ```text
@@ -655,7 +655,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `build: separate benchmarks from correctness tests` | Files: `CuttingStock.Tests/**`, `CuttingStock.Benchmarks/**`, `README.md`, `docs/**`
 
-- [ ] 17. Add CI And Single Test Count Source Policy
+- [x] 17. Add CI And Single Test Count Source Policy
 
   **What to do**: Add a CI workflow for build/test on Windows because WPF projects target `net10.0-windows`. Include Release build, full non-explicit tests, and optional benchmark smoke build. Establish one authoritative source for test counts; remove hard-coded stale counts from docs or mark them generated/snapshot with update instructions.
   **Must NOT do**: Do not make CI run long explicit benchmarks by default.
@@ -668,10 +668,10 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Commands from `AGENTS.md`.
 
   **Acceptance Criteria**:
-  - [ ] CI workflow exists under `.github/workflows/` or the chosen provider path.
-  - [ ] CI uses `dotnet build CuttingStock.slnx -c Release`.
-  - [ ] CI uses `dotnet test CuttingStock.slnx -c Release --nologo --no-build`.
-  - [ ] Docs no longer contradict each other on current test count.
+  - [x] CI workflow exists under `.github/workflows/` or the chosen provider path.
+  - [x] CI uses `dotnet build CuttingStock.slnx -c Release`.
+  - [x] CI uses `dotnet test CuttingStock.slnx -c Release --nologo --no-build`.
+  - [x] Docs no longer contradict each other on current test count.
 
   **QA Scenarios**:
   ```text

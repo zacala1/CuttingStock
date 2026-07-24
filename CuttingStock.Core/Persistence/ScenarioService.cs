@@ -5,6 +5,12 @@ using CuttingStock.Core.Domain;
 
 namespace CuttingStock.Core.Persistence
 {
+    public enum ScenarioKind
+    {
+        OneD,
+        TwoD,
+    }
+
     /// <summary>
     /// Round-trips a user's input scenario (rows + parameters) to JSON so they can
     /// reload a setup later or share it with colleagues. Pure data DTOs to keep the
@@ -76,6 +82,21 @@ namespace CuttingStock.Core.Persistence
                 !scenario.Schema.StartsWith("cutting-stock-1d/", StringComparison.Ordinal))
                 throw new InvalidDataException($"Expected 1D scenario but got schema '{scenario.Schema}'.");
             return scenario;
+        }
+
+        public static ScenarioKind DetectKind(string path)
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            if (!document.RootElement.TryGetProperty("schema", out var schemaElement))
+                throw new InvalidDataException("Scenario file does not declare a schema.");
+
+            string? schema = schemaElement.GetString();
+            if (schema?.StartsWith("cutting-stock-1d/", StringComparison.Ordinal) == true)
+                return ScenarioKind.OneD;
+            if (schema?.StartsWith("cutting-stock-2d/", StringComparison.Ordinal) == true)
+                return ScenarioKind.TwoD;
+
+            throw new InvalidDataException($"Unsupported scenario schema '{schema}'.");
         }
 
         // ─── 2D ────────────────────────────────────────────────────

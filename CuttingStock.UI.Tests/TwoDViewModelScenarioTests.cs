@@ -21,8 +21,10 @@ namespace CuttingStock.UI.Tests
             {
                 var saveDialog = new FakeDialogService();
                 saveDialog.SavePathResponses.Enqueue(path);
+                string? savedPath = null;
                 using (var source = new TwoDViewModel(saveDialog))
                 {
+                    source.ScenarioSaved += (_, value) => savedPath = value;
                     source.Sheets.Add(new SheetRow { Width = 2440, Height = 1220, Quantity = 3 });
                     source.Orders.Add(new RectOrderRow
                     {
@@ -41,12 +43,15 @@ namespace CuttingStock.UI.Tests
 
                     source.SaveScenarioCommand.Execute(null);
                 }
+                savedPath.Should().Be(path);
 
                 var loadDialog = new FakeDialogService();
-                loadDialog.OpenPathResponses.Enqueue(path);
                 using var target = new TwoDViewModel(loadDialog);
-                target.LoadScenarioCommand.Execute(null);
+                string? loadedPath = null;
+                target.ScenarioLoaded += (_, value) => loadedPath = value;
+                target.LoadScenarioFromPath(path).Should().BeTrue();
 
+                loadedPath.Should().Be(path);
                 target.Sheets.Should().ContainSingle().Which.Should().BeEquivalentTo(
                     new SheetRow { Width = 2440, Height = 1220, Quantity = 3 });
                 target.Orders.Should().ContainSingle().Which.Should().BeEquivalentTo(

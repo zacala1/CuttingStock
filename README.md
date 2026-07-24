@@ -6,7 +6,7 @@
 
 - **CuttingStock.Core** — 알고리즘, 도메인 모델, OR-Tools 통합, JSON 시나리오 영속화 (`Persistence/`)
 - **CuttingStock.UI** — WPF + MVVM(CommunityToolkit.Mvvm) UI. ViewModels / Services 분리
-- **CuttingStock.Tests** — NUnit + FluentAssertions, Core **638 테스트** + UI **40 테스트** 통과
+- **CuttingStock.Tests** — NUnit + FluentAssertions 기반 Core/UI 정합성 검증
 - **CuttingStock.Benchmarks** — BenchmarkDotNet 성능 측정 (인포메이셔널)
 
 ## 1D 솔버 (`ICuttingSolver`)
@@ -100,19 +100,21 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 - 비교 시각화 — LiveCharts (1D 3차트, 2D 3차트)
 - CSV / Excel 내보내기 (단일 + 비교, 1D + 2D)
 - **JSON 시나리오 저장 / 불러오기** — `.cstock1d.json` / `.cstock2d.json` (입력 + 옵션 round-trip)
+- 차원별 최근 시나리오 목록(최대 5개)과 JSON schema 기반 1D/2D 드래그앤드롭 열기
 - 엑셀 붙여넣기(Ctrl+V) 지원
 - 키보드 단축키: F1(예제), Ctrl+R(실행), Ctrl+Shift+C(비교), Ctrl+S(Excel 저장)
 - 멀티 시트 dim 자동 합산 (2D 솔버 진입부)
 
 ## 테스트
 
-| 범위 | 테스트 수 | 비고 |
-|---|---:|---|
-| `CuttingStock.Tests` (Core) | 638 | 1D/2D 솔버, 도메인, persistence, invariant, robustness, performance/stress |
-| `CuttingStock.UI.Tests` | 40 | 1D/2D ViewModel command/state, dialog flow, visualization service |
-| **합계** | **678** | Release 전체 통과, `[Explicit]` LargeScale benchmark 1개는 기본 실행 제외 |
+| 범위 | 비고 |
+|---|---|
+| `CuttingStock.Tests` (Core) | 1D/2D 솔버, 도메인, persistence, invariant, robustness, performance/stress |
+| `CuttingStock.UI.Tests` | 1D/2D ViewModel command/state, dialog flow, visualization service |
 
-`Benchmark_LargeScale_1000_Orders`는 `[Explicit]`로 디폴트 실행에서 제외, 별도 호출 시 ~7초.
+장시간 성능 측정은 정합성 테스트와 분리된 `CuttingStock.Benchmarks`에서 실행한다.
+현재 테스트 개수와 통과 여부의 단일 기준은 GitHub Actions `CI` 실행 결과이며,
+변동되는 개수는 문서에 하드코딩하지 않는다.
 
 ## 의존성
 
@@ -129,14 +131,14 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 # 전체 빌드 (Release)
 dotnet build CuttingStock.slnx -c Release
 
-# 전체 테스트 ([Explicit] LargeScale 제외)
+# 전체 정합성 테스트
 dotnet test CuttingStock.slnx -c Release --nologo
 
 # 특정 카테고리
 dotnet test CuttingStock.slnx -c Release --filter "Category=Welding"
 
-# Explicit LargeScale 1000-orders benchmark
-dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
+# LargeScale 1000-orders BenchmarkDotNet 측정
+dotnet run --project CuttingStock.Benchmarks -c Release -- --large
 
 # WPF 앱 실행
 dotnet run --project CuttingStock.UI

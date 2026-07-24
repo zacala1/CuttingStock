@@ -2,11 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>CS1591</NoWarn>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Authors>CuttingStock Team</Authors>
     <Description>Core library for cutting stock optimization algorithms. Contains Greedy Knapsack DP, Column Generation LP, and Arc Flow MIP (OR-Tools) solvers with kerf and welding support.</Description>
     <PackageProjectUrl>https://github.com/zacala1/CuttingStock</PackageProjectUrl>
@@ -15,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Google.OrTools" Version="9.15.6755" />
+    <PackageReference Include="Google.OrTools" />
   </ItemGroup>
 
 </Project>

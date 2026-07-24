@@ -12,8 +12,8 @@ namespace CuttingStock.Tests.Algorithms
 {
     /// <summary>
     /// Wall-clock performance budgets for the three 1D solvers across input sizes.
-    /// These complement BenchmarkDotNet (informational) by failing the build when
-    /// a regression blows past the budget. Budgets are generous (3-5× observed
+    /// These complement the informational benchmark workloads by failing the build
+    /// when a regression blows past the budget. Budgets are generous (3-5× observed
     /// runtimes on an i5-14600KF Release build) so transient CI noise doesn't
     /// flake them, but a genuine algorithmic regression (e.g. accidental O(N²)
     /// in the DP) gets caught.

@@ -7,13 +7,15 @@
 대상이라 이 프로젝트에서 직접 참조하지 않는다. ViewModel/service 검증은
 `CuttingStock.UI.Tests` 에 둔다.
 
-현재 Release 기준:
+검증 범위:
 
-| 프로젝트 | 테스트 수 | 범위 |
-|---|---:|---|
-| `CuttingStock.Tests` | 638 | Core 알고리즘/도메인/persistence |
-| `CuttingStock.UI.Tests` | 40 | WPF ViewModel command/state, dialog flow, visualization service |
-| **합계** | **678** | `[Explicit]` LargeScale benchmark 1개는 기본 실행 제외 |
+| 프로젝트 | 범위 |
+|---|---|
+| `CuttingStock.Tests` | Core 알고리즘/도메인/persistence |
+| `CuttingStock.UI.Tests` | WPF ViewModel command/state, dialog flow, visualization service |
+
+현재 테스트 개수와 통과 여부는 GitHub Actions `CI` 실행 결과를 기준으로 한다.
+변동되는 개수는 이 문서에서 별도로 유지하지 않는다.
 
 ## 프레임워크
 
@@ -21,7 +23,6 @@
 - FluentAssertions 8.8.0
 - Microsoft.NET.Test.Sdk 18.0.0
 - coverlet.collector 6.0.4
-- BenchmarkDotNet 0.15.5
 
 ## 주요 테스트 영역
 
@@ -43,7 +44,7 @@
 # 전체 빌드
 dotnet build CuttingStock.slnx -c Release
 
-# 전체 테스트: Explicit LargeScale benchmark 제외
+# 전체 정합성 테스트
 dotnet test CuttingStock.slnx -c Release --nologo --no-build
 
 # 특정 카테고리
@@ -51,8 +52,8 @@ dotnet test CuttingStock.slnx -c Release --filter "Category=Welding"
 dotnet test CuttingStock.slnx -c Release --filter "Category=Performance"
 dotnet test CuttingStock.slnx -c Release --filter "Category=Stress"
 
-# Explicit LargeScale 1000-orders benchmark
-dotnet test CuttingStock.slnx -c Release --filter "FullyQualifiedName~Benchmark_LargeScale"
+# 장시간 성능 측정은 별도 벤치마크 프로젝트에서 실행
+dotnet run --project CuttingStock.Benchmarks -c Release -- --large
 ```
 
 ## 핵심 불변식
