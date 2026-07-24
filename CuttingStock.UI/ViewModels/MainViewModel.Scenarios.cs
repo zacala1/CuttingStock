@@ -63,6 +63,9 @@ namespace CuttingStock.UI.ViewModels
             try
             {
                 var scenario = ScenarioService.Load1D(path);
+                if (IsRunning)
+                    CancelActiveRun();
+
                 Stocks.Clear();
                 foreach (var s in scenario.Stocks)
                     Stocks.Add(new StockRow { Length = s.Length, Quantity = s.Quantity });

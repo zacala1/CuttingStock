@@ -95,6 +95,14 @@ namespace CuttingStock.UI.ViewModels
 
         protected bool IsCurrent(SolverRunScope scope) => _runLifecycle.IsCurrent(scope);
 
+        protected void CancelActiveRun()
+        {
+            _runLifecycle.CancelCurrent();
+            CanCancel = false;
+            ProgressText = "취소됨";
+            StatusText = "취소됨";
+        }
+
         protected async Task<SolverComparisonBatch<TSolver, TResult, TRow>> CompareSolversAsync<TDescriptor, TSolver, TOptions, TResult, TRow>(
             SolverRunScope scope,
             IReadOnlyList<TDescriptor> descriptors,
@@ -174,11 +182,7 @@ namespace CuttingStock.UI.ViewModels
         [RelayCommand(CanExecute = nameof(CanCancelSolver))]
         private void Cancel()
         {
-            _runLifecycle.CancelCurrent();
-            IsRunning = false;
-            CanCancel = false;
-            ProgressText = "취소됨";
-            StatusText = "취소됨";
+            CancelActiveRun();
         }
 
         public void Dispose()

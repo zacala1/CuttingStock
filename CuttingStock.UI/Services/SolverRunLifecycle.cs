@@ -21,15 +21,23 @@ namespace CuttingStock.UI.Services
 
         public void CancelCurrent()
         {
-            _currentRunId++;
-            CancelAndDisposeCurrentSource();
+            try
+            {
+                _currentCts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Completion or supersession already owns disposal.
+            }
         }
 
-        public bool IsCurrent(SolverRunScope scope) => scope.RunId == _currentRunId;
+        public bool IsCurrent(SolverRunScope scope) =>
+            scope.RunId == _currentRunId &&
+            !scope.CancellationToken.IsCancellationRequested;
 
         public bool Complete(SolverRunScope scope)
         {
-            if (!IsCurrent(scope)) return false;
+            if (scope.RunId != _currentRunId) return false;
             _currentRunId++;
             _currentCts?.Dispose();
             _currentCts = null;

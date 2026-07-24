@@ -442,7 +442,7 @@ namespace CuttingStock.Core.Algorithms
             int maxStockCount,
             int kerf)
         {
-            var solver = Solver.CreateSolver("CBC");
+            using var solver = Solver.CreateSolver("CBC");
             if (solver == null) return false;
             if (_profile.IntegerMasterTimeLimitMs > 0)
                 solver.SetTimeLimit(_profile.IntegerMasterTimeLimitMs);

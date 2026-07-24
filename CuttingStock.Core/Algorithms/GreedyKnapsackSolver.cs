@@ -18,6 +18,8 @@ namespace CuttingStock.Core.Algorithms
         private const int Pass1MaxPerOrder = 2;
         private const int Pass2MaxPerOrder = 5;
 
+        private sealed record AvailablePiece(int Length, int SourcePlanIndex);
+
         public string Name => "Greedy Knapsack DP";
         public string Description => "Multi-pass sparse DP with post-processing.";
         public string TimeComplexity => "O(N * L * Passes)";
@@ -45,20 +47,20 @@ namespace CuttingStock.Core.Algorithms
                 var sortedOrders = SolverUtils.SortOrdersByScarcity(normalizedOrders);
 
                 var totalStockCount = sortedStock.Sum(s => s.Quantity);
-                var allLeftovers = new List<int>();
+                var availablePieces = new List<AvailablePiece>();
 
                 long initialTotalOrderQuantity = sortedOrders.Sum(o => (long)o.Quantity);
 
-                ProcessMultiPass(sortedStock, sortedOrders, options, result, allLeftovers, totalStockCount, progress, initialTotalOrderQuantity);
+                ProcessMultiPass(sortedStock, sortedOrders, options, result, availablePieces, totalStockCount, progress, initialTotalOrderQuantity);
 
-                if (sortedOrders.Any() && allLeftovers.Any())
+                if (sortedOrders.Any() && availablePieces.Any())
                 {
-                    ProcessLeftovers(sortedOrders, allLeftovers, options, result);
+                    ProcessLeftovers(sortedOrders, availablePieces, options, result);
                 }
 
                 if (options.EnableWelding && sortedOrders.Any())
                 {
-                    ProcessWeldedOrders(sortedOrders, allLeftovers, sortedStock, options, result);
+                    ProcessWeldedOrders(sortedOrders, sortedStock, options, result);
                 }
 
                 SolverUtils.OptimizePostProcess(result, options);
@@ -88,7 +90,7 @@ namespace CuttingStock.Core.Algorithms
             List<Order> sortedOrders,
             SolverOptions options,
             SolverResult result,
-            List<int> allLeftovers,
+            List<AvailablePiece> availablePieces,
             int totalStockCount,
             IProgress<double>? progress,
             long initialTotalOrderQuantity)
@@ -96,18 +98,18 @@ namespace CuttingStock.Core.Algorithms
             // Initialize usedStockCounts by index to avoid mutable object as Dictionary key
             var usedStockCounts = new int[sortedStock.Count];
 
-            ProcessPass(sortedStock, sortedOrders, options, result, allLeftovers,
+            ProcessPass(sortedStock, sortedOrders, options, result, availablePieces,
                         totalStockCount, Pass1MaxPerOrder, "Pass1", progress, initialTotalOrderQuantity, usedStockCounts);
 
             if (sortedOrders.Any())
             {
-                ProcessPass(sortedStock, sortedOrders, options, result, allLeftovers,
+                ProcessPass(sortedStock, sortedOrders, options, result, availablePieces,
                             totalStockCount, Pass2MaxPerOrder, "Pass2", progress, initialTotalOrderQuantity, usedStockCounts);
             }
 
             if (sortedOrders.Any())
             {
-                ProcessPass(sortedStock, sortedOrders, options, result, allLeftovers,
+                ProcessPass(sortedStock, sortedOrders, options, result, availablePieces,
                             totalStockCount, int.MaxValue, "Pass3", progress, initialTotalOrderQuantity, usedStockCounts);
             }
         }
@@ -117,7 +119,7 @@ namespace CuttingStock.Core.Algorithms
             List<Order> sortedOrders,
             SolverOptions options,
             SolverResult result,
-            List<int> allLeftovers,
+            List<AvailablePiece> availablePieces,
             int totalStockCount,
             int maxPerOrder,
             string passName,
@@ -209,7 +211,9 @@ namespace CuttingStock.Core.Algorithms
 
                         if (plan.Leftover >= options.Gamma)
                         {
-                            allLeftovers.Add(plan.Leftover);
+                            availablePieces.Add(new AvailablePiece(
+                                plan.Leftover,
+                                result.CuttingPlans.Count - 1));
                         }
 
                         UpdateOrders(sortedOrders, bestCuts);
@@ -236,14 +240,12 @@ namespace CuttingStock.Core.Algorithms
 
                             if (plan.Leftover >= options.Gamma)
                             {
-                                allLeftovers.Add(plan.Leftover);
+                                availablePieces.Add(new AvailablePiece(
+                                    plan.Leftover,
+                                    result.CuttingPlans.Count - 1));
                             }
 
                             UpdateOrders(sortedOrders, singleCut);
-                        }
-                        else if (stockItem.Length >= options.Gamma)
-                        {
-                            allLeftovers.Add(stockItem.Length);
                         }
                     }
                 }
@@ -365,32 +367,33 @@ namespace CuttingStock.Core.Algorithms
 
         private void ProcessLeftovers(
             List<Order> remainingOrders,
-            List<int> leftovers,
+            List<AvailablePiece> availablePieces,
             SolverOptions options,
             SolverResult result)
         {
-            leftovers.Sort(options.UsageOrder == StockUsageOrder.SmallToLarge
-                ? (a, b) => a.CompareTo(b)
-                : (a, b) => b.CompareTo(a));
+            availablePieces.Sort(options.UsageOrder == StockUsageOrder.SmallToLarge
+                ? (a, b) => a.Length.CompareTo(b.Length)
+                : (a, b) => b.Length.CompareTo(a.Length));
 
             var processedIndices = new HashSet<int>();
 
-            for (int i = 0; i < leftovers.Count; i++)
+            for (int i = 0; i < availablePieces.Count; i++)
             {
                 if (!remainingOrders.Any())
                     break;
 
-                var leftover = leftovers[i];
-                var bestCuts = FindBestCutsSparse(leftover, remainingOrders, 1, int.MaxValue, options.Kerf);
+                var piece = availablePieces[i];
+                var bestCuts = FindBestCutsSparse(piece.Length, remainingOrders, 1, int.MaxValue, options.Kerf);
 
                 if (bestCuts.Any())
                 {
                     var cuts = bestCuts.Select(len => new Cut { Length = len }).ToList();
                     var plan = new CuttingPlan
                     {
-                        StockLength = leftover,
+                        StockLength = piece.Length,
+                        ReusableLeftoverSourcePlanIndex = piece.SourcePlanIndex,
                         Cuts = cuts,
-                        Leftover = SolverUtils.ComputeLeftover(leftover, cuts, options.Kerf)
+                        Leftover = SolverUtils.ComputeLeftover(piece.Length, cuts, options.Kerf)
                     };
 
                     result.CuttingPlans.Add(plan);
@@ -400,36 +403,27 @@ namespace CuttingStock.Core.Algorithms
                 }
             }
 
-            for (int i = leftovers.Count - 1; i >= 0; i--)
+            for (int i = availablePieces.Count - 1; i >= 0; i--)
             {
                 if (processedIndices.Contains(i))
                 {
-                    leftovers.RemoveAt(i);
+                    availablePieces.RemoveAt(i);
                 }
             }
         }
 
         private void ProcessWeldedOrders(
             List<Order> remainingOrders,
-            List<int> leftovers,
             List<RebarStock> sortedStock,
             SolverOptions options,
             SolverResult result)
         {
             int weldGroupId = 1;
-            var stockUsage = new int[sortedStock.Count];
-
-            foreach (var plan in result.CuttingPlans)
-            {
-                for (int si = 0; si < sortedStock.Count; si++)
-                {
-                    if (sortedStock[si].Length == plan.StockLength)
-                    {
-                        stockUsage[si]++;
-                        break;
-                    }
-                }
-            }
+            var stockUsage = CountFreshStockUsage(sortedStock, result.CuttingPlans);
+            var consumedSourcePlanIndexes = result.CuttingPlans
+                .Where(plan => plan.ReusableLeftoverSourcePlanIndex.HasValue)
+                .Select(plan => plan.ReusableLeftoverSourcePlanIndex!.Value)
+                .ToHashSet();
 
             while (remainingOrders.Any())
             {
@@ -492,7 +486,11 @@ namespace CuttingStock.Core.Algorithms
                         CuttingPlan? hostPlan = null;
                         if (pieceLength < stockLength)
                         {
-                            hostPlan = FindHostPlanForWeld(result.CuttingPlans, pieceLength, options);
+                            hostPlan = FindHostPlanForWeld(
+                                result.CuttingPlans,
+                                consumedSourcePlanIndexes,
+                                pieceLength,
+                                options);
                         }
 
                         if (hostPlan != null)
@@ -574,13 +572,21 @@ namespace CuttingStock.Core.Algorithms
         /// accommodate a welded piece. Picks the smallest viable leftover to keep larger
         /// scraps available for later. Returns null when no such plan exists.
         /// </summary>
-        private static CuttingPlan? FindHostPlanForWeld(List<CuttingPlan> plans, int pieceLength, SolverOptions options)
+        private static CuttingPlan? FindHostPlanForWeld(
+            List<CuttingPlan> plans,
+            HashSet<int> consumedSourcePlanIndexes,
+            int pieceLength,
+            SolverOptions options)
         {
             CuttingPlan? best = null;
             int bestLeftover = int.MaxValue;
 
-            foreach (var plan in plans)
+            for (int planIndex = 0; planIndex < plans.Count; planIndex++)
             {
+                if (consumedSourcePlanIndexes.Contains(planIndex))
+                    continue;
+
+                var plan = plans[planIndex];
                 // Welded plans are structurally 1 cut per bar — adding to them breaks that
                 // invariant and the local-search/redistribute guards that rely on it.
                 bool isWeldedPlan = false;
@@ -598,6 +604,29 @@ namespace CuttingStock.Core.Algorithms
                 }
             }
             return best;
+        }
+
+        internal static int[] CountFreshStockUsage(
+            IReadOnlyList<RebarStock> stock,
+            IReadOnlyList<CuttingPlan> plans)
+        {
+            var stockUsage = new int[stock.Count];
+            foreach (var plan in plans)
+            {
+                if (plan.UsesReusableLeftover)
+                    continue;
+
+                for (int stockIndex = 0; stockIndex < stock.Count; stockIndex++)
+                {
+                    if (stock[stockIndex].Length != plan.StockLength)
+                        continue;
+
+                    stockUsage[stockIndex]++;
+                    break;
+                }
+            }
+
+            return stockUsage;
         }
 
         private double EstimateFutureWasteMFFDFromDict(Dictionary<int, int> orderDict, int stockLength)

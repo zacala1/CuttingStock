@@ -17,6 +17,20 @@ namespace CuttingStock.Tests.TwoD
     [TestFixture]
     public class Solver2DTests
     {
+        [Test]
+        public void ShelfSolveUntil_AlreadyCancelled_StopsBeforePacking()
+        {
+            var result = new ShelfGuillotineSolver().SolveUntil(
+                [new Sheet(1000, 1000, 1)],
+                [new RectOrder(100, 100, 1)],
+                new SolverOptions2D(),
+                shouldStop: () => true);
+
+            result.Success.Should().BeFalse();
+            result.ErrorMessage.Should().Contain("Time limit");
+            result.Patterns.Should().BeEmpty();
+        }
+
         private static IEnumerable<ICuttingSolver2D> AllSolvers()
         {
             yield return new ShelfGuillotineSolver();

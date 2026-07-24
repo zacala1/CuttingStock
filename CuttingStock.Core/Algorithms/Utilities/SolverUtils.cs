@@ -119,12 +119,15 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 return;
 
             // Phase 1: Original redistribution
-            RedistributeCuts(result, options);
+            RedistributeCuts(result, options, GetReuseProtectedPlanIndexes(result));
 
             // Phase 2: Local Search (2-opt style swap)
             LocalSearchOptimize(result, options, maxIterations: MaxLocalSearchIterations);
         }
-        private static void RedistributeCuts(SolverResult result, SolverOptions options)
+        private static void RedistributeCuts(
+            SolverResult result,
+            SolverOptions options,
+            HashSet<int> protectedPlanIndexes)
         {
             var sortedPlans = result.CuttingPlans
                 .Select((plan, index) => (plan, index))
@@ -136,6 +139,9 @@ namespace CuttingStock.Core.Algorithms.Utilities
             for (int i = 0; i < topCount; i++)
             {
                 var (largePlan, largeIndex) = sortedPlans[i];
+
+                if (protectedPlanIndexes.Contains(largeIndex))
+                    continue;
 
                 if (largePlan.Leftover < options.Gamma)
                     continue;
@@ -152,6 +158,9 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 for (int j = sortedPlans.Count - 1; j > i; j--)
                 {
                     var (smallPlan, smallIndex) = sortedPlans[j];
+
+                    if (protectedPlanIndexes.Contains(smallIndex))
+                        continue;
 
                     // Don't add to a welded plan — its single-cut layout is structural.
                     if (smallPlan.Cuts.Any(c => c.WeldGroupId.HasValue))
@@ -205,11 +214,16 @@ namespace CuttingStock.Core.Algorithms.Utilities
             {
                 improved = false;
                 iteration++;
+                var protectedPlanIndexes = GetReuseProtectedPlanIndexes(result);
 
                 for (int i = 0; i < result.CuttingPlans.Count - 1; i++)
                 {
                     for (int j = i + 1; j < result.CuttingPlans.Count; j++)
                     {
+                        if (protectedPlanIndexes.Contains(i) ||
+                            protectedPlanIndexes.Contains(j))
+                            continue;
+
                         var planA = result.CuttingPlans[i];
                         var planB = result.CuttingPlans[j];
 
@@ -233,9 +247,64 @@ namespace CuttingStock.Core.Algorithms.Utilities
                     }
                 }
 
-                // Remove plans that became empty after relocations
-                result.CuttingPlans.RemoveAll(p => p.Cuts.Count == 0);
+                RemoveEmptyPlansAndRemapReuseSources(result);
             }
+        }
+
+        private static HashSet<int> GetReuseProtectedPlanIndexes(SolverResult result)
+        {
+            var protectedPlanIndexes = new HashSet<int>();
+            for (int planIndex = 0; planIndex < result.CuttingPlans.Count; planIndex++)
+            {
+                if (result.CuttingPlans[planIndex].ReusableLeftoverSourcePlanIndex is not int sourceIndex)
+                    continue;
+
+                protectedPlanIndexes.Add(planIndex);
+                protectedPlanIndexes.Add(sourceIndex);
+            }
+
+            return protectedPlanIndexes;
+        }
+
+        private static void RemoveEmptyPlansAndRemapReuseSources(SolverResult result)
+        {
+            var survivingPlans = result.CuttingPlans
+                .Select((plan, oldIndex) => (plan, oldIndex))
+                .Where(entry => entry.plan.Cuts.Count > 0)
+                .ToList();
+            if (survivingPlans.Count == result.CuttingPlans.Count)
+                return;
+
+            var newIndexByOldIndex = survivingPlans
+                .Select((entry, newIndex) => (entry.oldIndex, newIndex))
+                .ToDictionary(entry => entry.oldIndex, entry => entry.newIndex);
+            var remappedPlans = new List<CuttingPlan>(survivingPlans.Count);
+
+            foreach (var (plan, _) in survivingPlans)
+            {
+                if (plan.ReusableLeftoverSourcePlanIndex is not int oldSourceIndex)
+                {
+                    remappedPlans.Add(plan);
+                    continue;
+                }
+
+                int newSourceIndex = newIndexByOldIndex[oldSourceIndex];
+                if (newSourceIndex == oldSourceIndex)
+                {
+                    remappedPlans.Add(plan);
+                    continue;
+                }
+
+                remappedPlans.Add(new CuttingPlan
+                {
+                    StockLength = plan.StockLength,
+                    ReusableLeftoverSourcePlanIndex = newSourceIndex,
+                    Cuts = plan.Cuts,
+                    Leftover = plan.Leftover,
+                });
+            }
+
+            result.CuttingPlans = remappedPlans;
         }
 
         /// <summary>

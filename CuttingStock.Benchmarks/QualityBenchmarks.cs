@@ -54,47 +54,23 @@ namespace CuttingStock.Benchmarks
         }
 
         [Benchmark(Baseline = true, Description = "Greedy Knapsack")]
-        public SolverResult GreedyKnapsack()
-        {
-            var optimizer = new GreedyKnapsackSolver();
-            var result = optimizer.Solve(_testStock, _testOrders, _defaultParams);
+        public SolverResult GreedyKnapsack() => Run(new GreedyKnapsackSolver());
 
-            // 결과 저장
+        [Benchmark(Description = "Column Generation")]
+        public SolverResult ColumnGeneration() => Run(new ColumnGenerationSolver());
+
+        [Benchmark(Description = "Arc Flow")]
+        public SolverResult ArcFlow() => Run(new ArcFlowSolver());
+
+        private SolverResult Run(ICuttingSolver solver)
+        {
+            var result = solver.Solve(_testStock, _testOrders, _defaultParams);
             LastTotalCost = result.TotalCost;
             LastWasteLength = result.WasteLength;
             LastStockUsed = result.StockUsed;
             LastMaterialEfficiency = result.MaterialEfficiency;
-
             return result;
         }
-
-        // [Benchmark(Description = "First Fit Decreasing")]
-        // public SolverResult FirstFitDecreasing()
-        // {
-        //     var optimizer = new FirstFitDecreasingSolver();
-        //     var result = optimizer.Solve(_testStock, _testOrders, _defaultParams);
-        //
-        //     LastTotalCost = result.TotalCost;
-        //     LastWasteLength = result.WasteLength;
-        //     LastStockUsed = result.StockUsed;
-        //     LastMaterialEfficiency = result.MaterialEfficiency;
-        //
-        //     return result;
-        // }
-
-        // [Benchmark(Description = "Best Fit Decreasing")]
-        // public SolverResult BestFitDecreasing()
-        // {
-        //     var optimizer = new BestFitDecreasingSolver();
-        //     var result = optimizer.Solve(_testStock, _testOrders, _defaultParams);
-        //
-        //     LastTotalCost = result.TotalCost;
-        //     LastWasteLength = result.WasteLength;
-        //     LastStockUsed = result.StockUsed;
-        //     LastMaterialEfficiency = result.MaterialEfficiency;
-        //
-        //     return result;
-        // }
     }
 
     /// <summary>
@@ -132,8 +108,8 @@ namespace CuttingStock.Benchmarks
             var optimizers = new List<ICuttingSolver>
             {
                 new GreedyKnapsackSolver(),
-                // new FirstFitDecreasingSolver(),
-                // new BestFitDecreasingSolver()
+                new ColumnGenerationSolver(),
+                new ArcFlowSolver(),
             };
 
             Console.WriteLine($"{"알고리즘",-30} {"비용",8} {"낭비",8} {"재고",6} {"효율",8} {"시간(ms)",10}");

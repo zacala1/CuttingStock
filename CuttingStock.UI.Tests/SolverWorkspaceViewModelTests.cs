@@ -34,8 +34,45 @@ namespace CuttingStock.UI.Tests
             vm.ProgressIndeterminate.Should().BeFalse();
         }
 
+        [Test]
+        public async Task Cancel_KeepsWorkspaceBusyUntilWorkerActuallyCompletes()
+        {
+            using var vm = new TestWorkspaceViewModel();
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var runTask = vm.RunUntilReleasedAsync(started, release);
+            await started.Task;
+
+            vm.CancelCommand.Execute(null);
+
+            vm.IsRunning.Should().BeTrue();
+            vm.CanCancel.Should().BeFalse();
+            vm.CanStartRun.Should().BeFalse();
+
+            release.SetResult();
+            await runTask;
+
+            vm.IsRunning.Should().BeFalse();
+            vm.CanStartRun.Should().BeTrue();
+        }
+
         private sealed class TestWorkspaceViewModel : SolverWorkspaceViewModel
         {
+            public bool CanStartRun => CanRunSolver();
+
+            public Task RunUntilReleasedAsync(
+                TaskCompletionSource started,
+                TaskCompletionSource release) =>
+                RunSolverAsync(
+                    initialProgressText: "testing",
+                    executeAsync: async _ =>
+                    {
+                        started.SetResult();
+                        await release.Task;
+                    },
+                    onError: ex => throw new InvalidOperationException("unexpected failure", ex));
+
             public async Task<SolverComparisonBatch<TestSolver, TestResult, TestRow>> CompareAsync(
                 IReadOnlyList<TestDescriptor> descriptors)
             {

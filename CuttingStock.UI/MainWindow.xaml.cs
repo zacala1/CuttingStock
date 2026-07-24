@@ -248,7 +248,7 @@ namespace CuttingStock
             // LiveCharts series can't be built declaratively in XAML (the
             // ColumnSeries<double> generic needs WPF runtime types), so we
             // refresh them whenever the comparison results change.
-            if (e.PropertyName == nameof(MainViewModel.HasComparisonResults) && _vm.HasComparisonResults)
+            if (e.PropertyName == nameof(MainViewModel.ComparisonResults) && _vm.HasComparisonResults)
                 UpdateCharts();
         }
 
@@ -474,7 +474,19 @@ namespace CuttingStock
         private void UpdateCharts()
         {
             var successResults = _vm.ComparisonResults.Where(r => r.Success).ToList();
-            if (successResults.Count == 0) return;
+            if (successResults.Count == 0)
+            {
+                costChart.Series = Array.Empty<ISeries>();
+                costChart.XAxes = Array.Empty<Axis>();
+                costChart.YAxes = Array.Empty<Axis>();
+                efficiencyChart.Series = Array.Empty<ISeries>();
+                efficiencyChart.XAxes = Array.Empty<Axis>();
+                efficiencyChart.YAxes = Array.Empty<Axis>();
+                timeChart.Series = Array.Empty<ISeries>();
+                timeChart.XAxes = Array.Empty<Axis>();
+                timeChart.YAxes = Array.Empty<Axis>();
+                return;
+            }
 
             string[] labels = successResults.Select(r => AbbreviateName(r.AlgorithmName)).ToArray();
 

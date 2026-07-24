@@ -79,7 +79,10 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 for (int iter = 0; iter < MaxCgIterations; iter++)
                 {
                     if (deadline.IsPast(pricingEnd)) break;
-                    if (!PatternMasterLp.Solve(columns, demand, out _, out var pi)) break;
+                    long pricingRemainingMs = pricingEnd - deadline.ElapsedMilliseconds;
+                    if (!PatternMasterLp.Solve(
+                            columns, demand, out _, out var pi, pricingRemainingMs))
+                        break;
 
                     bool anyAdded = false;
                     foreach (var newCol in PatternPricing.PriceImprovingColumns(
@@ -209,7 +212,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
             List<PatternColumn> columns, int[] demand, List<Sheet> sheets, long timeLimitMs, out int[]? xInt)
         {
             xInt = null;
-            var solver = Solver.CreateSolver("CBC");
+            using var solver = Solver.CreateSolver("CBC");
             if (solver == null) return false;
             solver.SetTimeLimit(timeLimitMs);
 

@@ -71,15 +71,24 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
 
         public static List<(int OrderIndex, int W, int H, bool Rot)> ExpandOrders(
             List<RectOrder> orders,
-            bool globalAllowRotation)
+            bool globalAllowRotation,
+            Func<bool>? shouldStop = null)
         {
+            shouldStop ??= static () => false;
             var list = new List<(int, int, int, bool)>();
             for (int i = 0; i < orders.Count; i++)
             {
+                if (shouldStop())
+                    throw new OperationCanceledException();
+
                 var o = orders[i];
                 bool rot = globalAllowRotation && o.AllowRotation;
                 for (int k = 0; k < o.Quantity; k++)
+                {
+                    if (shouldStop())
+                        throw new OperationCanceledException();
                     list.Add((i, o.Width, o.Height, rot));
+                }
             }
             return list;
         }

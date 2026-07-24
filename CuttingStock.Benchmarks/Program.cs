@@ -23,6 +23,7 @@ namespace CuttingStock.Benchmarks
 
                 case "--quality":
                     Run<QualityBenchmarks>("품질");
+                    DetailedQualityComparison.Run();
                     break;
 
                 case "--large":
@@ -33,6 +34,7 @@ namespace CuttingStock.Benchmarks
                     Run<AlgorithmBenchmarks>("1D");
                     Run<TwoDBenchmarks>("2D");
                     Run<QualityBenchmarks>("품질");
+                    DetailedQualityComparison.Run();
                     Run<LargeScaleBenchmarks>("1,000건 대규모");
                     break;
 

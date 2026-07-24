@@ -178,6 +178,145 @@ namespace CuttingStock.Tests.Algorithms
                 .Should().Contain("leftover is 4000mm, expected 3995mm");
         }
 
+        [Test]
+        public void InvalidSuccessfulResult_WithUnknownStockLength_ReturnsClearContractError()
+        {
+            var stock = new List<RebarStock> { new(12000, 1) };
+            var orders = new List<Order> { new(4000, 1) };
+            var result = new SolverResult
+            {
+                CuttingPlans =
+                [
+                    new CuttingPlan
+                    {
+                        StockLength = 10000,
+                        Cuts = [new Cut { Length = 4000 }],
+                        Leftover = 6000,
+                    },
+                ],
+            };
+
+            SolverUtils.ValidateSuccessfulResult(stock, orders, new SolverOptions(), result)
+                .Should().Contain("unknown stock length 10000mm");
+        }
+
+        [Test]
+        public void ValidSuccessfulResult_WithTrackedReusableLeftover_PreservesMaterialAccounting()
+        {
+            var stock = new List<RebarStock> { new(10000, 1) };
+            var orders = new List<Order> { new(1, 10) };
+            var options = new SolverOptions { Gamma = 100 };
+            var result = new SolverResult
+            {
+                CuttingPlans =
+                [
+                    new CuttingPlan
+                    {
+                        StockLength = 10000,
+                        Cuts = [new Cut { Length = 1 }, new Cut { Length = 1 }],
+                        Leftover = 9998,
+                    },
+                    new CuttingPlan
+                    {
+                        StockLength = 9998,
+                        ReusableLeftoverSourcePlanIndex = 0,
+                        Cuts =
+                        [
+                            new Cut { Length = 1 }, new Cut { Length = 1 },
+                            new Cut { Length = 1 }, new Cut { Length = 1 },
+                            new Cut { Length = 1 }, new Cut { Length = 1 },
+                            new Cut { Length = 1 }, new Cut { Length = 1 },
+                        ],
+                        Leftover = 9990,
+                    },
+                ],
+            };
+
+            SolverResultFinalizer.FinalizeResult(result, options);
+
+            SolverUtils.ValidateSuccessfulResult(stock, orders, options, result).Should().BeNull();
+            result.StockUsed.Should().Be(1);
+            result.MaterialEfficiency.Should().BeApproximately(0.1, 0.001);
+            result.ReusableLeftovers.Should().Equal(9990);
+        }
+
+        [Test]
+        public void OptimizePostProcess_WithReusableChain_DoesNotMutateConsumedSource()
+        {
+            var result = new SolverResult
+            {
+                CuttingPlans =
+                [
+                    new CuttingPlan
+                    {
+                        StockLength = 1000,
+                        Cuts = [new Cut { Length = 600 }],
+                        Leftover = 400,
+                    },
+                    new CuttingPlan
+                    {
+                        StockLength = 400,
+                        ReusableLeftoverSourcePlanIndex = 0,
+                        Cuts = [new Cut { Length = 100 }],
+                        Leftover = 300,
+                    },
+                    new CuttingPlan
+                    {
+                        StockLength = 1000,
+                        Cuts = [new Cut { Length = 600 }],
+                        Leftover = 400,
+                    },
+                    new CuttingPlan
+                    {
+                        StockLength = 400,
+                        Cuts = [new Cut { Length = 100 }],
+                        Leftover = 300,
+                    },
+                ],
+            };
+
+            SolverUtils.OptimizePostProcess(result, new SolverOptions { Gamma = 300 });
+
+            result.CuttingPlans.Should().HaveCount(3);
+            result.CuttingPlans[0].Cuts.Should().ContainSingle()
+                .Which.Length.Should().Be(600);
+            result.CuttingPlans[0].Leftover.Should().Be(400);
+            result.CuttingPlans[1].ReusableLeftoverSourcePlanIndex.Should().Be(0);
+            result.CuttingPlans[2].Cuts.Select(cut => cut.Length)
+                .Should().BeEquivalentTo([600, 100]);
+        }
+
+        [Test]
+        public void CountFreshStockUsage_ReusableLengthCollision_DoesNotConsumeInventoryTwice()
+        {
+            var stock = new List<RebarStock> { new(10000, 1), new(5000, 2) };
+            var plans = new List<CuttingPlan>
+            {
+                new()
+                {
+                    StockLength = 10000,
+                    Cuts = [new Cut { Length = 5000 }],
+                    Leftover = 5000,
+                },
+                new()
+                {
+                    StockLength = 5000,
+                    Cuts = [new Cut { Length = 1000 }],
+                    Leftover = 4000,
+                },
+                new()
+                {
+                    StockLength = 5000,
+                    ReusableLeftoverSourcePlanIndex = 0,
+                    Cuts = [new Cut { Length = 1000 }],
+                    Leftover = 4000,
+                },
+            };
+
+            GreedyKnapsackSolver.CountFreshStockUsage(stock, plans)
+                .Should().Equal(1, 1);
+        }
+
         private static void AssertSuccessfulContract(
             SolverDescriptor descriptor,
             List<RebarStock> stock,
@@ -196,7 +335,8 @@ namespace CuttingStock.Tests.Algorithms
 
             var stockLengths = stock.Select(s => s.Length).ToHashSet();
             result.CuttingPlans.Should().NotBeEmpty();
-            result.CuttingPlans.Should().OnlyContain(p => stockLengths.Contains(p.StockLength));
+            result.CuttingPlans.Should().OnlyContain(
+                p => p.UsesReusableLeftover || stockLengths.Contains(p.StockLength));
 
             foreach (var plan in result.CuttingPlans)
             {
@@ -207,11 +347,18 @@ namespace CuttingStock.Tests.Algorithms
                 plan.Leftover.Should().BeGreaterThanOrEqualTo(0);
             }
 
+            var consumedSourcePlanIndexes = result.CuttingPlans
+                .Where(plan => plan.ReusableLeftoverSourcePlanIndex.HasValue)
+                .Select(plan => plan.ReusableLeftoverSourcePlanIndex!.Value)
+                .ToHashSet();
             var expectedReusable = result.CuttingPlans
-                .Where(p => p.Leftover >= options.Gamma)
-                .Select(p => p.Leftover)
-                .OrderBy(x => x);
-            result.ReusableLeftovers.OrderBy(x => x).Should().Equal(expectedReusable);
+                .Select((plan, index) => (plan, index))
+                .Where(entry =>
+                    entry.plan.Leftover >= options.Gamma &&
+                    !consumedSourcePlanIndexes.Contains(entry.index))
+                .Select(entry => entry.plan.Leftover);
+            result.ReusableLeftovers.OrderBy(x => x)
+                .Should().Equal(expectedReusable.OrderBy(x => x));
 
             var expectedWaste = result.CuttingPlans
                 .Where(p => p.Leftover < options.Gamma)
@@ -222,7 +369,8 @@ namespace CuttingStock.Tests.Algorithms
                 result.WasteLength * (double)options.Alpha +
                 result.WeldCount * (double)options.Beta);
             result.TotalCost.Should().Be(expectedCost);
-            result.StockUsed.Should().Be(result.CuttingPlans.Count);
+            result.StockUsed.Should().Be(
+                result.CuttingPlans.Count(plan => !plan.UsesReusableLeftover));
             result.MaterialEfficiency.Should().BeInRange(0d, 100d);
         }
 

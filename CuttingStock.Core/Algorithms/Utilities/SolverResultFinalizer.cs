@@ -13,10 +13,9 @@ namespace CuttingStock.Core.Algorithms.Utilities
         {
             RecomputeLeftovers(result, options);
 
-            result.ReusableLeftovers = result.CuttingPlans
-                .Where(p => p.Leftover >= options.Gamma)
-                .Select(p => p.Leftover)
-                .ToList();
+            result.ReusableLeftovers = ComputeAvailableReusableLeftovers(
+                result.CuttingPlans,
+                options.Gamma);
 
             result.WasteLength = result.CuttingPlans
                 .Where(p => p.Leftover < options.Gamma)
@@ -66,14 +65,35 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 .ToDictionary(g => g.Key, g => g.Sum(o => o.Quantity));
             var producedByLength = new Dictionary<int, int>();
             var usedStockByLength = new Dictionary<int, int>();
+            var consumedSourcePlanIndexes = new HashSet<int>();
 
             for (int planIndex = 0; planIndex < result.CuttingPlans.Count; planIndex++)
             {
                 var plan = result.CuttingPlans[planIndex];
-                if (stockByLength.ContainsKey(plan.StockLength))
+                if (plan.ReusableLeftoverSourcePlanIndex is int sourcePlanIndex)
                 {
+                    if (sourcePlanIndex < 0 || sourcePlanIndex >= planIndex)
+                        return $"Plan {planIndex + 1} has invalid reusable-leftover source plan {sourcePlanIndex + 1}.";
+                    if (!consumedSourcePlanIndexes.Add(sourcePlanIndex))
+                        return $"Plan {sourcePlanIndex + 1} leftover is reused more than once.";
+
+                    var sourcePlan = result.CuttingPlans[sourcePlanIndex];
+                    if (sourcePlan.Leftover < options.Gamma)
+                        return $"Plan {sourcePlanIndex + 1} leftover {sourcePlan.Leftover}mm is below Gamma {options.Gamma}mm.";
+                    if (sourcePlan.Leftover != plan.StockLength)
+                        return $"Plan {planIndex + 1} reuses {plan.StockLength}mm but source plan {sourcePlanIndex + 1} provides {sourcePlan.Leftover}mm.";
+                }
+                else
+                {
+                    if (!stockByLength.ContainsKey(plan.StockLength))
+                        return $"Plan {planIndex + 1} uses unknown stock length {plan.StockLength}mm.";
+
                     usedStockByLength.TryGetValue(plan.StockLength, out int used);
-                    usedStockByLength[plan.StockLength] = used + 1;
+                    used++;
+                    if (used > stockByLength[plan.StockLength])
+                        return $"Stock {plan.StockLength}mm usage {used} exceeds inventory {stockByLength[plan.StockLength]}.";
+
+                    usedStockByLength[plan.StockLength] = used;
                 }
 
                 int consumed = plan.Cuts.Sum(c => c.Length) + Math.Max(0, plan.Cuts.Count - 1) * options.Kerf;
@@ -119,12 +139,6 @@ namespace CuttingStock.Core.Algorithms.Utilities
                 producedByLength[weldedLength] = produced + 1;
             }
 
-            foreach (var (length, used) in usedStockByLength)
-            {
-                if (used > stockByLength[length])
-                    return $"Stock {length}mm usage {used} exceeds inventory {stockByLength[length]}.";
-            }
-
             foreach (var (length, demand) in demandByLength)
             {
                 producedByLength.TryGetValue(length, out int produced);
@@ -139,6 +153,24 @@ namespace CuttingStock.Core.Algorithms.Utilities
             }
 
             return null;
+        }
+
+        private static List<int> ComputeAvailableReusableLeftovers(
+            List<CuttingPlan> plans,
+            int gamma)
+        {
+            var consumedSourcePlanIndexes = plans
+                .Where(plan => plan.ReusableLeftoverSourcePlanIndex.HasValue)
+                .Select(plan => plan.ReusableLeftoverSourcePlanIndex!.Value)
+                .ToHashSet();
+
+            return plans
+                .Select((plan, index) => (plan, index))
+                .Where(entry =>
+                    entry.plan.Leftover >= gamma &&
+                    !consumedSourcePlanIndexes.Contains(entry.index))
+                .Select(entry => entry.plan.Leftover)
+                .ToList();
         }
 
         private static void RecomputeLeftovers(SolverResult result, SolverOptions options)

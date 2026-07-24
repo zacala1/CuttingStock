@@ -64,6 +64,9 @@ namespace CuttingStock.UI.ViewModels
             try
             {
                 var scenario = ScenarioService.Load2D(path);
+                if (IsRunning)
+                    CancelActiveRun();
+
                 Sheets.Clear();
                 foreach (var s in scenario.Sheets)
                     Sheets.Add(new SheetRow { Width = s.Width, Height = s.Height, Quantity = s.Quantity });
