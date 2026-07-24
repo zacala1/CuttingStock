@@ -36,9 +36,9 @@ namespace CuttingStock.UI.Tests
                     source.KerfText = "3";
                     source.TrimText = "7";
                     source.AlphaAreaText = "2.5";
-                    source.TimeLimitText = "1234";
+                    source.TimeLimitText = "1";
                     source.AllowRotation = false;
-                    source.StageIndex = 0;
+                    source.StageIndex = 1;
                     source.UsageOrderIndex = 0;
 
                     source.SaveScenarioCommand.Execute(null);
@@ -49,9 +49,14 @@ namespace CuttingStock.UI.Tests
                 using var target = new TwoDViewModel(loadDialog);
                 string? loadedPath = null;
                 target.ScenarioLoaded += (_, value) => loadedPath = value;
+                target.IsRunning = true;
+                target.CanCancel = true;
                 target.LoadScenarioFromPath(path).Should().BeTrue();
 
                 loadedPath.Should().Be(path);
+                target.IsRunning.Should().BeTrue();
+                target.CanCancel.Should().BeFalse();
+                target.CalculateCommand.CanExecute(null).Should().BeFalse();
                 target.Sheets.Should().ContainSingle().Which.Should().BeEquivalentTo(
                     new SheetRow { Width = 2440, Height = 1220, Quantity = 3 });
                 target.Orders.Should().ContainSingle().Which.Should().BeEquivalentTo(
@@ -65,9 +70,9 @@ namespace CuttingStock.UI.Tests
                 target.KerfText.Should().Be("3");
                 target.TrimText.Should().Be("7");
                 target.AlphaAreaText.Should().Be("2.5");
-                target.TimeLimitText.Should().Be("1234");
+                target.TimeLimitText.Should().Be("1");
                 target.AllowRotation.Should().BeFalse();
-                target.StageIndex.Should().Be(0);
+                target.StageIndex.Should().Be(1);
                 target.UsageOrderIndex.Should().Be(0);
             }
             finally

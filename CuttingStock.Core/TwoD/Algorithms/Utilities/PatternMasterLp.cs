@@ -12,13 +12,19 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             List<PatternColumn> columns,
             int[] demand,
             out double[] multiplicities,
-            out double[] duals)
+            out double[] duals,
+            long? timeLimitMs = null)
         {
             multiplicities = Array.Empty<double>();
             duals = Array.Empty<double>();
 
-            var solver = Solver.CreateSolver("GLOP");
+            if (timeLimitMs is <= 0)
+                return false;
+
+            using var solver = Solver.CreateSolver("GLOP");
             if (solver == null) return false;
+            if (timeLimitMs.HasValue)
+                solver.SetTimeLimit(timeLimitMs.Value);
 
             int orderCount = demand.Length;
             int columnCount = columns.Count;

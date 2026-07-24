@@ -67,15 +67,24 @@ namespace CuttingStock.UI.Tests
         [Test]
         public void CreateProgress_IgnoresStaleRun()
         {
+            var previousContext = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(new InlineSynchronizationContext());
             using var lifecycle = new SolverRunLifecycle();
-            var run = lifecycle.Begin();
-            double observed = 0;
-            var progress = lifecycle.CreateProgress(run, v => observed = v);
+            try
+            {
+                var run = lifecycle.Begin();
+                double observed = 0;
+                var progress = lifecycle.CreateProgress(run, v => observed = v);
 
-            lifecycle.CancelCurrent();
-            ((IProgress<double>)progress).Report(75);
+                lifecycle.CancelCurrent();
+                ((IProgress<double>)progress).Report(75);
 
-            observed.Should().Be(0);
+                observed.Should().Be(0);
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previousContext);
+            }
         }
 
         [Test]
@@ -128,7 +137,7 @@ namespace CuttingStock.UI.Tests
         }
 
         [Test]
-        public async Task RunAsync_IgnoresStaleExceptionAfterCancel()
+        public async Task RunAsync_CompletesCancelledCurrentRunWithoutRoutingItsException()
         {
             using var lifecycle = new SolverRunLifecycle();
             bool completed = false;
@@ -144,8 +153,13 @@ namespace CuttingStock.UI.Tests
                 onCompleted: () => completed = true,
                 onError: _ => errorHandled = true);
 
-            completed.Should().BeFalse();
+            completed.Should().BeTrue();
             errorHandled.Should().BeFalse();
+        }
+
+        private sealed class InlineSynchronizationContext : SynchronizationContext
+        {
+            public override void Post(SendOrPostCallback callback, object? state) => callback(state);
         }
     }
 }

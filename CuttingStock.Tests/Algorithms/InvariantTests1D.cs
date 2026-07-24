@@ -27,7 +27,7 @@ namespace CuttingStock.Tests.Algorithms
     ///   (d) stock-usage of any RebarStock instance does not exceed its Quantity,
     ///   (e) waste length (∑ leftover &lt; γ) is consistent with reported WasteLength,
     ///   (f) TotalCost == round(WasteLength × α + WeldCount × β),
-    ///   (g) StockUsed == CuttingPlans.Count,
+    ///   (g) StockUsed counts only fresh-stock plans,
     ///   (h) MaterialEfficiency is in [0, 100].
     /// </summary>
     [TestFixture]
@@ -91,8 +91,10 @@ namespace CuttingStock.Tests.Algorithms
             }
 
             // (d) stock inventory not exceeded
-            var stockUsage = r.CuttingPlans.GroupBy(p => p.StockLength)
-                                            .ToDictionary(g => g.Key, g => g.Count());
+            var stockUsage = r.CuttingPlans
+                .Where(p => !p.UsesReusableLeftover)
+                .GroupBy(p => p.StockLength)
+                .ToDictionary(g => g.Key, g => g.Count());
             foreach (var s in stocks)
             {
                 stockUsage.TryGetValue(s.Length, out var used);
@@ -115,7 +117,8 @@ namespace CuttingStock.Tests.Algorithms
                 "{0}: cost formula mismatch", solver.Name);
 
             // (g) StockUsed
-            r.StockUsed.Should().Be(r.CuttingPlans.Count);
+            r.StockUsed.Should().Be(
+                r.CuttingPlans.Count(plan => !plan.UsesReusableLeftover));
 
             // (h) efficiency range
             r.MaterialEfficiency.Should().BeInRange(0, 100.001);

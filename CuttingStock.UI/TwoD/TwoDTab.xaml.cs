@@ -25,6 +25,7 @@ namespace CuttingStock.UI.TwoD
     public partial class TwoDTab : UserControl, IDisposable
     {
         private readonly TwoDViewModel _vm;
+        public WorkspaceShortcutTarget ShortcutTarget { get; }
         private static readonly Regex IntegerRegex = new("[^0-9]+", RegexOptions.Compiled);
         private static readonly Regex DecimalRegex = new("[^0-9.]+", RegexOptions.Compiled);
 
@@ -44,6 +45,13 @@ namespace CuttingStock.UI.TwoD
         {
             InitializeComponent();
             _vm = new TwoDViewModel(new DialogService());
+            ShortcutTarget = new WorkspaceShortcutTarget(
+                _vm.LoadExampleCommand,
+                _vm.CalculateCommand,
+                _vm.CompareCommand,
+                _vm.ExportToExcelCommand,
+                _vm.CancelCommand,
+                () => _vm.HasSingleResult);
             DataContext = _vm;
             _vm.PropertyChanged += Vm_PropertyChanged;
         }
@@ -172,19 +180,6 @@ namespace CuttingStock.UI.TwoD
                 MessageBox.Show($"'{header}'에는 양의 정수만 입력 가능합니다.", "입력 오류",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 e.Cancel = true;
-            }
-        }
-
-        // ─── Keyboard shortcuts ──────────────────────────────────────
-
-        private void UserControl_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            // Esc cancels an in-flight 2D solve. MainWindow's window-level handler
-            // only knows about the 1D ViewModel, so we route Esc locally here.
-            if (e.Key == Key.Escape && _vm.CanCancel)
-            {
-                _vm.CancelCommand.Execute(null);
-                e.Handled = true;
             }
         }
 

@@ -103,10 +103,15 @@ namespace CuttingStock.UI.Tests
 
                 string? capturedPath = null;
                 _vm.ScenarioLoaded += (_, p) => capturedPath = p;
+                _vm.IsRunning = true;
+                _vm.CanCancel = true;
 
                 _vm.LoadScenarioFromPath(path).Should().BeTrue();
 
                 capturedPath.Should().Be(path);
+                _vm.IsRunning.Should().BeTrue();
+                _vm.CanCancel.Should().BeFalse();
+                _vm.CalculateCommand.CanExecute(null).Should().BeFalse();
             }
             finally
             {

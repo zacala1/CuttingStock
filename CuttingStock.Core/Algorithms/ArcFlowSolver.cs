@@ -110,7 +110,7 @@ namespace CuttingStock.Core.Algorithms
             SolverOptions options,
             IProgress<double>? progress)
         {
-            var solver = Solver.CreateSolver("SCIP");
+            using var solver = Solver.CreateSolver("SCIP");
             if (solver == null)
             {
                 throw new InvalidOperationException("SCIP solver not available. Ensure Google.OrTools is correctly installed.");

@@ -70,6 +70,17 @@ namespace CuttingStock.UI.Tests
             _vm.StageIndex.Should().Be(0);
         }
 
+        [Test]
+        public void StageIndex_AdvisorySolverPreservesThreeStageSelection()
+        {
+            _vm.AlgorithmIndex = 0;
+
+            _vm.StageIndex = 1;
+
+            _vm.StageIndex.Should().Be(1);
+            _vm.CanConfigureStage.Should().BeTrue();
+        }
+
         // ─── Calculate validation ───────────────────────────────────
 
         [Test]

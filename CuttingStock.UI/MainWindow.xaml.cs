@@ -29,12 +29,20 @@ namespace CuttingStock
     public partial class MainWindow : Window
     {
         private readonly MainViewModel _vm;
+        private readonly WorkspaceShortcutTarget _oneDShortcutTarget;
         private UserPreferences _prefs = new();
 
         public MainWindow()
         {
             InitializeComponent();
             _vm = new MainViewModel(new DialogService());
+            _oneDShortcutTarget = new WorkspaceShortcutTarget(
+                _vm.LoadExampleCommand,
+                _vm.CalculateCommand,
+                _vm.CompareAlgorithmsCommand,
+                _vm.ExportToExcelCommand,
+                _vm.CancelCommand,
+                () => _vm.HasSingleResult);
             DataContext = _vm;
             _vm.PropertyChanged += Vm_PropertyChanged;
             _vm.ScenarioSaved += (_, path) => OnScenarioPathUsed(_prefs.Recent1D, path);
@@ -240,7 +248,7 @@ namespace CuttingStock
             // LiveCharts series can't be built declaratively in XAML (the
             // ColumnSeries<double> generic needs WPF runtime types), so we
             // refresh them whenever the comparison results change.
-            if (e.PropertyName == nameof(MainViewModel.HasComparisonResults) && _vm.HasComparisonResults)
+            if (e.PropertyName == nameof(MainViewModel.ComparisonResults) && _vm.HasComparisonResults)
                 UpdateCharts();
         }
 
@@ -371,14 +379,14 @@ namespace CuttingStock
             bool shift = (Keyboard.Modifiers & ModifierKeys.Shift)   == ModifierKeys.Shift;
 
             if (e.Key == Key.F1)
-            { _vm.LoadExampleCommand.Execute(null); e.Handled = true; return; }
+            { e.Handled = ExecuteWorkspaceShortcut(WorkspaceShortcut.LoadExample); return; }
             if (ctrl && !shift && e.Key == Key.R)
-            { _vm.CalculateCommand.Execute(null); e.Handled = true; return; }
+            { e.Handled = ExecuteWorkspaceShortcut(WorkspaceShortcut.Calculate); return; }
             if (ctrl && shift && e.Key == Key.C)
-            { _vm.CompareAlgorithmsCommand.Execute(null); e.Handled = true; return; }
-            if (ctrl && !shift && e.Key == Key.S && _vm.HasSingleResult)
-            { _vm.ExportToExcelCommand.Execute(null); e.Handled = true; return; }
-            if (ctrl && !shift && e.Key == Key.F)
+            { e.Handled = ExecuteWorkspaceShortcut(WorkspaceShortcut.Compare); return; }
+            if (ctrl && !shift && e.Key == Key.S)
+            { e.Handled = ExecuteWorkspaceShortcut(WorkspaceShortcut.ExportToExcel); return; }
+            if (ctrl && !shift && e.Key == Key.F && topTabControl.SelectedIndex == 0)
             {
                 // Ctrl+F should open the search bar OR re-focus the box if it's
                 // already open — never close it. Closing is Esc's job.
@@ -393,15 +401,23 @@ namespace CuttingStock
                 }
                 e.Handled = true; return;
             }
-            if (e.Key == Key.F3 && shift)
+            if (e.Key == Key.F3 && shift && topTabControl.SelectedIndex == 0)
             { SearchPrev_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
-            if (e.Key == Key.F3)
+            if (e.Key == Key.F3 && topTabControl.SelectedIndex == 0)
             { SearchNext_Click(this, new RoutedEventArgs()); e.Handled = true; return; }
-            if (e.Key == Key.Escape && _vm.CanCancel)
-            { _vm.CancelCommand.Execute(null); e.Handled = true; return; }
+            if (e.Key == Key.Escape &&
+                ExecuteWorkspaceShortcut(WorkspaceShortcut.Cancel))
+            { e.Handled = true; return; }
             if (e.Key == Key.Escape && searchBar.Visibility == Visibility.Visible)
             { ToggleSearchBar(false); e.Handled = true; }
         }
+
+        private bool ExecuteWorkspaceShortcut(WorkspaceShortcut shortcut) =>
+            WorkspaceShortcutDispatcher.TryExecute(
+                topTabControl.SelectedIndex,
+                shortcut,
+                _oneDShortcutTarget,
+                twoDTab.ShortcutTarget);
 
         // ─── Search bar (Ctrl+F) ─────────────────────────────────────
 
@@ -458,7 +474,19 @@ namespace CuttingStock
         private void UpdateCharts()
         {
             var successResults = _vm.ComparisonResults.Where(r => r.Success).ToList();
-            if (successResults.Count == 0) return;
+            if (successResults.Count == 0)
+            {
+                costChart.Series = Array.Empty<ISeries>();
+                costChart.XAxes = Array.Empty<Axis>();
+                costChart.YAxes = Array.Empty<Axis>();
+                efficiencyChart.Series = Array.Empty<ISeries>();
+                efficiencyChart.XAxes = Array.Empty<Axis>();
+                efficiencyChart.YAxes = Array.Empty<Axis>();
+                timeChart.Series = Array.Empty<ISeries>();
+                timeChart.XAxes = Array.Empty<Axis>();
+                timeChart.YAxes = Array.Empty<Axis>();
+                return;
+            }
 
             string[] labels = successResults.Select(r => AbbreviateName(r.AlgorithmName)).ToArray();
 

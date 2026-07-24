@@ -129,6 +129,24 @@ namespace CuttingStock.UI.Tests
         }
 
         [Test]
+        public async Task Compare_RaisesComparisonResultsChangedForEveryCompletedRun()
+        {
+            _vm.Stocks.Add(new StockRow { Length = 12000, Quantity = 3 });
+            _vm.Orders.Add(new OrderRow { Length = 4000, Quantity = 2 });
+            int refreshCount = 0;
+            _vm.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(MainViewModel.ComparisonResults))
+                    refreshCount++;
+            };
+
+            await _vm.CompareAlgorithmsCommand.ExecuteAsync(null);
+            await _vm.CompareAlgorithmsCommand.ExecuteAsync(null);
+
+            refreshCount.Should().Be(2);
+        }
+
+        [Test]
         public async Task ExportToCsv_AfterCalculateUsesOneDResultAndOptions()
         {
             string path = Path.Combine(
@@ -250,15 +268,16 @@ namespace CuttingStock.UI.Tests
         }
 
         [Test]
-        public void Cancel_WhenRunning_FreesUiAndSetsCancelledText()
+        public void Cancel_WhenRunning_KeepsUiBusyAndSetsCancelledText()
         {
             _vm.IsRunning = true;
             _vm.CanCancel = true;
 
             _vm.CancelCommand.Execute(null);
 
-            _vm.IsRunning.Should().BeFalse();
+            _vm.IsRunning.Should().BeTrue();
             _vm.CanCancel.Should().BeFalse();
+            _vm.CalculateCommand.CanExecute(null).Should().BeFalse();
             _vm.ProgressText.Should().Contain("취소");
         }
 

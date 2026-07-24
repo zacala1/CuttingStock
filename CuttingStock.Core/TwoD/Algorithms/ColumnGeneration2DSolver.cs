@@ -46,6 +46,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 orders = input.Orders;
                 int n = orders.Count;
                 int[] demand = orders.Select(o => o.Quantity).ToArray();
+                var deadline = TwoDDeadline.FromStopwatch(sw, options.TimeLimitMs);
 
                 // 1) Warm start with the shelf heuristic.
                 var warm = new ShelfGuillotineSolver().Solve(sheets, orders, options);
@@ -58,6 +59,9 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     return result;
                 }
 
+                if (deadline.IsExpired)
+                    return FinishWithWarmStart(result, warm, sheets, orders, options, sw);
+
                 var columns = new List<PatternColumn>();
                 var signatures = new HashSet<long>();
                 foreach (var p in warm.Patterns)
@@ -69,19 +73,15 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 // 2) Column generation loop with multi-pricing: every iteration picks ALL
                 //    improving columns (one per sheet type), not just the best one. Empirically
                 //    this shrinks the iteration count by 2–4× on multi-sheet inputs.
-                var deadline = TwoDDeadline.FromStopwatch(sw, options.TimeLimitMs);
                 for (int iter = 0; iter < MaxCgIterations; iter++)
                 {
-                    if (deadline.IsExpired) break;
+                    if (!deadline.TryGetRemainingMilliseconds(out long remainingMs))
+                        break;
 
-                    if (!PatternMasterLp.Solve(columns, demand, out _, out var pi))
+                    if (!PatternMasterLp.Solve(
+                            columns, demand, out _, out var pi, remainingMs))
                     {
-                        // LP infeasible — fall back to warm start.
-                        result.Patterns = warm.Patterns;
-                        TwoDResultFinalizer.FinalizeAndValidate(sheets, orders, options, result);
-                        sw.Stop();
-                        result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
-                        return result;
+                        return FinishWithWarmStart(result, warm, sheets, orders, options, sw);
                     }
 
                     bool anyAdded = false;
@@ -98,20 +98,35 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 }
 
                 // 3) Final LP, then floor to integer multiplicities and mop up the residual.
-                if (!PatternMasterLp.Solve(columns, demand, out var xFinal, out _))
-                {
-                    result.Patterns = warm.Patterns;
-                    TwoDResultFinalizer.FinalizeAndValidate(sheets, orders, options, result);
-                    sw.Stop();
-                    result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
-                    return result;
-                }
+                if (!deadline.TryGetRemainingMilliseconds(out long finalLpMs))
+                    return FinishWithWarmStart(result, warm, sheets, orders, options, sw);
+
+                if (!PatternMasterLp.Solve(
+                        columns, demand, out var xFinal, out _, finalLpMs))
+                    return FinishWithWarmStart(result, warm, sheets, orders, options, sw);
+
+                if (deadline.IsExpired)
+                    return FinishWithWarmStart(result, warm, sheets, orders, options, sw);
 
                 var integerPatterns = RoundDownAndMaterialize(
                     columns, xFinal, sheets, n, demand, out var produced, out var sheetUsage);
 
+                if (deadline.IsExpired)
+                    return FinishWithWarmStart(result, warm, sheets, orders, options, sw);
+
                 CoverResidualWithHeuristic(
-                    integerPatterns, sheets, sheetUsage, orders, demand, produced, options, result);
+                    integerPatterns,
+                    sheets,
+                    sheetUsage,
+                    orders,
+                    demand,
+                    produced,
+                    options,
+                    result,
+                    deadline);
+
+                if (deadline.IsExpired)
+                    return FinishWithWarmStart(result, warm, sheets, orders, options, sw);
 
                 if (integerPatterns.Count == 0)
                     integerPatterns = warm.Patterns;
@@ -139,6 +154,23 @@ namespace CuttingStock.Core.TwoD.Algorithms
         }
 
         // ---- helpers ----
+
+        internal static SolverResult2D FinishWithWarmStart(
+            SolverResult2D result,
+            SolverResult2D warm,
+            List<Sheet> sheets,
+            List<RectOrder> orders,
+            SolverOptions2D options,
+            Stopwatch stopwatch)
+        {
+            result.Patterns = warm.Patterns;
+            result.Success = warm.Success;
+            result.ErrorMessage = warm.ErrorMessage;
+            TwoDResultFinalizer.FinalizeAndValidate(sheets, orders, options, result);
+            stopwatch.Stop();
+            result.ExecutionTimeMs = stopwatch.Elapsed.TotalMilliseconds;
+            return result;
+        }
 
         /// <summary>
         /// Floor the LP solution to integer multiplicities while respecting per-sheet stock,
@@ -192,7 +224,8 @@ namespace CuttingStock.Core.TwoD.Algorithms
             int[] demand,
             int[] produced,
             SolverOptions2D options,
-            SolverResult2D result)
+            SolverResult2D result,
+            TwoDDeadline deadline)
         {
             int n = orders.Count;
             var residualOriginalIndex = new List<int>();
@@ -220,7 +253,11 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 return;
             }
 
-            var mop = new ShelfGuillotineSolver().Solve(remainSheets, residual, options);
+            var mop = new ShelfGuillotineSolver().SolveUntil(
+                remainSheets,
+                residual,
+                options,
+                shouldStop: () => deadline.IsExpired);
             if (!mop.Success)
             {
                 result.Success = false;

@@ -37,14 +37,17 @@ namespace CuttingStock.UI.ViewModels
         public string SelectedSolverAdvancedNotes => SelectedSolverDescriptor.AdvancedNotes;
         public bool CanConfigureTimeLimit => SelectedSolverDescriptor.Supports(SolverCapability.TimeLimit);
         public bool CanConfigureStage =>
-            SelectedSolverDescriptor.Supports(SolverCapability.EnforcedStage) &&
-            SelectedSolverDescriptor.SupportedStages.Count > 1;
+            SelectedSolverDescriptor.Supports(SolverCapability.AdvisoryStage) ||
+            (SelectedSolverDescriptor.Supports(SolverCapability.EnforcedStage) &&
+             SelectedSolverDescriptor.SupportedStages.Count > 1);
         public string TimeLimitOptionTip => CanConfigureTimeLimit
             ? "CG/MIP 솔버 wall-clock 제한 (ms)"
             : $"{SelectedSolverDescriptor.Name}은(는) 시간 제한을 사용하지 않습니다.";
-        public string StageOptionTip => CanConfigureStage
-            ? "선택한 stage 수를 절단 패턴 제약으로 강제합니다."
-            : SelectedSolverDescriptor.Supports(SolverCapability.EnforcedStage)
+        public string StageOptionTip => SelectedSolverDescriptor.Supports(SolverCapability.AdvisoryStage)
+            ? "Stage 값은 시나리오에 보존되지만 현재 절단 패턴을 제한하지 않습니다."
+            : CanConfigureStage
+                ? "선택한 stage 수를 절단 패턴 제약으로 강제합니다."
+                : SelectedSolverDescriptor.Supports(SolverCapability.EnforcedStage)
                 ? $"{SelectedSolverDescriptor.Name}은(는) {string.Join("/", SelectedSolverDescriptor.SupportedStages)}-stage로 고정됩니다."
                 : "현재 선택한 solver는 Stage 값을 강제하지 않습니다. 패턴은 unrestricted guillotine입니다.";
 

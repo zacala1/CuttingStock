@@ -153,6 +153,7 @@ namespace CuttingStock.UI.ViewModels
 
                     ComparisonText = summary.Report;
                     HasComparisonResults = true;
+                    OnPropertyChanged(nameof(ComparisonResults));
 
                     var best = summary.BestOutcome?.Row;
                     if (best != null)

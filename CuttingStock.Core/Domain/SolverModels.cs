@@ -72,13 +72,15 @@ namespace CuttingStock.Core.Domain
         public double ExecutionTimeMs { get; set; }
         public bool Success { get; set; } = true;
         public string? ErrorMessage { get; set; }
-        public int StockUsed => CuttingPlans.Count;
+        public int StockUsed => CuttingPlans.Count(plan => !plan.UsesReusableLeftover);
 
         public double MaterialEfficiency
         {
             get
             {
-                long totalStockLength = CuttingPlans.Sum(p => (long)p.StockLength);
+                long totalStockLength = CuttingPlans
+                    .Where(plan => !plan.UsesReusableLeftover)
+                    .Sum(plan => (long)plan.StockLength);
                 if (totalStockLength == 0) return 0;
                 long totalUsedLength = CuttingPlans.Sum(p => p.Cuts.Sum(c => (long)c.Length));
                 return 100.0 * totalUsedLength / totalStockLength;
@@ -100,7 +102,8 @@ namespace CuttingStock.Core.Domain
                     c.WeldGroupId.HasValue
                         ? $"{c.Length}mm*G{c.WeldGroupId.Value}"
                         : $"{c.Length}mm");
-                sb.AppendLine($"#{planNumber}: Stock {plan.StockLength}mm -> [{string.Join(", ", cutsDisplay)}] (Rem: {plan.Leftover}mm)");
+                string source = plan.UsesReusableLeftover ? "Reusable leftover" : "Stock";
+                sb.AppendLine($"#{planNumber}: {source} {plan.StockLength}mm -> [{string.Join(", ", cutsDisplay)}] (Rem: {plan.Leftover}mm)");
                 planNumber++;
             }
 
@@ -149,6 +152,8 @@ namespace CuttingStock.Core.Domain
     {
         public int StockLength { get; init; }
         public List<Cut> Cuts { get; init; } = new();
+        public int? ReusableLeftoverSourcePlanIndex { get; init; }
+        public bool UsesReusableLeftover => ReusableLeftoverSourcePlanIndex.HasValue;
         // Mutable: post-processing (relocate/swap) recomputes this after Cuts changes.
         public int Leftover { get; set; }
     }

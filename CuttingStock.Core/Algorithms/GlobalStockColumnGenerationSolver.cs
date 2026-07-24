@@ -156,7 +156,7 @@ namespace CuttingStock.Core.Algorithms
         private static bool SolveLpMaster(List<Column> columns, int[] demand, out double[] pi)
         {
             pi = Array.Empty<double>();
-            var solver = Solver.CreateSolver("GLOP");
+            using var solver = Solver.CreateSolver("GLOP");
             if (solver == null) return false;
 
             var vars = new Variable[columns.Count];
@@ -234,7 +234,7 @@ namespace CuttingStock.Core.Algorithms
             out List<CuttingPlan> plans)
         {
             plans = new List<CuttingPlan>();
-            var solver = Solver.CreateSolver("CBC");
+            using var solver = Solver.CreateSolver("CBC");
             if (solver == null) return false;
             solver.SetTimeLimit(IntegerMasterTimeLimitMs);
 

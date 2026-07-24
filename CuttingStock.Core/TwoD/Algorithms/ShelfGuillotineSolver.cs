@@ -27,11 +27,33 @@ namespace CuttingStock.Core.TwoD.Algorithms
             SolverOptions2D options,
             IProgress<double>? progress = null)
         {
+            return SolveCore(sheets, orders, options, progress, static () => false);
+        }
+
+        internal SolverResult2D SolveUntil(
+            List<Sheet> sheets,
+            List<RectOrder> orders,
+            SolverOptions2D options,
+            Func<bool> shouldStop,
+            IProgress<double>? progress = null)
+        {
+            ArgumentNullException.ThrowIfNull(shouldStop);
+            return SolveCore(sheets, orders, options, progress, shouldStop);
+        }
+
+        private SolverResult2D SolveCore(
+            List<Sheet> sheets,
+            List<RectOrder> orders,
+            SolverOptions2D options,
+            IProgress<double>? progress,
+            Func<bool> shouldStop)
+        {
             var sw = Stopwatch.StartNew();
             var result = new SolverResult2D { AlgorithmName = Name };
 
             try
             {
+                ThrowIfStopped(shouldStop);
                 var input = TwoDInputPreprocessor.Preprocess(sheets, orders, result);
                 if (input.ShouldReturn)
                 {
@@ -42,16 +64,31 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 }
 
                 var orderedSheets = TwoDInputPreprocessor.OrderSheets(input.Sheets, options);
-                var items = TwoDInputPreprocessor.ExpandOrders(input.Orders, options.AllowRotation);
+                var items = TwoDInputPreprocessor.ExpandOrders(
+                    input.Orders,
+                    options.AllowRotation,
+                    shouldStop);
+                ThrowIfStopped(shouldStop);
 
                 // Try every (order rule × shelf strategy) combo and keep the best.
-                var orderingRules = new (string Name, Func<List<Item>, List<Item>> Sort)[]
+                var orderingRules = new Comparison<Item>[]
                 {
-                    ("DecH",    xs => xs.OrderByDescending(i => i.H).ThenByDescending(i => i.W).ToList()),
-                    ("DecW",    xs => xs.OrderByDescending(i => i.W).ThenByDescending(i => i.H).ToList()),
-                    ("DecArea", xs => xs.OrderByDescending(i => (long)i.W * i.H).ToList()),
-                    ("DecPeri", xs => xs.OrderByDescending(i => i.W + i.H).ToList()),
-                    ("DecLong", xs => xs.OrderByDescending(i => Math.Max(i.W, i.H)).ToList()),
+                    static (left, right) =>
+                    {
+                        int byHeight = right.H.CompareTo(left.H);
+                        return byHeight != 0 ? byHeight : right.W.CompareTo(left.W);
+                    },
+                    static (left, right) =>
+                    {
+                        int byWidth = right.W.CompareTo(left.W);
+                        return byWidth != 0 ? byWidth : right.H.CompareTo(left.H);
+                    },
+                    static (left, right) =>
+                        ((long)right.W * right.H).CompareTo((long)left.W * left.H),
+                    static (left, right) =>
+                        ((long)right.W + right.H).CompareTo((long)left.W + left.H),
+                    static (left, right) =>
+                        Math.Max(right.W, right.H).CompareTo(Math.Max(left.W, left.H)),
                 };
                 var strategies = new (string Name, ShelfStrategy S)[]
                 {
@@ -64,14 +101,15 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 long bestWaste = long.MaxValue;
                 int totalCombos = orderingRules.Length * strategies.Length;
                 int comboIdx = 0;
+                var normalizedItems = NormalizeOrientation(items, shouldStop);
 
                 foreach (var rule in orderingRules)
                 {
+                    var sorted = SortWithCancellation(normalizedItems, rule, shouldStop);
                     foreach (var strat in strategies)
                     {
-                        var rotated = NormalizeOrientation(items);
-                        var sorted  = rule.Sort(rotated);
-                        var patterns = PackAll(sorted, orderedSheets, options, strat.S);
+                        ThrowIfStopped(shouldStop);
+                        var patterns = PackAll(sorted, orderedSheets, options, strat.S, shouldStop);
                         if (patterns == null) { comboIdx++; continue; }
 
                         long waste = patterns.Sum(p => p.WasteArea * p.Multiplicity);
@@ -95,6 +133,11 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     result.Patterns = bestPatterns;
                     TwoDResultFinalizer.FinalizeAndValidate(input.Sheets, input.Orders, options, result);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                result.Success = false;
+                result.ErrorMessage = "Time limit reached during shelf packing.";
             }
             catch (Exception ex)
             {
@@ -121,12 +164,14 @@ namespace CuttingStock.Core.TwoD.Algorithms
         }
 
         private static List<Item> NormalizeOrientation(
-            List<(int OrderIndex, int W, int H, bool Rot)> raw)
+            List<(int OrderIndex, int W, int H, bool Rot)> raw,
+            Func<bool> shouldStop)
         {
             // Orient tall-side-up: shorter shelves → more shelves per sheet → less wasted height.
             var list = new List<Item>(raw.Count);
             foreach (var t in raw)
             {
+                ThrowIfStopped(shouldStop);
                 int w = t.W, h = t.H; bool rotated = false;
                 if (t.Rot && w > h) { (w, h) = (h, w); rotated = true; }
                 list.Add(new Item { OrderIndex = t.OrderIndex, W = w, H = h, AllowRot = t.Rot, Rotated = rotated });
@@ -138,7 +183,8 @@ namespace CuttingStock.Core.TwoD.Algorithms
             List<Item> items,
             List<Sheet> orderedSheets,
             SolverOptions2D options,
-            ShelfStrategy strategy)
+            ShelfStrategy strategy,
+            Func<bool> shouldStop)
         {
             var remaining = new LinkedList<Item>(items);
             var patterns = new List<CuttingPattern2D>();
@@ -146,13 +192,15 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             while (remaining.Count > 0)
             {
+                ThrowIfStopped(shouldStop);
                 Sheet? chosen = null;
                 foreach (var s in orderedSheets)
                 {
+                    ThrowIfStopped(shouldStop);
                     if (stockLeft[s] > 0)
                     {
                         // Quick feasibility: at least one remaining item must fit in this sheet.
-                        if (AnyFits(remaining, s, options))
+                        if (AnyFits(remaining, s, options, shouldStop))
                         {
                             chosen = s;
                             break;
@@ -165,7 +213,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     return null;
                 }
 
-                var pattern = PackOneSheet(chosen, remaining, options, strategy);
+                var pattern = PackOneSheet(chosen, remaining, options, strategy, shouldStop);
                 if (pattern.Placements.Count == 0)
                 {
                     // Should not happen because of AnyFits, but guard.
@@ -178,13 +226,18 @@ namespace CuttingStock.Core.TwoD.Algorithms
             return patterns;
         }
 
-        private static bool AnyFits(LinkedList<Item> items, Sheet sheet, SolverOptions2D options)
+        private static bool AnyFits(
+            LinkedList<Item> items,
+            Sheet sheet,
+            SolverOptions2D options,
+            Func<bool> shouldStop)
         {
             int W = sheet.Width  - 2 * options.Trim;
             int H = sheet.Height - 2 * options.Trim;
             if (W <= 0 || H <= 0) return false;
             foreach (var it in items)
             {
+                ThrowIfStopped(shouldStop);
                 if (it.W <= W && it.H <= H) return true;
                 if (it.AllowRot && it.H <= W && it.W <= H) return true;
             }
@@ -192,7 +245,11 @@ namespace CuttingStock.Core.TwoD.Algorithms
         }
 
         private static CuttingPattern2D PackOneSheet(
-            Sheet sheet, LinkedList<Item> remaining, SolverOptions2D options, ShelfStrategy strategy)
+            Sheet sheet,
+            LinkedList<Item> remaining,
+            SolverOptions2D options,
+            ShelfStrategy strategy,
+            Func<bool> shouldStop)
         {
             int trim = options.Trim;
             int kerf = options.Kerf;
@@ -207,10 +264,20 @@ namespace CuttingStock.Core.TwoD.Algorithms
             var node = remaining.First;
             while (node != null)
             {
+                ThrowIfStopped(shouldStop);
                 var next = node.Next;
                 var it = node.Value;
 
-                if (TryPlace(it, shelves, sheetW, sheetH, kerf, strategy, trim, out var pl))
+                if (TryPlace(
+                    it,
+                    shelves,
+                    sheetW,
+                    sheetH,
+                    kerf,
+                    strategy,
+                    trim,
+                    shouldStop,
+                    out var pl))
                 {
                     placements.Add(pl);
                     remaining.Remove(node);
@@ -230,6 +297,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
         private static bool TryPlace(
             Item it, List<Shelf> shelves, int sheetW, int sheetH,
             int kerf, ShelfStrategy strategy, int trim,
+            Func<bool> shouldStop,
             out Placement placement)
         {
             placement = null!;
@@ -241,6 +309,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 int sum = 0;
                 for (int i = 0; i < shelves.Count; i++)
                 {
+                    ThrowIfStoppedPeriodically(i, shouldStop);
                     sum += shelves[i].Height;
                     if (i > 0) sum += kerf;
                 }
@@ -270,6 +339,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
             for (int i = 0; i < shelves.Count; i++)
             {
+                ThrowIfStoppedPeriodically(i, shouldStop);
                 if (strategy == ShelfStrategy.NextFit && i != shelves.Count - 1) continue;
                 Consider(i, it.W, it.H, it.Rotated);
                 if (it.AllowRot && it.W != it.H) Consider(i, it.H, it.W, !it.Rotated);
@@ -334,6 +404,56 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 Rotated = orientRot,
             };
             return true;
+        }
+
+        internal static List<T> SortWithCancellation<T>(
+            IReadOnlyList<T> values,
+            Comparison<T> comparison,
+            Func<bool> shouldStop)
+        {
+            ArgumentNullException.ThrowIfNull(values);
+            ArgumentNullException.ThrowIfNull(comparison);
+            ArgumentNullException.ThrowIfNull(shouldStop);
+
+            var sorted = new List<T>(values.Count);
+            for (int index = 0; index < values.Count; index++)
+            {
+                ThrowIfStoppedPeriodically(index, shouldStop);
+                sorted.Add(values[index]);
+            }
+
+            int comparisons = 0;
+            try
+            {
+                sorted.Sort((left, right) =>
+                {
+                    ThrowIfStoppedPeriodically(comparisons++, shouldStop);
+                    return comparison(left, right);
+                });
+            }
+            catch (InvalidOperationException ex)
+                when (ex.InnerException is OperationCanceledException cancellation)
+            {
+                throw new OperationCanceledException(
+                    "Sorting was cancelled.",
+                    cancellation);
+            }
+            ThrowIfStopped(shouldStop);
+            return sorted;
+        }
+
+        internal static void ThrowIfStoppedPeriodically(
+            int operationIndex,
+            Func<bool> shouldStop)
+        {
+            if ((operationIndex & 0xFF) == 0)
+                ThrowIfStopped(shouldStop);
+        }
+
+        private static void ThrowIfStopped(Func<bool> shouldStop)
+        {
+            if (shouldStop())
+                throw new OperationCanceledException();
         }
 
         private sealed class Shelf

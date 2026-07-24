@@ -17,8 +17,12 @@ namespace CuttingStock.UI.ViewModels
 
         partial void OnStageIndexChanged(int value)
         {
-            if (value != 0 && !CanConfigureStage)
-                StageIndex = 0;
+            if (!SelectedSolverDescriptor.Supports(SolverCapability.EnforcedStage))
+                return;
+
+            int selectedStage = value == 1 ? 3 : 2;
+            if (!SelectedSolverDescriptor.SupportedStages.Contains(selectedStage))
+                StageIndex = SelectedSolverDescriptor.SupportedStages.Contains(2) ? 0 : 1;
         }
 
         private List<Sheet> BuildSheets()
@@ -55,18 +59,19 @@ namespace CuttingStock.UI.ViewModels
                 Kerf = kerf, Trim = trim, AlphaArea = (float)alpha,
                 AllowRotation = AllowRotation,
                 Stage = StageIndex == 1 ? 3 : 2,
-                TimeLimitMs = System.Math.Max(1000, tl),
+                TimeLimitMs = tl,
                 UsageOrder = UsageOrderIndex == 0 ? StockUsageOrder.SmallToLarge : StockUsageOrder.LargeToSmall,
             };
         }
 
         private void CoerceUnsupportedOptions()
         {
+            if (!SelectedSolverDescriptor.Supports(SolverCapability.EnforcedStage))
+                return;
+
             int selectedStage = StageIndex == 1 ? 3 : 2;
             if (!SelectedSolverDescriptor.SupportedStages.Contains(selectedStage))
                 StageIndex = SelectedSolverDescriptor.SupportedStages.Contains(2) ? 0 : 1;
-            else if (!CanConfigureStage)
-                StageIndex = 0;
         }
 
         private void RefreshSelectedSolverProperties()
