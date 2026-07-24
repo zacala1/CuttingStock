@@ -450,7 +450,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(core): split 2d pattern pool services` | Files: `CuttingStock.Core/TwoD/**`, `CuttingStock.Tests/TwoD/**`
 
-- [ ] 11. Extract UI Shell Services For Non-Visual Workflow
+- [x] 11. Extract UI Shell Services For Non-Visual Workflow
 
   **What to do**: Move non-visual shell workflow out of `MainWindow.xaml.cs` and `TwoDTab.xaml.cs` into testable services. Start with MRU/recent scenarios, file import parsing, clipboard import parsing, and text search. Keep actual `MessageBox`, `Clipboard`, `OpenFileDialog`, and visual tree interaction in the view or `DialogService`.
   **Must NOT do**: Do not move LiveCharts series or Canvas element creation into ViewModel/Core.
@@ -463,9 +463,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Dialog seam: `CuttingStock.UI/Services/IDialogService.cs:8`
 
   **Acceptance Criteria**:
-  - [ ] Parsing/search/history logic is unit-testable without constructing WPF windows.
-  - [ ] Views still own WPF objects and call services with plain data.
-  - [ ] UI tests cover MRU update, CSV/XLSX parse path where feasible, clipboard text parse, and search indexing.
+  - [x] Parsing/search/history logic is unit-testable without constructing WPF windows.
+  - [x] Views still own WPF objects and call services with plain data.
+  - [x] UI tests cover MRU update, CSV/XLSX parse path where feasible, clipboard text parse, and search indexing.
 
   **QA Scenarios**:
   ```text

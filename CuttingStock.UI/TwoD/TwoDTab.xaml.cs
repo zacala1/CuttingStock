@@ -72,32 +72,38 @@ namespace CuttingStock.UI.TwoD
                 var text = Clipboard.GetText();
                 if (string.IsNullOrWhiteSpace(text)) return;
 
-                int added = 0;
-                foreach (var row in text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                int added;
+                if (grid.ItemsSource == _vm.Sheets)
                 {
-                    var cols = row.Split(new[] { '\t', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (grid.ItemsSource == _vm.Sheets)
+                    var rows = ClipboardRowParser.ParseSheetRows(text);
+                    foreach (var row in rows)
                     {
-                        if (cols.Length < 3) continue;
-                        if (!int.TryParse(cols[0].Trim(), out int w) ||
-                            !int.TryParse(cols[1].Trim(), out int h) ||
-                            !int.TryParse(cols[2].Trim(), out int q) ||
-                            w <= 0 || h <= 0 || q <= 0) continue;
-                        _vm.Sheets.Add(new SheetRow { Width = w, Height = h, Quantity = q });
-                        added++;
+                        _vm.Sheets.Add(new SheetRow
+                        {
+                            Width = row.Width,
+                            Height = row.Height,
+                            Quantity = row.Quantity,
+                        });
                     }
-                    else if (grid.ItemsSource == _vm.Orders)
-                    {
-                        if (cols.Length < 3) continue;
-                        if (!int.TryParse(cols[0].Trim(), out int w) ||
-                            !int.TryParse(cols[1].Trim(), out int h) ||
-                            !int.TryParse(cols[2].Trim(), out int q) ||
-                            w <= 0 || h <= 0 || q <= 0) continue;
-                        bool rot = cols.Length < 4 || ParseBool(cols[3].Trim(), defaultValue: true);
-                        _vm.Orders.Add(new RectOrderRow { Width = w, Height = h, Quantity = q, AllowRotation = rot });
-                        added++;
-                    }
+                    added = rows.Count;
                 }
+                else if (grid.ItemsSource == _vm.Orders)
+                {
+                    var rows = ClipboardRowParser.ParseRectOrderRows(text);
+                    foreach (var row in rows)
+                    {
+                        _vm.Orders.Add(new RectOrderRow
+                        {
+                            Width = row.Width,
+                            Height = row.Height,
+                            Quantity = row.Quantity,
+                            AllowRotation = row.AllowRotation,
+                        });
+                    }
+                    added = rows.Count;
+                }
+                else return;
+
                 if (added > 0)
                     MessageBox.Show($"{added}개의 항목을 붙여넣었습니다.", "붙여넣기 성공",
                         MessageBoxButton.OK, MessageBoxImage.Information);
@@ -108,14 +114,6 @@ namespace CuttingStock.UI.TwoD
                 MessageBox.Show($"붙여넣기 중 오류가 발생했습니다: {ex.Message}", "오류",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
-        }
-
-        private static bool ParseBool(string s, bool defaultValue)
-        {
-            if (bool.TryParse(s, out var b)) return b;
-            if (s == "1" || s.Equals("yes", StringComparison.OrdinalIgnoreCase) || s.Equals("y", StringComparison.OrdinalIgnoreCase)) return true;
-            if (s == "0" || s.Equals("no", StringComparison.OrdinalIgnoreCase) || s.Equals("n", StringComparison.OrdinalIgnoreCase)) return false;
-            return defaultValue;
         }
 
         private void DataGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
