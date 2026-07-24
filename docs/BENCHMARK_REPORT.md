@@ -8,7 +8,7 @@
 | OS | Windows 11 (10.0.26200) |
 | Runtime | .NET 10.0, RyuJIT x86-64-v3 |
 | 측정 | BenchmarkDotNet v0.15.5 (DefaultJob) |
-| 테스트 | Core 638개 + UI 40개 통과 (NUnit 4.4.0 + FluentAssertions 8.8.0) |
+| 테스트 | 당시 Core/UI 전체 스위트 통과 (NUnit 4.4.0 + FluentAssertions 8.8.0) |
 
 ---
 
@@ -123,11 +123,14 @@
 
 ## 테스트 커버리지 요약
 
-| 분류 | 테스트 수 |
-|---|---:|
-| `CuttingStock.Tests` Core suite | 638 |
-| `CuttingStock.UI.Tests` WPF ViewModel/service suite | 40 |
-| **합계** | **678** |
+이 리포트는 측정 당시의 범위를 기록한 역사적 스냅샷이다. 현재 테스트 개수와
+통과 여부는 GitHub Actions `CI` 실행 결과를 기준으로 하며 이 문서에 숫자를
+중복 유지하지 않는다.
+
+| 분류 | 스냅샷 상태 |
+|---|---|
+| `CuttingStock.Tests` Core suite | 통과 |
+| `CuttingStock.UI.Tests` WPF ViewModel/service suite | 통과 |
 
 불변식 테스트(fuzzing)가 검증하는 속성:
 1. 수요 정확 충족 (과생산/미달 0)

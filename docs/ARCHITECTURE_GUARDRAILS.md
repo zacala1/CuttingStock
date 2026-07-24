@@ -182,6 +182,17 @@ dotnet test CuttingStock.slnx -c Release --nologo --no-build
 BenchmarkDotNet workloads must not become required for ordinary correctness
 merges.
 
+## Continuous Verification
+
+`.github/workflows/ci.yml` is the required Windows verification path because the
+solution includes WPF targets. It restores once, builds the full solution in
+Release, runs all correctness tests without rebuilding, and smoke-builds the
+benchmark project without running long performance workloads.
+
+The CI run is the single source of truth for the current test count and status.
+Documentation describes coverage areas but must not duplicate a changing test
+total.
+
 ## Adding A Solver Safely
 
 Before adding a solver to a catalog:

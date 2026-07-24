@@ -105,7 +105,7 @@
 
 ## 7. 구현
 
-현재 7개 1D 카탈로그 솔버(`ICuttingSolver`)와 4개 2D 카탈로그 솔버(`ICuttingSolver2D`)가 구현되어 있다.
+1D 카탈로그 솔버(`ICuttingSolver`)와 2D 카탈로그 솔버(`ICuttingSolver2D`)가 구현되어 있다.
 상세는 `docs/ALGORITHMS.md` (1D) 및 `docs/2D_ALGORITHMS.md` (2D) 참조.
 공개 표면은 `docs/API_REFERENCE.md`, 측정치는 `docs/BENCHMARK_REPORT.md`에 정리되어 있다.
 성공 결과는 1D/2D 공통 validator를 통과해야 하며, `Success=true` 는 재고/수요/kerf/용접/길로틴
@@ -126,4 +126,4 @@
 
 ---
 
-**최근 갱신**: 2026-06-01 — 678 테스트 스냅샷 / solver 성공 결과 validator / kerf·수요 불변식 보강 반영
+**최근 갱신**: 2026-06-01 — solver 성공 결과 validator / kerf·수요 불변식 보강 반영

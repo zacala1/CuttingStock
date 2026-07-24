@@ -45,8 +45,8 @@ CuttingStock/
 │   ├── TwoD/TwoDTab.xaml(.cs)        # 2D 탭 View
 │   ├── ViewModels/                   # MainViewModel, TwoDViewModel + row DTOs
 │   └── Services/                     # DialogService, ExportService, VisualizationService
-├── CuttingStock.Tests/               # NUnit + FluentAssertions (638 Core tests)
-├── CuttingStock.UI.Tests/            # WPF ViewModel/service tests (40 tests)
+├── CuttingStock.Tests/               # NUnit + FluentAssertions Core tests
+├── CuttingStock.UI.Tests/            # WPF ViewModel/service tests
 │   ├── Algorithms/                   # Greedy/CG/ArcFlow 단위 + Quality/Robustness/Stress/Perf
 │   ├── TwoD/                         # 2D 솔버 + Invariant 매트릭스 (90 fuzz runs)
 │   └── Persistence/                  # ScenarioService 라운드트립

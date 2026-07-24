@@ -7,13 +7,15 @@
 대상이라 이 프로젝트에서 직접 참조하지 않는다. ViewModel/service 검증은
 `CuttingStock.UI.Tests` 에 둔다.
 
-현재 Release 기준:
+검증 범위:
 
-| 프로젝트 | 테스트 수 | 범위 |
-|---|---:|---|
-| `CuttingStock.Tests` | 638 | Core 알고리즘/도메인/persistence |
-| `CuttingStock.UI.Tests` | 40 | WPF ViewModel command/state, dialog flow, visualization service |
-| **합계** | **678** | 기본 정합성 테스트 |
+| 프로젝트 | 범위 |
+|---|---|
+| `CuttingStock.Tests` | Core 알고리즘/도메인/persistence |
+| `CuttingStock.UI.Tests` | WPF ViewModel command/state, dialog flow, visualization service |
+
+현재 테스트 개수와 통과 여부는 GitHub Actions `CI` 실행 결과를 기준으로 한다.
+변동되는 개수는 이 문서에서 별도로 유지하지 않는다.
 
 ## 프레임워크
 

@@ -655,7 +655,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `build: separate benchmarks from correctness tests` | Files: `CuttingStock.Tests/**`, `CuttingStock.Benchmarks/**`, `README.md`, `docs/**`
 
-- [ ] 17. Add CI And Single Test Count Source Policy
+- [x] 17. Add CI And Single Test Count Source Policy
 
   **What to do**: Add a CI workflow for build/test on Windows because WPF projects target `net10.0-windows`. Include Release build, full non-explicit tests, and optional benchmark smoke build. Establish one authoritative source for test counts; remove hard-coded stale counts from docs or mark them generated/snapshot with update instructions.
   **Must NOT do**: Do not make CI run long explicit benchmarks by default.
@@ -668,10 +668,10 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Commands from `AGENTS.md`.
 
   **Acceptance Criteria**:
-  - [ ] CI workflow exists under `.github/workflows/` or the chosen provider path.
-  - [ ] CI uses `dotnet build CuttingStock.slnx -c Release`.
-  - [ ] CI uses `dotnet test CuttingStock.slnx -c Release --nologo --no-build`.
-  - [ ] Docs no longer contradict each other on current test count.
+  - [x] CI workflow exists under `.github/workflows/` or the chosen provider path.
+  - [x] CI uses `dotnet build CuttingStock.slnx -c Release`.
+  - [x] CI uses `dotnet test CuttingStock.slnx -c Release --nologo --no-build`.
+  - [x] Docs no longer contradict each other on current test count.
 
   **QA Scenarios**:
   ```text

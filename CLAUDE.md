@@ -37,8 +37,9 @@ dotnet test CuttingStock.slnx --filter "Category=Welding"
 dotnet run --project CuttingStock.UI
 ```
 
-Tests currently pass 525+ in ~1m 10s. Don't merge anything that drops
-the count.
+The GitHub Actions `CI` run is authoritative for the current test count and
+status; documentation deliberately does not hard-code a changing total. Do not
+merge unless the full Release test command passes.
 
 ## Domain conventions
 
