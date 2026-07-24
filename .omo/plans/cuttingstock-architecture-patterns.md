@@ -587,7 +587,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `docs(ui): define tab parity matrix` | Files: `docs/**`, `CuttingStock.UI/**`, `CuttingStock.UI.Tests/**`
 
-- [ ] 15. Add Solution-Level Build And Package Governance
+- [x] 15. Add Solution-Level Build And Package Governance
 
   **What to do**: Add `Directory.Build.props` for shared project settings and, if adopted, `Directory.Packages.props` for centralized package versions. Preserve project-specific settings such as `UseWPF`, output type, package metadata, and test project markers.
   **Must NOT do**: Do not accidentally change target frameworks or package versions while centralizing.
@@ -600,9 +600,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Test target split: `CuttingStock.Tests/CuttingStock.Tests.csproj`, `CuttingStock.UI.Tests/CuttingStock.UI.Tests.csproj`
 
   **Acceptance Criteria**:
-  - [ ] Shared properties are centralized without changing effective TFM/WPF/test metadata.
-  - [ ] Build and full tests pass.
-  - [ ] Package centralization does not duplicate version declarations.
+  - [x] Shared properties are centralized without changing effective TFM/WPF/test metadata.
+  - [x] Build and full tests pass.
+  - [x] Package centralization does not duplicate version declarations.
 
   **QA Scenarios**:
   ```text
