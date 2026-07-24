@@ -132,8 +132,10 @@ public interface ICuttingSolver2D
 | `ColumnGeneration2DSolver` | CG + GLOP 마스터 + Beasley 1985 DP 가격 매김 | Poly/iter, exp 최악 |
 | `StagedMipGuillotineSolver` | CG 풀 + CBC 정수 마스터 + 다양화 라운드 | NP-hard, 시간 제한 |
 
-**모든 2D 솔버는 `TwoDInputPreprocessor` 진입 경로에서 `SolverUtils2D.AggregateByDims`
-호환 파사드를 호출**해 동일 (Width, Height) 시트 행을 합산한다. `Sheet.Equals`가 구조적이므로 분산된 행은 `Dictionary<Sheet, _>` 키 충돌로 인벤토리 절반을 잃는다.
+**모든 2D 솔버는 집계 구현을 소유한 `TwoDInputPreprocessor` 진입 경로에서**
+동일 (Width, Height) 시트 행을 합산한다. `SolverUtils2D.AggregateByDims`는 기존
+호출자를 위한 단방향 호환 파사드다. `Sheet.Equals`가 구조적이므로 분산된 행은
+`Dictionary<Sheet, _>` 키 충돌로 인벤토리 절반을 잃는다.
 
 성공 결과는 `SolverUtils2D.ValidateSuccessfulResult` 로 재검증한다. 검증 항목은 sheet
 inventory, pattern multiplicity, trim bounds, kerf-aware overlap, guillotine compliance,

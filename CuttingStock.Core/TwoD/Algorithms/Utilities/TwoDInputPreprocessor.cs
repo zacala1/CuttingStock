@@ -23,13 +23,13 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             {
                 return new TwoDPreprocessedInput(
                     true,
-                    sheets == null ? new List<Sheet>() : SolverUtils2D.AggregateByDims(sheets),
+                    sheets == null ? new List<Sheet>() : AggregateByDims(sheets),
                     orders ?? new List<RectOrder>());
             }
 
             return new TwoDPreprocessedInput(
                 false,
-                SolverUtils2D.AggregateByDims(sheets!),
+                AggregateByDims(sheets!),
                 orders!);
         }
 

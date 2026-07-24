@@ -59,10 +59,11 @@ and FindHostPlanForWeld all check this invariant — keep it intact when
 adding new post-processing.
 
 **Sheets aggregate by (Width, Height).** All 2D solvers enter through
-`TwoDInputPreprocessor`, which routes aggregation through the
-source-compatible `SolverUtils2D.AggregateByDims` facade. `Sheet.Equals`
-is structural, so unaggregated duplicate-dim rows collide as the same key
-in `Dictionary<Sheet, _>` and silently hide half the inventory.
+`TwoDInputPreprocessor`, which owns the aggregation implementation.
+`SolverUtils2D.AggregateByDims` remains a one-way source-compatible facade
+for legacy callers. `Sheet.Equals` is structural, so unaggregated
+duplicate-dim rows collide as the same key in `Dictionary<Sheet, _>` and
+silently hide half the inventory.
 
 **TimeLimitMs is an absolute wall-clock deadline** from solver start,
 not "time remaining after warm-start". 2D solvers compare against

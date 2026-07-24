@@ -42,11 +42,12 @@ DAG 네트워크 + SCIP MIP.
 
 ## 2D 솔버 (`ICuttingSolver2D`)
 
-`CuttingStock.Core.TwoD` 네임스페이스에 2D 솔버 4종. 산업용 패널 톱이 요구하는 **길로틴(guillotine)** 절단, 90° 회전, kerf, 트림 모두 지원. **모든 솔버는 `TwoDInputPreprocessor` 공통 진입 경로에서 `SolverUtils2D.AggregateByDims` 호환 파사드를 통해 동일 dim 시트 행을 합산**하고, 성공 조기 반환을 포함해 `TwoDResultFinalizer`에서 시트 재고·수요 정확 충족·trim/kerf/회전·길로틴 적합성을 재검증한다.
+`CuttingStock.Core.TwoD` 네임스페이스에 2D 솔버 4종. 산업용 패널 톱이 요구하는 **길로틴(guillotine)** 절단, 90° 회전, kerf, 트림 모두 지원. **모든 솔버는 `TwoDInputPreprocessor` 공통 진입 경로에서 동일 dim 시트 행을 합산**하고, 성공 조기 반환을 포함해 `TwoDResultFinalizer`에서 시트 재고·수요 정확 충족·trim/kerf/회전·길로틴 적합성을 재검증한다. `SolverUtils2D.AggregateByDims`는 기존 호출자를 위한 단방향 호환 파사드다.
 
 | 솔버 | 핵심 알고리즘 | 출처 |
 |---|---|---|
 | `ShelfGuillotineSolver` | NFDH/FFDH/BFDH × 5 정렬 휴리스틱 | Coffman et al. 1980; Berkey & Wang 1987 |
+| `TwoStageShelfGuillotineSolver` | 전용 2-stage shelf 생성 + 구조 검증 | Shelf 휴리스틱 + two-stage 구조 검증 |
 | `ColumnGeneration2DSolver` | Master LP(GLOP) + 2D guillotine knapsack DP | Gilmore & Gomory 1965; Beasley 1985; Cintra et al. 2008 |
 | `StagedMipGuillotineSolver` | Pattern pool + 정수 마스터 (CBC) | Vance et al. 1994; Belov & Scheithauer 2006; Furini et al. 2016 |
 

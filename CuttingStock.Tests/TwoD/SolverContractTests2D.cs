@@ -118,7 +118,7 @@ namespace CuttingStock.Tests.TwoD
         }
 
         [TestCaseSource(nameof(TimedCatalogSolvers))]
-        public void CatalogSolver_TinyAbsoluteDeadline_DoesNotReceiveFreeSecondPhaseBudget(
+        public void CatalogSolver_TinyAbsoluteDeadline_ReturnsValidBoundedResult(
             SolverDescriptor2D descriptor)
         {
             var sheets = new List<Sheet> { new(2440, 1220, 10) };
@@ -143,7 +143,7 @@ namespace CuttingStock.Tests.TwoD
             result.Success.Should().BeTrue(result.ErrorMessage);
             result.ExecutionTimeMs.Should().BeLessThan(
                 1000,
-                "{0} must not grant a new one-second budget after its warm start consumes the absolute deadline",
+                "{0} should return its valid fallback without runaway work under a tiny deadline",
                 descriptor.Key);
             SolverUtils2D.ValidateSuccessfulResult(sheets, orders, options, result)
                 .Should().BeNull();

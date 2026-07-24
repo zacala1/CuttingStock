@@ -2,9 +2,10 @@
 
 본 프로젝트는 2D 솔버 4종을 제공하며 모두 동일 인터페이스 `ICuttingSolver2D` 를 구현한다.
 
-**공통 진입 규약.** 네 솔버는 `TwoDInputPreprocessor` 진입 경로에서
-`SolverUtils2D.AggregateByDims` 호환 파사드를 호출해
-동일 `(Width, Height)` 시트 행을 합산한다. `Sheet.Equals`가 구조적이라 분산된 행은
+**공통 진입 규약.** 네 솔버는 집계 구현을 소유한 `TwoDInputPreprocessor`
+진입 경로에서 동일 `(Width, Height)` 시트 행을 합산한다.
+`SolverUtils2D.AggregateByDims`는 기존 호출자를 위한 단방향 호환 파사드다.
+`Sheet.Equals`가 구조적이라 분산된 행은
 `Dictionary<Sheet, _>` 키 충돌로 인벤토리 절반을 잃거나 `ArgumentException`을 던진다.
 
 **TimeLimit 의미.** `SolverOptions2D.TimeLimitMs`는 솔버 시작 시점 기준 **절대

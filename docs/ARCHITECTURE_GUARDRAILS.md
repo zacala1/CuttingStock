@@ -68,8 +68,9 @@ dictionary or stock-capacity logic:
 var input = TwoDInputPreprocessor.Preprocess(sheets, orders, result);
 ```
 
-`TwoDInputPreprocessor` owns the entry policy and routes aggregation through the
-source-compatible `SolverUtils2D.AggregateByDims` facade.
+`TwoDInputPreprocessor` owns the entry policy and aggregation implementation.
+`SolverUtils2D.AggregateByDims` is a one-way source-compatible facade that
+delegates to the preprocessor for legacy callers.
 
 This is required because `Sheet.Equals` is structural. Duplicate same-dimension
 rows can otherwise collide as dictionary keys and hide inventory.

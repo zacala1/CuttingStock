@@ -95,9 +95,9 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
                 // 4) Integer master MIP with hard time limit on remaining budget.
                 int[]? xInt = null;
-                bool ipSolved = false;
-                if (deadline.TryGetRemainingMilliseconds(out long remaining))
-                    ipSolved = SolveIntegerMaster(columns, demand, sheets, remaining, out xInt);
+                bool ipSolved = TryRunIntegerMaster(
+                    deadline,
+                    remaining => SolveIntegerMaster(columns, demand, sheets, remaining, out xInt));
 
                 List<CuttingPattern2D> outPatterns;
                 if (ipSolved && xInt != null)
@@ -139,6 +139,15 @@ namespace CuttingStock.Core.TwoD.Algorithms
             result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
             TwoDResultFinalizer.FinalizeResult(result, options);
             return result;
+        }
+
+        internal static bool TryRunIntegerMaster(
+            TwoDDeadline deadline,
+            Func<long, bool> solve)
+        {
+            ArgumentNullException.ThrowIfNull(solve);
+            return deadline.TryGetRemainingMilliseconds(out long remaining) &&
+                   solve(remaining);
         }
 
         // ---- diversification ----

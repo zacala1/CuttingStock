@@ -124,11 +124,11 @@ public interface ICuttingSolver2D
 - `ColumnGeneration2DSolver` — Gilmore-Gomory CG (OR-Tools GLOP + Beasley DP)
 - `StagedMipGuillotineSolver` — 패턴 풀 + 정수 마스터 (OR-Tools CBC)
 
-**모든 솔버는 `TwoDInputPreprocessor` 진입 경로에서
-`SolverUtils2D.AggregateByDims(sheets)` 호환 파사드를 호출** —
+**모든 솔버는 집계 구현을 소유한 `TwoDInputPreprocessor` 진입 경로를 사용** —
 `Sheet.Equals`가 구조적이라 동일 dim 행이 여러 개 있으면 `Dictionary<Sheet, _>`에서
 키가 충돌해 인벤토리가 절반으로 잘리거나 `ArgumentException`이 난다. 외부에서 시트
 리스트를 만들 때 미리 합쳐도 되고, 그대로 넘겨도 솔버 안에서 안전하게 합산된다.
+`SolverUtils2D.AggregateByDims(sheets)`는 기존 호출자를 위한 단방향 호환 파사드다.
 
 또한 모든 솔버는 성공 조기 반환을 포함해 `Success=true` 반환 전
 `TwoDResultFinalizer.FinalizeAndValidate` 를 통과한다.
@@ -141,9 +141,10 @@ CG2D / Staged MIP는 정수화 또는 MIP materialization 뒤 `TrimToDemand` 로
 ```csharp
 public static List<Sheet> AggregateByDims(List<Sheet> sheets);
 ```
-동일 `(Width, Height)` 행을 한 `Sheet` 로 합쳐 `Quantity` 를 더한다. 모든 2D 솔버의
-진입부에서 호출하므로 일반적인 사용자가 직접 호출할 필요는 없으나, 외부 코드가
-LP 마스터 같은 하위 컴포넌트에 직접 접근하는 경우 같이 호출해야 한다.
+동일 `(Width, Height)` 행을 한 `Sheet` 로 합쳐 `Quantity` 를 더하는 기존 호환
+파사드다. 모든 2D 솔버는 같은 구현을 소유한 `TwoDInputPreprocessor`를 통과하므로
+일반적인 사용자가 직접 호출할 필요는 없으나, 외부 코드가 LP 마스터 같은 하위
+컴포넌트에 직접 접근하는 경우 같이 호출해야 한다.
 
 ### `SolverUtils2D.TrimToDemand`
 ```csharp

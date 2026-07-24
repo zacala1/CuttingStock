@@ -1,3 +1,4 @@
+using CuttingStock.Core.TwoD.Algorithms;
 using CuttingStock.Core.TwoD.Algorithms.Utilities;
 using FluentAssertions;
 using NUnit.Framework;
@@ -65,6 +66,42 @@ namespace CuttingStock.Tests.TwoD
             elapsed = 10000;
             deadline.TryGetRemainingMilliseconds(out remaining).Should().BeFalse();
             remaining.Should().Be(0);
+        }
+
+        [Test]
+        public void StagedMip_IntegerMasterDeadlineGate_SkipsSolverAfterAbsoluteDeadline()
+        {
+            var deadline = TwoDDeadline.FromElapsedProvider(1000, () => 1000);
+            int calls = 0;
+
+            bool solved = StagedMipGuillotineSolver.TryRunIntegerMaster(
+                deadline,
+                _ =>
+                {
+                    calls++;
+                    return true;
+                });
+
+            solved.Should().BeFalse();
+            calls.Should().Be(0);
+        }
+
+        [Test]
+        public void StagedMip_IntegerMasterDeadlineGate_ForwardsExactRemainingBudget()
+        {
+            var deadline = TwoDDeadline.FromElapsedProvider(1000, () => 625);
+            long? receivedBudget = null;
+
+            bool solved = StagedMipGuillotineSolver.TryRunIntegerMaster(
+                deadline,
+                remaining =>
+                {
+                    receivedBudget = remaining;
+                    return true;
+                });
+
+            solved.Should().BeTrue();
+            receivedBudget.Should().Be(375);
         }
 
         [Test]
