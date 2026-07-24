@@ -37,14 +37,17 @@ namespace CuttingStock
             _vm = new MainViewModel(new DialogService());
             DataContext = _vm;
             _vm.PropertyChanged += Vm_PropertyChanged;
-            _vm.ScenarioSaved  += (_, path) => OnScenarioPathUsed(path);
-            _vm.ScenarioLoaded += (_, path) => OnScenarioPathUsed(path);
+            _vm.ScenarioSaved += (_, path) => OnScenarioPathUsed(_prefs.Recent1D, path);
+            _vm.ScenarioLoaded += (_, path) => OnScenarioPathUsed(_prefs.Recent1D, path);
+            twoDTab.ScenarioSaved += (_, path) => OnScenarioPathUsed(_prefs.Recent2D, path);
+            twoDTab.ScenarioLoaded += (_, path) => OnScenarioPathUsed(_prefs.Recent2D, path);
+            twoDTab.RecentScenariosRequested += (_, _) => ShowRecent2D();
         }
 
         /// <summary>Push a recently-touched scenario path into the MRU list and persist.</summary>
-        private void OnScenarioPathUsed(string path)
+        private void OnScenarioPathUsed(List<string> recent, string path)
         {
-            RecentScenarioService.Touch(_prefs.Recent1D, path);
+            RecentScenarioService.Touch(recent, path);
             UserPreferencesStore.Save(_prefs);
         }
 
@@ -72,6 +75,7 @@ namespace CuttingStock
 
             topTabControl.SelectedIndex = Math.Clamp(_prefs.LastTopTabIndex, 0, 1);
             _vm.AlgorithmIndex = Math.Clamp(_prefs.LastAlgorithm1D, 0, _vm.SolverDescriptors.Count - 1);
+            twoDTab.AlgorithmIndex = Math.Clamp(_prefs.LastAlgorithm2D, 0, twoDTab.SolverCount - 1);
         }
 
         private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -86,6 +90,7 @@ namespace CuttingStock
             }
             _prefs.LastTopTabIndex = topTabControl.SelectedIndex;
             _prefs.LastAlgorithm1D = _vm.AlgorithmIndex;
+            _prefs.LastAlgorithm2D = twoDTab.AlgorithmIndex;
             UserPreferencesStore.Save(_prefs);
         }
 
@@ -99,30 +104,55 @@ namespace CuttingStock
 
         private void Recent1D_Click(object sender, RoutedEventArgs e)
         {
-            var menu = new ContextMenu { Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom, PlacementTarget = btnRecent1D };
-            if (_prefs.Recent1D.Count == 0)
+            ShowRecentMenu(
+                btnRecent1D,
+                _prefs.Recent1D,
+                _vm.LoadScenarioFromPath);
+        }
+
+        private void ShowRecent2D()
+        {
+            ShowRecentMenu(
+                twoDTab.RecentMenuPlacementTarget,
+                _prefs.Recent2D,
+                twoDTab.LoadScenarioFromPath);
+        }
+
+        private void ShowRecentMenu(
+            FrameworkElement placementTarget,
+            List<string> recent,
+            Func<string, bool> load)
+        {
+            var menu = new ContextMenu
+            {
+                Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+                PlacementTarget = placementTarget,
+            };
+            if (recent.Count == 0)
             {
                 menu.Items.Add(new MenuItem { Header = "(최근 시나리오 없음)", IsEnabled = false });
             }
             else
             {
-                foreach (var entry in RecentScenarioService.BuildEntries(_prefs.Recent1D))
+                foreach (var entry in RecentScenarioService.BuildEntries(recent))
                 {
                     var menuItem = new MenuItem
                     {
-                        Header = entry.DisplayName,
+                        Header = entry.Exists
+                            ? entry.DisplayName
+                            : $"{entry.DisplayName} (파일 없음)",
                         ToolTip = entry.Path,
-                        IsEnabled = entry.Exists,
                     };
                     var capturedPath = entry.Path;
-                    menuItem.Click += (_, _) => LoadRecentScenario(capturedPath);
+                    menuItem.Click += (_, _) =>
+                        LoadRecentScenario(recent, capturedPath, load);
                     menu.Items.Add(menuItem);
                 }
                 menu.Items.Add(new Separator());
                 var clear = new MenuItem { Header = "목록 지우기" };
                 clear.Click += (_, _) =>
                 {
-                    RecentScenarioService.Clear(_prefs.Recent1D);
+                    RecentScenarioService.Clear(recent);
                     UserPreferencesStore.Save(_prefs);
                 };
                 menu.Items.Add(clear);
@@ -130,9 +160,12 @@ namespace CuttingStock
             menu.IsOpen = true;
         }
 
-        private void LoadRecentScenario(string path)
+        private void LoadRecentScenario(
+            List<string> recent,
+            string path,
+            Func<string, bool> load)
         {
-            if (!System.IO.File.Exists(path))
+            if (!File.Exists(path))
             {
                 // Ask the user before silently rewriting the MRU — they may have
                 // moved the file rather than deleted it and want to fix the path
@@ -142,39 +175,13 @@ namespace CuttingStock
                     "파일 없음", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (choice == MessageBoxResult.Yes)
                 {
-                    RecentScenarioService.Remove(_prefs.Recent1D, path);
+                    RecentScenarioService.Remove(recent, path);
                     UserPreferencesStore.Save(_prefs);
                 }
                 return;
             }
-            try
-            {
-                var scenario = ScenarioService.Load1D(path);
-                _vm.Stocks.Clear();
-                foreach (var s in scenario.Stocks)
-                    _vm.Stocks.Add(new StockRow { Length = s.Length, Quantity = s.Quantity });
-                _vm.Orders.Clear();
-                foreach (var o in scenario.Orders)
-                    _vm.Orders.Add(new OrderRow { Length = o.Length, Quantity = o.Quantity });
 
-                var p = scenario.Parameters;
-                _vm.AlphaText = p.Alpha.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.BetaText  = p.Beta.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.GammaText = p.Gamma.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.DeltaText = p.Delta.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.KerfText  = p.Kerf.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.UsageOrderIndex = p.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge ? 0 : 1;
-                _vm.EnableWelding = p.EnableWelding;
-
-                RecentScenarioService.Touch(_prefs.Recent1D, path);
-                UserPreferencesStore.Save(_prefs);
-                _vm.StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"시나리오를 불러올 수 없습니다.\n{ex.Message}", "오류",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            load(path);
         }
 
         // ─── Drag-and-drop scenario load ──────────────────────────────
@@ -185,10 +192,8 @@ namespace CuttingStock
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (files != null && files.Length == 1 &&
-                    (files[0].EndsWith(".cstock1d.json", StringComparison.OrdinalIgnoreCase) ||
-                     files[0].EndsWith(".cstock2d.json", StringComparison.OrdinalIgnoreCase) ||
-                     files[0].EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
+                if (files is { Length: 1 } &&
+                    ScenarioFileRouteService.IsCandidate(files[0]))
                 {
                     e.Effects = DragDropEffects.Copy;
                 }
@@ -211,37 +216,17 @@ namespace CuttingStock
 
             try
             {
-                // Try 1D first then 2D — both use schema validation so wrong-tab loads throw.
-                if (path.EndsWith(".cstock2d.json", StringComparison.OrdinalIgnoreCase))
+                switch (ScenarioFileRouteService.DetectRoute(path))
                 {
-                    topTabControl.SelectedIndex = 1; // 2D tab
-                    // TwoDTab's VM picks the file up via its own drag handler if we extend later.
-                    MessageBox.Show("2D 시나리오는 2D 탭의 '시나리오 열기' 버튼을 사용하세요.",
-                        "안내", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
+                    case ScenarioRoute.OneD:
+                        topTabControl.SelectedIndex = 0;
+                        _vm.LoadScenarioFromPath(path);
+                        break;
+                    case ScenarioRoute.TwoD:
+                        topTabControl.SelectedIndex = 1;
+                        twoDTab.LoadScenarioFromPath(path);
+                        break;
                 }
-
-                var scenario = ScenarioService.Load1D(path);
-                topTabControl.SelectedIndex = 0;
-                _vm.Stocks.Clear();
-                foreach (var s in scenario.Stocks)
-                    _vm.Stocks.Add(new StockRow { Length = s.Length, Quantity = s.Quantity });
-                _vm.Orders.Clear();
-                foreach (var o in scenario.Orders)
-                    _vm.Orders.Add(new OrderRow { Length = o.Length, Quantity = o.Quantity });
-
-                var p = scenario.Parameters;
-                _vm.AlphaText = p.Alpha.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.BetaText  = p.Beta.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.GammaText = p.Gamma.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.DeltaText = p.Delta.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.KerfText  = p.Kerf.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                _vm.UsageOrderIndex = p.UsageOrder == CuttingStock.Core.Domain.StockUsageOrder.SmallToLarge ? 0 : 1;
-                _vm.EnableWelding = p.EnableWelding;
-
-                RecentScenarioService.Touch(_prefs.Recent1D, path);
-                UserPreferencesStore.Save(_prefs);
-                _vm.StatusText = $"불러옴: {System.IO.Path.GetFileName(path)}";
             }
             catch (Exception ex)
             {

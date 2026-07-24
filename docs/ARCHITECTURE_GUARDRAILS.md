@@ -139,17 +139,30 @@ belongs to the other dimension:
 | Add/delete rows | yes | yes | Keep parity |
 | Example data | yes | yes | Keep parity |
 | Scenario save/load | yes | yes | Keep parity |
+| Recent scenario MRU | yes | yes | Keep separate 1D/2D histories with the same five-entry policy |
+| Drag/drop scenario import | yes | yes | Route by persisted JSON schema, not filename |
 | Calculate and compare | yes | yes | Keep parity |
 | Cancel in-flight run | yes | yes | Keep parity |
+| Progress and run state | yes | yes | Share `SolverWorkspaceViewModel` lifecycle state |
 | CSV/Excel export | yes | yes | Keep parity |
 | Result visualization | bar groups | placement canvas | Dimension-specific |
 | LiveCharts comparison | yes | yes | Keep parity |
-| Recent scenario MRU | yes | no | Intentional until Task 14 resolves parity |
-| Drag/drop scenario import | yes | no | Intentional until Task 14 resolves parity |
-| Result text search | yes | no | Intentional until Task 14 resolves parity |
+| Result text search | yes | no | Intentional: 1D has one searchable text surface; 2D output is split across report, placement canvas, and charts |
 
 If a mismatch remains intentional, document why. If it is not intentional, add
 the feature and tests in the same change.
+
+Scenario loading has one mapping owner per dimension:
+
+- `MainViewModel.LoadScenarioFromPath` maps 1D scenario DTOs.
+- `TwoDViewModel.LoadScenarioFromPath` maps 2D scenario DTOs.
+- `ScenarioFileRouteService` only classifies a dropped file from its persisted
+  schema and delegates to the matching ViewModel. It does not duplicate mapping.
+
+The visualization split is also intentional. A 1D plan is naturally represented
+as grouped linear bars, while a 2D plan requires coordinate-aware placement on a
+Canvas. Both ViewModels expose plain projection state; WPF visual construction
+remains in the corresponding view.
 
 ## Benchmark And Test Boundaries
 

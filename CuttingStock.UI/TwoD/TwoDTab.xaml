@@ -74,14 +74,16 @@
                 </StackPanel>
             </GroupBox>
 
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
+            <WrapPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
                 <Button Content="예제 로드" Command="{Binding LoadExampleCommand}" Width="80" Margin="0,0,5,0"/>
                 <Button Content="시나리오 저장" Command="{Binding SaveScenarioCommand}" Width="100" Margin="0,0,5,0"
                         ToolTip="현재 시트/주문/옵션을 .json 파일로 저장"/>
                 <Button Content="시나리오 열기" Command="{Binding LoadScenarioCommand}" Width="100" Margin="0,0,5,0"
                         ToolTip="저장된 .json 시나리오를 불러오기"/>
+                <Button x:Name="btnRecent2D" Content="최근 ▾" Click="Recent2D_Click" Width="65" Margin="0,0,5,0"
+                        ToolTip="최근에 사용한 2D 시나리오 (최대 5개)"/>
                 <Button Content="전체 초기화" Command="{Binding ClearAllCommand}" Width="80"/>
-            </StackPanel>
+            </WrapPanel>
         </Grid>
 
         <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch"

@@ -100,6 +100,7 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 - 비교 시각화 — LiveCharts (1D 3차트, 2D 3차트)
 - CSV / Excel 내보내기 (단일 + 비교, 1D + 2D)
 - **JSON 시나리오 저장 / 불러오기** — `.cstock1d.json` / `.cstock2d.json` (입력 + 옵션 round-trip)
+- 차원별 최근 시나리오 목록(최대 5개)과 JSON schema 기반 1D/2D 드래그앤드롭 열기
 - 엑셀 붙여넣기(Ctrl+V) 지원
 - 키보드 단축키: F1(예제), Ctrl+R(실행), Ctrl+Shift+C(비교), Ctrl+S(Excel 저장)
 - 멀티 시트 dim 자동 합산 (2D 솔버 진입부)

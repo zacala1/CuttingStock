@@ -91,7 +91,7 @@
             </GroupBox>
 
             <!-- 공통 버튼: 예제 로드 / 시나리오 / 초기화 -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
+            <WrapPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
                 <Button Content="예제 로드" Command="{Binding LoadExampleCommand}" Width="80" Margin="0,0,5,0"/>
                 <Button Content="시나리오 저장" Command="{Binding SaveScenarioCommand}" Width="100" Margin="0,0,5,0"
                         ToolTip="현재 재고/주문/파라미터를 .json 파일로 저장"/>
@@ -100,7 +100,7 @@
                 <Button x:Name="btnRecent1D" Content="최근 ▾" Click="Recent1D_Click" Width="65" Margin="0,0,5,0"
                         ToolTip="최근에 사용한 시나리오 (최대 5개)"/>
                 <Button Content="전체 초기화" Command="{Binding ClearAllCommand}" Width="80"/>
-            </StackPanel>
+            </WrapPanel>
         </Grid>
 
         <!-- GridSplitter -->

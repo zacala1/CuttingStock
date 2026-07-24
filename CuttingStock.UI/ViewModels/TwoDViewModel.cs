@@ -77,5 +77,8 @@ namespace CuttingStock.UI.ViewModels
 
         public SolverResult2D? LastResult => _lastResult;
         public SolverOptions2D? LastOptions => _lastOptions;
+
+        public event EventHandler<string>? ScenarioSaved;
+        public event EventHandler<string>? ScenarioLoaded;
     }
 }

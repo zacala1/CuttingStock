@@ -553,7 +553,7 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
 
   **Commit**: YES | Message: `refactor(ui): consolidate solver workspace workflows` | Files: `CuttingStock.UI/**`, `CuttingStock.UI.Tests/**`
 
-- [ ] 14. Define And Enforce 1D/2D UI Parity Matrix
+- [x] 14. Define And Enforce 1D/2D UI Parity Matrix
 
   **What to do**: Create a parity matrix for user-facing tab features: example load, add/delete, scenario save/load, recent scenarios, drag/drop, search, calculate, compare, cancel, export, visualization, and progress. For each mismatch, choose one of two outcomes: implement parity with tests or document intentional difference in architecture guardrails/tooltips/docs.
   **Must NOT do**: Do not silently add large UI features without matching tests.
@@ -566,9 +566,9 @@ Wave 5: Task 18 and Final Verification integrate, document, and audit.
   - Feature parity rule: `AGENTS.md` "When you add a feature".
 
   **Acceptance Criteria**:
-  - [ ] Parity matrix exists in docs or architecture guardrails.
-  - [ ] Every intentional mismatch is documented with rationale.
-  - [ ] Every implemented parity improvement has UI tests or shell service tests.
+  - [x] Parity matrix exists in docs or architecture guardrails.
+  - [x] Every intentional mismatch is documented with rationale.
+  - [x] Every implemented parity improvement has UI tests or shell service tests.
 
   **QA Scenarios**:
   ```text
