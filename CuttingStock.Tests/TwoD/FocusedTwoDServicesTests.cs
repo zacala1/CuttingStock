@@ -29,6 +29,26 @@ namespace CuttingStock.Tests.TwoD
         }
 
         [Test]
+        public void InputPreprocessor_Preprocess_PreservesNormalizedInputForTrivialSuccess()
+        {
+            var result = new SolverResult2D();
+
+            var input = TwoDInputPreprocessor.Preprocess(
+                new List<Sheet>
+                {
+                    new(1000, 500, 1),
+                    new(1000, 500, 2),
+                },
+                new List<RectOrder>(),
+                result);
+
+            input.ShouldReturn.Should().BeTrue();
+            result.Success.Should().BeTrue();
+            input.Sheets.Should().Equal(new Sheet(1000, 500, 3));
+            input.Orders.Should().BeEmpty();
+        }
+
+        [Test]
         public void ResultFinalizer_FinalizeAndValidate_ComputesCostAfterValidation()
         {
             var result = new SolverResult2D

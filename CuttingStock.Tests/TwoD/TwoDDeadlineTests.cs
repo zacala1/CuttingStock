@@ -24,7 +24,7 @@ namespace CuttingStock.Tests.TwoD
         [Test]
         public void Deadline_IsExpired_DoesNotResetAfterWarmStart()
         {
-            long elapsed = 1001;
+            long elapsed = 1000;
             var deadline = TwoDDeadline.FromElapsedProvider(1000, () => elapsed);
 
             deadline.IsExpired.Should().BeTrue();
@@ -49,20 +49,22 @@ namespace CuttingStock.Tests.TwoD
 
             deadline.IsPast(pricingEnd).Should().BeFalse();
 
-            elapsed = 5001;
+            elapsed = 5000;
             deadline.IsPast(pricingEnd).Should().BeTrue();
         }
 
         [Test]
-        public void Deadline_RemainingMillisecondsWithFloor_PreservesMinimumMipBudget()
+        public void Deadline_TryGetRemainingMilliseconds_NeverExtendsAbsoluteBudget()
         {
             long elapsed = 9500;
             var deadline = TwoDDeadline.FromElapsedProvider(10000, () => elapsed);
 
-            deadline.RemainingMillisecondsWithFloor(1000).Should().Be(1000);
+            deadline.TryGetRemainingMilliseconds(out long remaining).Should().BeTrue();
+            remaining.Should().Be(500);
 
-            elapsed = 2000;
-            deadline.RemainingMillisecondsWithFloor(1000).Should().Be(8000);
+            elapsed = 10000;
+            deadline.TryGetRemainingMilliseconds(out remaining).Should().BeFalse();
+            remaining.Should().Be(0);
         }
 
         [Test]

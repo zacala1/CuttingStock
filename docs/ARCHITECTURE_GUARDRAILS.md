@@ -65,8 +65,11 @@ Every 2D solver entry must aggregate sheets by `(Width, Height)` before any
 dictionary or stock-capacity logic:
 
 ```csharp
-sheets = SolverUtils2D.AggregateByDims(sheets);
+var input = TwoDInputPreprocessor.Preprocess(sheets, orders, result);
 ```
+
+`TwoDInputPreprocessor` owns the entry policy and routes aggregation through the
+source-compatible `SolverUtils2D.AggregateByDims` facade.
 
 This is required because `Sheet.Equals` is structural. Duplicate same-dimension
 rows can otherwise collide as dictionary keys and hide inventory.

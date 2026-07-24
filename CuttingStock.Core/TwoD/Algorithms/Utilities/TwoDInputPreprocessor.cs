@@ -20,11 +20,16 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             SolverResult2D result)
         {
             if (ValidateInputs(sheets, orders, result))
-                return new TwoDPreprocessedInput(true, new List<Sheet>(), new List<RectOrder>());
+            {
+                return new TwoDPreprocessedInput(
+                    true,
+                    sheets == null ? new List<Sheet>() : SolverUtils2D.AggregateByDims(sheets),
+                    orders ?? new List<RectOrder>());
+            }
 
             return new TwoDPreprocessedInput(
                 false,
-                AggregateByDims(sheets!),
+                SolverUtils2D.AggregateByDims(sheets!),
                 orders!);
         }
 

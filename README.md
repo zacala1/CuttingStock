@@ -1,6 +1,6 @@
 # Cutting Stock Optimization
 
-1D(철근/봉재) **및** 2D(시트/플레이트) Cutting Stock 문제를 해결하는 .NET 10 WPF 데스크톱 애플리케이션. 각 차원에 휴리스틱·LP·MIP 솔버 3종을 제공한다.
+1D(철근/봉재) **및** 2D(시트/플레이트) Cutting Stock 문제를 해결하는 .NET 10 WPF 데스크톱 애플리케이션. 휴리스틱·LP·MIP 계열을 1D 7개, 2D 4개 카탈로그 항목으로 제공한다.
 
 ## 프로젝트 구조
 
@@ -42,7 +42,7 @@ DAG 네트워크 + SCIP MIP.
 
 ## 2D 솔버 (`ICuttingSolver2D`)
 
-`CuttingStock.Core.TwoD` 네임스페이스에 1D 거울 구조 3종. 산업용 패널 톱이 요구하는 **길로틴(guillotine)** 절단, 90° 회전, kerf, 트림 모두 지원. **모든 솔버는 입력 시 `SolverUtils2D.AggregateByDims`로 동일 dim 시트 행을 합산**하고, `Success=true` 반환 전 시트 재고·수요 정확 충족·trim/kerf/회전·길로틴 적합성을 공통 validator로 재검증한다.
+`CuttingStock.Core.TwoD` 네임스페이스에 2D 솔버 4종. 산업용 패널 톱이 요구하는 **길로틴(guillotine)** 절단, 90° 회전, kerf, 트림 모두 지원. **모든 솔버는 `TwoDInputPreprocessor` 공통 진입 경로에서 `SolverUtils2D.AggregateByDims` 호환 파사드를 통해 동일 dim 시트 행을 합산**하고, 성공 조기 반환을 포함해 `TwoDResultFinalizer`에서 시트 재고·수요 정확 충족·trim/kerf/회전·길로틴 적합성을 재검증한다.
 
 | 솔버 | 핵심 알고리즘 | 출처 |
 |---|---|---|
@@ -84,13 +84,13 @@ WPF UI는 상단에 **1D 절단 / 2D 절단** 두 탭. 두 탭 모두 입력 그
 | Trim | 시트 각 변 트림 (mm) | 0 |
 | AlphaArea | 면적 1mm² 당 비용 (원/mm²) | 1 |
 | AllowRotation | 90° 회전 허용 (글로벌) | true |
-| Stage | 길로틴 단계 수 — **현재는 advisory only** | 2 |
+| Stage | 길로틴 단계 수 — Two-Stage Shelf만 2-stage 강제, 나머지는 advisory | 2 |
 | TimeLimitMs | CG/MIP 솔버 wall-clock 절대 deadline | 30000 |
 | UsageOrder | 시트 소비 순서 | LargeToSmall |
 
 ## 주요 기능
 
-- 1D / 2D 각 3종 알고리즘 + 비교
+- 1D 7개 / 2D 4개 카탈로그 솔버 + 비교
 - Kerf(톱날 두께) 지원 — 현실 절단 손실 반영
 - 1D 용접 지원 — 긴 주문을 여러 조각으로 분할, 부분 조각은 기존 plan leftover에 호스트
 - 성공 결과 공통 validator — `Success=true` 결과는 재고/수요/kerf/용접/길로틴 불변식 통과

@@ -10,7 +10,8 @@ namespace CuttingStock.Core.TwoD.Algorithms
 {
     /// <summary>
     /// Shelf-based heuristic: NFDH/FFDH/BFDH x 5 sort orders, best-of-15 by waste.
-    /// Naturally 2-stage guillotine (horizontal shelf cuts, vertical item cuts).
+    /// Produces shelf-shaped 2-stage layouts, while the Stage option remains advisory;
+    /// TwoStageShelfGuillotineSolver owns explicit stage-contract enforcement.
     /// Ref: Coffman et al. 1980; Berkey &amp; Wang 1987.
     /// </summary>
     public sealed class ShelfGuillotineSolver : ICuttingSolver2D
@@ -34,6 +35,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 var input = TwoDInputPreprocessor.Preprocess(sheets, orders, result);
                 if (input.ShouldReturn)
                 {
+                    TwoDResultFinalizer.FinalizeAndValidate(input.Sheets, input.Orders, options, result);
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;

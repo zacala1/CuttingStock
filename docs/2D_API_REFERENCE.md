@@ -64,7 +64,7 @@ Console.WriteLine(result.GetDetailedReport(options));
 | `Trim` | int | 0 | 시트 각 변의 트림 폐기 (mm) |
 | `AllowRotation` | bool | true | 글로벌 90° 회전 토글 (per-`RectOrder` 플래그도 활성이어야 함) |
 | `AlphaArea` | float | 1.0 | mm² 당 폐기 비용 |
-| `Stage` | int | 2 | 길로틴 stage 수 (2 또는 3). **현재 advisory only** — 어떤 솔버도 3-stage를 강제하지 않으며 출력은 unrestricted-stage 길로틴이다 |
+| `Stage` | int | 2 | 길로틴 stage 수 (2 또는 3). `TwoStageShelfGuillotineSolver`는 2-stage를 강제하고 나머지 솔버에서는 advisory다. 어떤 솔버도 3-stage를 강제하지 않는다 |
 | `TimeLimitMs` | int | 30000 | CG/MIP 솔버 **절대 wall-clock deadline**. 솔버 시작 시점부터 카운트되며 warm-start / bootstrap 시간도 포함 |
 | `UsageOrder` | enum | LargeToSmall | 시트 소비 순서 |
 
@@ -120,15 +120,18 @@ public interface ICuttingSolver2D
 
 ### 구현
 - `ShelfGuillotineSolver` — 빠른 휴리스틱
+- `TwoStageShelfGuillotineSolver` — shelf 결과의 2-stage 구조를 강제 검증
 - `ColumnGeneration2DSolver` — Gilmore-Gomory CG (OR-Tools GLOP + Beasley DP)
 - `StagedMipGuillotineSolver` — 패턴 풀 + 정수 마스터 (OR-Tools CBC)
 
-**모든 솔버는 진입 즉시 `SolverUtils2D.AggregateByDims(sheets)`를 호출** —
+**모든 솔버는 `TwoDInputPreprocessor` 진입 경로에서
+`SolverUtils2D.AggregateByDims(sheets)` 호환 파사드를 호출** —
 `Sheet.Equals`가 구조적이라 동일 dim 행이 여러 개 있으면 `Dictionary<Sheet, _>`에서
 키가 충돌해 인벤토리가 절반으로 잘리거나 `ArgumentException`이 난다. 외부에서 시트
 리스트를 만들 때 미리 합쳐도 되고, 그대로 넘겨도 솔버 안에서 안전하게 합산된다.
 
-또한 모든 솔버는 `Success=true` 반환 전 `SolverUtils2D.ValidateSuccessfulResult` 를 통과한다.
+또한 모든 솔버는 성공 조기 반환을 포함해 `Success=true` 반환 전
+`TwoDResultFinalizer.FinalizeAndValidate` 를 통과한다.
 CG2D / Staged MIP는 정수화 또는 MIP materialization 뒤 `TrimToDemand` 로 과생산 배치를
 제거한 다음 validator를 실행한다.
 

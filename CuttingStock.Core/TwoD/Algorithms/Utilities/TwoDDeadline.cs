@@ -20,7 +20,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
         public long TotalMilliseconds { get; }
         public long ElapsedMilliseconds => _elapsedMilliseconds();
         public long RemainingMilliseconds => Math.Max(0, TotalMilliseconds - ElapsedMilliseconds);
-        public bool IsExpired => ElapsedMilliseconds > TotalMilliseconds;
+        public bool IsExpired => ElapsedMilliseconds >= TotalMilliseconds;
 
         public static TwoDDeadline FromStopwatch(Stopwatch stopwatch, long totalMilliseconds)
         {
@@ -44,7 +44,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
 
         public bool IsPast(long absoluteMilliseconds)
         {
-            return ElapsedMilliseconds > absoluteMilliseconds;
+            return ElapsedMilliseconds >= absoluteMilliseconds;
         }
 
         public bool HasLessThanReserve(long reserveMilliseconds)
@@ -55,12 +55,10 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             return TotalMilliseconds - ElapsedMilliseconds < reserveMilliseconds;
         }
 
-        public long RemainingMillisecondsWithFloor(long floorMilliseconds)
+        public bool TryGetRemainingMilliseconds(out long remainingMilliseconds)
         {
-            if (floorMilliseconds < 0)
-                throw new ArgumentOutOfRangeException(nameof(floorMilliseconds));
-
-            return Math.Max(floorMilliseconds, TotalMilliseconds - ElapsedMilliseconds);
+            remainingMilliseconds = RemainingMilliseconds;
+            return remainingMilliseconds > 0;
         }
     }
 }

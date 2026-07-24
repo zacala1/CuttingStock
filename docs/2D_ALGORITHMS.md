@@ -1,8 +1,9 @@
 # 2D Guillotine Cutting Stock — 알고리즘
 
-본 프로젝트는 1D 솔버 3종(Greedy KP / Column Generation / Arc Flow MIP)을 거울 삼아 2D에서도 3종 솔버를 제공한다. 모두 동일 인터페이스 `ICuttingSolver2D` 를 구현한다.
+본 프로젝트는 2D 솔버 4종을 제공하며 모두 동일 인터페이스 `ICuttingSolver2D` 를 구현한다.
 
-**공통 진입 규약.** 세 솔버는 입력 즉시 `SolverUtils2D.AggregateByDims`를 호출해
+**공통 진입 규약.** 네 솔버는 `TwoDInputPreprocessor` 진입 경로에서
+`SolverUtils2D.AggregateByDims` 호환 파사드를 호출해
 동일 `(Width, Height)` 시트 행을 합산한다. `Sheet.Equals`가 구조적이라 분산된 행은
 `Dictionary<Sheet, _>` 키 충돌로 인벤토리 절반을 잃거나 `ArgumentException`을 던진다.
 
@@ -11,18 +12,19 @@ wall-clock deadline**. warm-start / bootstrap 시간도 예산 안에 포함된�
 `deadline = sw.ElapsedMilliseconds + TimeLimitMs`로 워밍업 시간을 이중 계산했으나
 2026-05 수정되어 user-visible 한도와 일치한다.
 
-**Stage 옵션.** `SolverOptions2D.Stage`는 2 또는 3 을 받지만 현재 advisory only —
-어떤 솔버도 3-stage 컷을 강제하지 않고 출력은 unrestricted-stage 길로틴이다.
-UI는 "2-stage" / "3-stage"로 노출하나 동작은 동일하다.
+**Stage 옵션.** `TwoStageShelfGuillotineSolver`만 2-stage shelf 구조를 강제한다.
+`ShelfGuillotineSolver`, CG2D, Staged MIP에서 `Stage`는 advisory metadata이며,
+현재 어떤 솔버도 3-stage 컷을 강제하지 않는다.
 
-**성공 결과 검증.** 세 솔버는 `Success=true` 반환 전
-`SolverUtils2D.ValidateSuccessfulResult` 를 통과해야 한다. 검증기는 sheet inventory,
+**성공 결과 검증.** 네 솔버는 빈 주문 조기 반환을 포함해 `Success=true` 반환 전
+`TwoDResultFinalizer.FinalizeAndValidate` 를 통과해야 한다. 검증기는 sheet inventory,
 pattern multiplicity, trim bounds, kerf-aware overlap, guillotine compliance, order index,
 치수/회전 플래그, exact demand coverage 를 확인한다.
 
 | Solver | 특성 | 복잡도 | 출처 |
 |---|---|---|---|
 | `ShelfGuillotineSolver` | 빠른 휴리스틱 | O(K · N log N) | Coffman et al. 1980; Berkey & Wang 1987 |
+| `TwoStageShelfGuillotineSolver` | 2-stage shelf 계약 강제 | O(K · N log N) | Shelf 결과 + 구조 검증 |
 | `ColumnGeneration2DSolver` | LP 기반 근최적 | Polynomial/iter, exp. worst | Gilmore & Gomory 1965; Cintra et al. 2008 |
 | `StagedMipGuillotineSolver` | 정수 마스터 MIP | NP-hard, 시간 제한 | Vance et al. 1994; Belov & Scheithauer 2006 |
 

@@ -63,6 +63,32 @@ namespace CuttingStock.Tests.Algorithms
         }
 
         [TestCaseSource(nameof(CatalogSolvers))]
+        public void CatalogSolver_OnInsufficientInventory_SatisfiesFailureResultContract(SolverDescriptor descriptor)
+        {
+            var stock = new List<RebarStock> { new(6000, 1) };
+            var orders = new List<Order> { new(4000, 2) };
+            var options = new SolverOptions
+            {
+                Kerf = 5,
+                EnableWelding = false,
+            };
+
+            var result = descriptor.CreateSolver().Solve(
+                CloneStock(stock),
+                CloneOrders(orders),
+                options);
+
+            result.Success.Should().BeFalse(
+                "{0} must report insufficient inventory as a failed solve",
+                descriptor.Key);
+            result.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+            result.ExecutionTimeMs.Should().BeGreaterThanOrEqualTo(0);
+            result.AlgorithmName.Should().NotBeNullOrWhiteSpace();
+            result.TotalCost.Should().BeGreaterThanOrEqualTo(0);
+            result.CuttingPlans.Should().HaveCountLessThanOrEqualTo(stock.Sum(s => s.Quantity));
+        }
+
+        [TestCaseSource(nameof(CatalogSolvers))]
         public void Descriptor_WhenWeldingRequested_ReportsSupportAccurately(SolverDescriptor descriptor)
         {
             var options = new SolverOptions { EnableWelding = true };

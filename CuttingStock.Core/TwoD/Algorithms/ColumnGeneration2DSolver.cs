@@ -36,6 +36,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 var input = TwoDInputPreprocessor.Preprocess(sheets, orders, result);
                 if (input.ShouldReturn)
                 {
+                    TwoDResultFinalizer.FinalizeAndValidate(input.Sheets, input.Orders, options, result);
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;
@@ -75,12 +76,12 @@ namespace CuttingStock.Core.TwoD.Algorithms
 
                     if (!PatternPool.SolveLpMaster(columns, demand, out _, out var pi))
                     {
-                    // LP infeasible — fall back to warm start.
-                    result.Patterns = warm.Patterns;
-                    TwoDResultFinalizer.FinalizeAndValidate(sheets, orders, options, result);
-                    sw.Stop();
-                    result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
-                    return result;
+                        // LP infeasible — fall back to warm start.
+                        result.Patterns = warm.Patterns;
+                        TwoDResultFinalizer.FinalizeAndValidate(sheets, orders, options, result);
+                        sw.Stop();
+                        result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
+                        return result;
                     }
 
                     bool anyAdded = false;

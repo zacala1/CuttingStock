@@ -9,8 +9,8 @@
 |---|---|---|
 | [PROBLEM_DEFINITION.md](PROBLEM_DEFINITION.md) | 1D 절단 문제 정의 — 입력, 제약, 목적 함수 | ~10분 |
 | [2D_PROBLEM_DEFINITION.md](2D_PROBLEM_DEFINITION.md) | 2D 길로틴 절단 문제 정의 — 길로틴 제약, 회전, 트림 | ~10분 |
-| [ALGORITHMS.md](ALGORITHMS.md) | 1D 솔버 3종 알고리즘 요약 | ~15분 |
-| [2D_ALGORITHMS.md](2D_ALGORITHMS.md) | 2D 솔버 3종(Shelf / CG2D / StagedMip) 상세 + 벤치 | ~20분 |
+| [ALGORITHMS.md](ALGORITHMS.md) | 1D 알고리즘 계열과 카탈로그 변형 요약 | ~15분 |
+| [2D_ALGORITHMS.md](2D_ALGORITHMS.md) | 2D 솔버 4종(Shelf / Two-Stage / CG2D / StagedMip) 상세 + 벤치 | ~20분 |
 | [API_REFERENCE.md](API_REFERENCE.md) | 1D + 2D 공개 타입과 인터페이스 | ~20분 |
 | [2D_API_REFERENCE.md](2D_API_REFERENCE.md) | 2D 전용 API 상세 + Quick Start | ~15분 |
 | [BENCHMARK_REPORT.md](BENCHMARK_REPORT.md) | BenchmarkDotNet 측정치 + 테스트 커버리지 요약 | ~10분 |

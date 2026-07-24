@@ -40,6 +40,7 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 var input = TwoDInputPreprocessor.Preprocess(sheets, orders, result);
                 if (input.ShouldReturn)
                 {
+                    TwoDResultFinalizer.FinalizeAndValidate(input.Sheets, input.Orders, options, result);
                     sw.Stop();
                     result.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
                     return result;
@@ -93,8 +94,10 @@ namespace CuttingStock.Core.TwoD.Algorithms
                 AddDiversifiedColumns(columns, signatures, sheets, orders, demand, options, deadline, n);
 
                 // 4) Integer master MIP with hard time limit on remaining budget.
-                long remaining = deadline.RemainingMillisecondsWithFloor(1000);
-                bool ipSolved = SolveIntegerMaster(columns, demand, sheets, remaining, out var xInt);
+                int[]? xInt = null;
+                bool ipSolved = false;
+                if (deadline.TryGetRemainingMilliseconds(out long remaining))
+                    ipSolved = SolveIntegerMaster(columns, demand, sheets, remaining, out xInt);
 
                 List<CuttingPattern2D> outPatterns;
                 if (ipSolved && xInt != null)
