@@ -19,6 +19,16 @@ deliberate, reviewed migration plan before merging.
 Anything that can be tested without WPF belongs in Core or in a UI service
 that exposes plain data.
 
+## Compatibility Policy
+
+The architecture hardening work is source-compatible. Existing public solver
+interfaces, domain constructors, result models, and compatibility solver class
+names remain available. Legacy facades may delegate one-way to a new owner, but
+new code must not create a reverse dependency back to the facade.
+
+Any future public API removal or result-contract change requires a separate,
+reviewed migration plan; it must not be hidden inside an internal refactor.
+
 ## 1D Solver Guardrails
 
 ### Kerf
@@ -51,6 +61,11 @@ Successful 1D results must satisfy all of these conditions:
 
 - Produced demand matches input demand, including weld-group totals.
 - Stock usage by length does not exceed inventory.
+- A plan that cuts a previously produced scrap sets
+  `CuttingPlan.ReusableLeftoverSourcePlanIndex`; validation must resolve that
+  earlier plan and require its terminal leftover to equal `StockLength`.
+- `StockUsed`, material efficiency, and terminal `ReusableLeftovers` must not
+  count an intermediate reused leftover as fresh stock.
 - Every plan `Leftover` matches `SolverUtils.ComputeLeftover`.
 - `ReusableLeftovers`, `WasteLength`, `WeldCount`, and `TotalCost` are
   finalized through the shared result path.
@@ -161,8 +176,9 @@ Scenario loading has one mapping owner per dimension:
 
 The visualization split is also intentional. A 1D plan is naturally represented
 as grouped linear bars, while a 2D plan requires coordinate-aware placement on a
-Canvas. Both ViewModels expose plain projection state; WPF visual construction
-remains in the corresponding view.
+Canvas. The 2D ViewModel exposes plain placement and chart projections. The 1D
+`VisualizationRow` is a WPF-only projection and may contain `Brush`; final
+LiveCharts and Canvas construction remains in the corresponding view.
 
 ## Benchmark And Test Boundaries
 
@@ -195,15 +211,38 @@ total.
 
 ## Adding A Solver Safely
 
-Before adding a solver to a catalog:
+### 1D Solver
 
-1. Add the solver implementation under Core.
-2. Add a catalog descriptor with truthful capabilities.
-3. Add catalog-driven contract coverage for shared invariants.
-4. Add solver-specific tests only for behavior that is unique to that solver.
-5. Wire UI selection through existing ViewModel descriptor surfaces.
-6. Keep export, comparison, and visualization behavior compatible with existing
-   result models.
+1. Implement `ICuttingSolver` under `CuttingStock.Core/Algorithms`. Express a
+   behavioral variant as a profile when it shares the same engine.
+2. Route every successful result through
+   `SolverResultFinalizer.FinalizeAndValidate`.
+3. Add a truthful descriptor to `SolverCatalog`; catalog registration
+   automatically enrolls the solver in `SolverContractTests1D`.
+4. Run the contract harness and add focused tests only for solver-specific
+   behavior, quality, or capability claims.
+5. Wire UI selection through the descriptor surface and preserve existing
+   result, export, comparison, and visualization contracts.
 
-For 2D solvers, the entry path must aggregate sheets, final successful results
-must validate, and `TimeLimitMs` must remain absolute from solver start.
+### 2D Solver
+
+1. Implement `ICuttingSolver2D` under `CuttingStock.Core/TwoD/Algorithms`.
+2. Enter through `TwoDInputPreprocessor.Preprocess`, keep `TimeLimitMs`
+   absolute from solver start, and route every successful exit through
+   `TwoDResultFinalizer.FinalizeAndValidate`.
+3. Add a truthful descriptor to `SolverCatalog2D`; catalog registration
+   automatically enrolls the solver in `SolverContractTests2D`.
+4. Produce canonical `CuttingPattern2D.Placements` and validate geometry,
+   inventory, demand, rotation, kerf, and guillotine compliance.
+5. Claim enforced 2-stage or 3-stage behavior only with structural contract
+   tests. Otherwise report `Stage` as advisory.
+6. Add solver-specific tests, then wire UI selection through the existing
+   descriptor and plain-projection surfaces.
+
+Run both catalog contract suites before broader verification:
+
+```bash
+dotnet test CuttingStock.Tests/CuttingStock.Tests.csproj -c Release --filter "SolverContractTests"
+dotnet build CuttingStock.slnx -c Release
+dotnet test CuttingStock.slnx -c Release --nologo --no-build
+```

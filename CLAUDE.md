@@ -104,7 +104,7 @@ fit the project's scale:
   consolidated input validation in `SolverUtils2D.ValidateInputs`,
   killed duplicate sheet-inventory constraints in StagedMip.
 
-**MVVM:** As of `8075cc7` the UI is MVVM (CommunityToolkit.Mvvm).
+**MVVM:** As of `83bab19` the UI is MVVM (CommunityToolkit.Mvvm).
 MainWindow / TwoDTab code-behind shrank from 2052 to 607 lines (-70%).
 ViewModels live in `CuttingStock.UI/ViewModels/`, dialog/file-IO is
 abstracted via `IDialogService`, and the 1D visualization data is built

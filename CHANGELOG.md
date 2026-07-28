@@ -1,7 +1,32 @@
 # Changelog
 
-`docs/archive/` 에 흩어져 있던 PHASE 노트들을 시간순으로 압축한 변경 이력.
-원본은 git history 에 보존되어 있다 (`git log -- docs/archive/`).
+`docs/archive/` 에 흩어져 있던 PHASE 노트와 구현 이력을 주제별로 압축한 변경 이력.
+`main` 은 아래 주요 단계와 일치하는 curated milestone commit으로 구성한다.
+
+## 2026-07-24 — Architecture and pattern hardening
+
+- **아키텍처 계약과 검증 하네스** — Core/UI/benchmark 경계, 1D/2D solver
+  생명주기, 2D placement/stage 계약을 문서화하고 카탈로그 기반 공통 계약
+  테스트를 추가 (`5b926bf`).
+- **공통 생명주기와 정책 소유권** — 1D 결과 finalization, 2D 전처리/후처리,
+  절대 deadline, 2D utility facade를 단일 경로로 정리하고 검토에서 발견된
+  invariant 및 one-way dependency 위반을 수정 (`5b926bf`).
+- **변형과 패턴 서비스 구성** — Column Generation 변형을 profile로 모델링하고
+  2D pattern pool 생성/정규화/중복 제거 책임을 분리 (`5b926bf`).
+- **UI shell과 projection 경계** — 창 shell workflow, plain projection DTO,
+  비교/내보내기 workflow를 서비스로 추출하고 1D/2D 사용자 기능 parity 정책을
+  고정했다. 활성 작업공간 기준 단축키 라우팅을 회귀 테스트로 보호하고 상태
+  표시도 선택된 탭을 따르도록 수정했다 (`bef5f62`, `edfaae8`).
+- **빌드와 검증 거버넌스** — 공통 MSBuild/package 설정, 정합성 테스트와
+  BenchmarkDotNet 분리, Windows .NET 10 CI 및 테스트 수 단일 출처 정책을 추가
+  (`5efddbf`).
+- **최종 계약 하드닝** — 취소된 worker가 종료되기 전 재진입을 차단하고,
+  비교 차트 stale state를 제거했다. 2D 절대 deadline을 확장·정렬·선반 탐색까지
+  전달하고 OR-Tools 수명을 명시했으며, 1D 재사용 잔재의 출처·재고·효율 계약과
+  benchmark 품질 비교 출력을 회귀 테스트로 고정했다 (`edfaae8`).
+
+이 작업은 기존 공개 solver 인터페이스와 호환 클래스 이름을 유지하는
+source-compatible 리팩터링이다.
 
 ## 2026-06-30 — Solver lifecycle architecture 정리
 
@@ -14,7 +39,7 @@
 - **회귀 테스트** — descriptor 계약, run lifecycle, workspace 공통 실행 흐름,
   scenario 저장/로드 fixture를 보강.
 
-1개 implementation commit (`821de18`).
+Lifecycle architecture milestone (`2fb7d72`).
 
 ## 2026-06-13 — Solver capability catalog + 선택형 CG 강화 variants
 
@@ -28,7 +53,7 @@
 - **회귀 테스트** — solver catalog 계약, CG variant smoke/quality, global stock 선택,
   2D solver matrix에 TwoStage solver를 추가.
 
-1개 commit (`ac2278f`).
+Solver contract milestone (`bbb9413`).
 
 ## 2026-06-01 — Solver 성공 결과 validator 보강
 
@@ -41,7 +66,7 @@
 - **validator 회귀 테스트** — 1D over-pack / over-production / welded order 합계,
   2D overlap / illegal rotation / valid kerf pattern 검증 케이스 추가.
 
-1개 commit (`c7de45a`).
+Solver contract milestone (`bbb9413`).
 
 ## 2026-05-31 — 알고리즘 kerf / 수요 불변식 보강
 
@@ -56,7 +81,7 @@
 - **2D CG/MIP exact-demand guard** — LP/MIP 패턴이 overproduce할 수 있는 경로를
   최종 materialization에서 demand 기준으로 trim하고 정확히 덮지 못하면 실패 처리.
 
-2개 commit (`ece74b9`, `cee7d96`).
+Solver contract milestone (`bbb9413`).
 
 ## 2026-05 (late) — 전방위 안정성 sweep + UX 마감
 
@@ -86,31 +111,33 @@
 - **R1-2: BoolToVisibilityConverter Inverse, Calculate/Compare CanExecute** —
   MVVM 라운드 직후 catch한 두 critical UX bug.
 
-5개 commit (`cf6660f`...`4b3c1ee`).
+Desktop stability milestone (`edde40d`).
 
 ## 2026-05 — MVVM + 강력한 테스트 + 잔여 버그 정리
 
-- **WPF UI MVVM 전환** (`8075cc7`) — CommunityToolkit.Mvvm 도입. `MainViewModel` /
+아래 변경은 MVVM milestone (`83bab19`)에 통합되어 있다.
+
+- **WPF UI MVVM 전환** — CommunityToolkit.Mvvm 도입. `MainViewModel` /
   `TwoDViewModel` + `IDialogService` + `VisualizationService` 로 분리. code-behind 2052 → 607 줄 (-70%).
-- **테스트 615개로 확대** (`06df2dc`, `28519ac`) — 신규 suite: `InvariantTests1D`
+- **테스트 615개로 확대** — 신규 suite: `InvariantTests1D`
   (15 seeds × 3 솔버 매트릭스), `PerformanceTests1D/2D` (wall-clock 예산),
   `StressTests1D` (`[Category("Stress")]`), `QualityComparisonTests`,
   `RobustnessTests`.
-- **CG 버그 fix 2건** (`06df2dc`)
+- **CG 버그 fix 2건**
   - 초기 그리디 컬럼이 kerf 무시 — `5×1000mm` 패턴이 5000mm bar에 들어가 over-pack.
     초기 컬럼 생성을 `weight = len + (cutsSoFar>0 ? kerf : 0)` 으로 수정.
   - `SolveSingleStock`이 order > stock 인 demand에도 identity 패턴을 생성해
     `Success=true` 와 invalid 패턴을 반환. demand를 `length ≤ stockLength`
     로 필터링하도록 수정.
-- **시트 인벤토리 합산** (`28519ac`) — 동일 dim 시트 행이 두 개면 `Dictionary<Sheet,_>`
+- **시트 인벤토리 합산** — 동일 dim 시트 행이 두 개면 `Dictionary<Sheet,_>`
   키 충돌로 인벤토리 절반 손실 / `ArgumentException`. `SolverUtils2D.AggregateByDims`
   추가, 모든 2D 솔버 진입부에서 호출.
-- **2D 진행률 + 비교 차트 + JSON 시나리오** (`d10f882`) — 2D 탭이 1D 패리티 도달.
+- **2D 진행률 + 비교 차트 + JSON 시나리오** — 2D 탭이 1D 패리티 도달.
   `ScenarioService` (Core/Persistence) — `.cstock1d/2d.json` round-trip + 스키마 가드.
-- **UI/UX 전면 정비** (`a061993`) — Excel import 타입 체크 수정, ExportComparison
+- **UI/UX 전면 정비** — Excel import 타입 체크 수정, ExportComparison
   rank 정렬 (실패 행 마지막), placeholder 추가, ToolTip 전면 도입, 키보드 단축키
   (F1/Ctrl+R/Ctrl+Shift+C/Ctrl+S), HSL 팔레트 적용, 차트 라벨 회전.
-- **알고리즘 정확성 + 도메인 불변성** (`c85b60e`) — `Order`/`RebarStock` 완전
+- **알고리즘 정확성 + 도메인 불변성** — `Order`/`RebarStock` 완전
   immutable, `Cut`/`CuttingPlan` init-only, `TotalCost` int → long, ArcFlow
   flow decomposition safety counter, `PatternBuilder` 단일-rect non-corner
   케이스 처리, Greedy `FindHostPlanForWeld` 도입 (용접 부분 조각을 기존 plan에
@@ -162,6 +189,5 @@ ColumnGeneration 또는 ArcFlow 선택.
 
 ---
 
-이력 작성 규칙: 새 변경은 위쪽에 추가, 커밋 SHA 와 함께. 한 라운드 = 한 묶음.
-원본 PHASE 노트(2025-11~2026-01)는 git history에서 `git show 7259d84^:docs/archive/PHASE3_CHANGES.md`
-같은 형식으로 복원 가능.
+이력 작성 규칙: 새 변경은 위쪽에 추가하고 해당 milestone commit SHA를 기록한다.
+한 라운드의 구현·검증·문서화는 하나의 의미 있는 변경 묶음으로 유지한다.
