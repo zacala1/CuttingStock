@@ -37,9 +37,13 @@ Sparse DP + 2-opt 후처리.
 DAG 네트워크 + SCIP MIP.
 
 - **전략**: 노드 = 위치, 아이템 arc = `length + kerf`, capacity = `stock + kerf`, GCD 노드 압축
-- **복잡도**: 정확(NP-hard, 30s 시간 제한)
-- **장점**: 수학적 최적, 다중 재고 지원
-- **단점**: 입력 distinct length가 많거나 kerf로 GCD 작아지면 시간 제한 도달 가능
+- **복잡도**: MIP(NP-hard), 내부 30s 시간 제한
+- **장점**: 30초 안에 SCIP가 최적을 증명하면 수학적 최적. 다중 재고 지원
+- **단점**: 입력 distinct length가 많거나 kerf로 GCD 작아지면 시간 제한 도달 가능.
+  kerf > 0이면 사실상 항상 30초 한도에 도달한다
+- **한도 도달 시**: 찾은 해에 `(time limit, best found)`를 표시하고, 해가 없거나
+  CG/Greedy보다 재료를 더 쓰면 그 휴리스틱 결과로 대체한다
+  (`(fallback: …)` 표시). 재고 사용 순서 옵션은 적용하지 않는다
 
 ## 2D 솔버 (`ICuttingSolver2D`)
 

@@ -13,6 +13,15 @@ wall-clock deadline**. warm-start / bootstrap 시간도 예산 안에 포함된�
 `deadline = sw.ElapsedMilliseconds + TimeLimitMs`로 워밍업 시간을 이중 계산했으나
 2026-05 수정되어 user-visible 한도와 일치한다.
 
+**TimeLimit과 DP.** CG2D/Staged MIP의 pricing은 `GuillotineKnapsackDp`를 호출하는데, 큰
+시트에 고유 치수가 많으면 DP 한 번이 수 초 걸린다. DP는 `TrySolve(cancel, …)`로 deadline
+술어를 재귀 중에 주기적으로 확인해 시간 초과 시 즉시 중단한다 (부분값은 memo에 쓰지 않는다).
+이전에는 DP 사이에서만 deadline을 확인해 `TimeLimitMs=3000`이 CG2D 7.5s, Staged MIP 31s까지
+늘어졌다. 회귀 테스트: `CatalogSolver_HeavyPricingInstance_HonorsTimeLimit`.
+
+**재고 사용 순서.** `UsageOrder`는 Shelf / Two-Stage Shelf만 반영한다. CG2D와 Staged MIP는
+전체 시트 풀에서 면적을 최소화하므로 사용 순서를 적용하지 않고 UI에서도 비활성화된다.
+
 **Stage 옵션.** `TwoStageShelfGuillotineSolver`만 2-stage shelf 구조를 강제한다.
 `ShelfGuillotineSolver`, CG2D, Staged MIP에서 `Stage`는 advisory metadata이며,
 현재 어떤 솔버도 3-stage 컷을 강제하지 않는다.

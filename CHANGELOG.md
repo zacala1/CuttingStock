@@ -3,6 +3,37 @@
 `docs/archive/` 에 흩어져 있던 PHASE 노트와 구현 이력을 주제별로 압축한 변경 이력.
 `main` 은 아래 주요 단계와 일치하는 curated milestone commit으로 구성한다.
 
+## 2026-10-05 — 전수 재분석 후 solver 계약/품질 수정
+
+재분석(실측 probe 기반)에서 발견한 5건을 순서대로 수정했다. 항목마다 회귀 테스트를 추가했고, 수정 전 코드에서의
+실패는 1·2·3번에서 확인했다.
+
+- **Integer-master CG / Global-stock CG 품질** — 정수 master가 등호 수요 행 + waste 목적함수로
+  모델링돼, 생성된 column 풀에 정확 cover가 없으면 단일 cut identity column으로 채워
+  LP 반올림 해보다 약 2배 bar를 썼다(12m 평균 12.2 vs 7.2 bars). ≥ 수요 행 + 재료(stock
+  길이) 목적, 초과 생산 trim, "LP 반올림 해보다 나쁘면 채택하지 않는" 품질 가드로 교체
+  (평균 6.6 bars, 다중 재고 효율 88.5% → 93.9%). `IntegerMasterQualityTests` 92건
+  (수정 전 59건 실패) (`ccdd680`).
+- **`StockUsageOrder` capability 정직화** — ArcFlow, Global-stock CG, CG2D, Staged MIP는
+  옵션을 읽지 않으면서 지원한다고 선언했다. 선언을 제거하고 UI의 "재고 사용 순서" 컨트롤을
+  solver 선택에 따라 비활성화(`CanConfigureUsageOrder`). `StockUsageOrderContractTests`가
+  선언과 실제 동작을 양방향 검증한다 (`a699f80`).
+- **2D `TimeLimitMs` 준수** — `GuillotineKnapsackDp`에 재귀 중 협력적 취소(`TrySolve`)를
+  추가하고 pricing/diversification에서 deadline을 전달. 대형 시트 + 고유 치수 40종에서
+  3s 한도가 CG2D 7.5s, Staged MIP 31s로 늘어지던 것이 한도 내로 복귀 (`002f7aa`).
+- **ArcFlow 실패/주장** — SCIP가 해를 못 찾으면(`NOT_SOLVED`) 예외로 실패하던 것을
+  CG/Greedy 중 재료가 적은 결과로 대체하고, 한도에 걸린 해는 `(time limit, best found)`로
+  표시하며 휴리스틱보다 나쁘면 휴리스틱 결과로 대체. kerf=3 probe에서 SCIP 해가 Greedy보다
+  최대 1.8배 bar를 썼고(11 vs 6), 다중 재고에서는 30초 후 실패하던 것이 성공으로 바뀐다.
+  `SolverResult.StockMaterial` 추가, MIP 시간 제한은 테스트용 internal 생성자로 주입 (`a699f80`).
+- **1D 비교 순위 tie-break** — 비용만으로 순위를 매겨 동률(여유 자투리 ≥ Gamma는 무료)이
+  catalog 순서로 정해졌다. `(TotalCost, 높은 재료 효율)`로 정렬하고, 비교 행에 solver가 낸
+  결과 이름(fallback/time limit 표시)을 유지한다 (`dca5667`).
+
+알려진 후속 과제: ArcFlow는 kerf > 0에서 unit-step 손실 arc 때문에 노드가 capacity/GCD
+개수까지 늘어 사실상 항상 30초 한도에 도달한다(손실 arc를 종단으로 모으는 축소 그래프 필요).
+다중 재고 ArcFlow의 목적함수는 bar 수(Σz)이며 재료 길이 합이 아니다.
+
 ## 2026-07-24 — Architecture and pattern hardening
 
 - **아키텍처 계약과 검증 하네스** — Core/UI/benchmark 경계, 1D/2D solver

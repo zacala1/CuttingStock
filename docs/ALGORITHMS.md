@@ -49,13 +49,21 @@ Arc Flow 네트워크 + OR-Tools SCIP MIP.
   capacity 를 `stock + kerf` 로 확장해 첫 cut 가장자리 kerf를 잘못 과금하지 않는다.
 - **GCD 압축**: stockLength, itemLength, kerf의 GCD로 노드 수 축소
 - **Multi-stock**: stock 길이별 sub-graph, 단일 MIP
-- **Time limit**: 30s 내부 한도 (`MipTimeLimitMs` 상수)
+- **Time limit**: 30s 내부 한도 (`ArcFlowSolver.DefaultMipTimeLimitMs`)
 - **Trim**: 결과 추출 시 demand 초과 cut을 잘라냄
+- **한도 도달 처리**: SCIP가 `OPTIMAL`을 증명한 경우에만 결과 이름이 `Arc Flow MIP (OR-Tools)`
+  그대로다. 한도에 걸린 `FEASIBLE` 해는 `(time limit, best found)`로 표시하고,
+  CG/Greedy 중 더 적은 재료를 쓰는 결과보다 나쁘면 그 결과로 대체한다
+  (`(fallback: Greedy Knapsack DP)` 등). 해를 못 찾은 경우(`NOT_SOLVED`)도 같은 휴리스틱으로
+  대체하며, 둘 다 실패할 때만 실패로 보고한다.
+- **재고 사용 순서**: `UsageOrder`는 적용하지 않는다 (전체 재고를 한 MIP에서 함께 최적화)
 
-복잡도: exact (NP-hard, 시간 제한 bounded). Ref: Valerio de Carvalho 1999.
+복잡도: MIP (NP-hard, 시간 제한 bounded). Ref: Valerio de Carvalho 1999.
 
 distinct length가 많거나 kerf 때문에 GCD가 작아지면 MIP 그래프가 폭증해 30s 한도에 도달할 수 있다.
-실무 입력(고정된 표준 길이 팔레트, 큰 quantity)에서는 빠르게 최적해를 찾는다.
+kerf=3, 12m 단일 재고, 7종 길이 probe에서는 매번 한도에 도달했고 SCIP 해가 CG/Greedy보다
+나빴다(Greedy 6 bars vs SCIP 11 bars). 현재는 그 경우 휴리스틱 결과를 반환한다.
+kerf=0이고 길이가 표준 팔레트인 입력(GCD 큼)에서는 빠르게 최적을 증명한다.
 
 ## 성공 결과 검증
 
@@ -79,8 +87,24 @@ distinct length가 많거나 kerf 때문에 GCD가 작아지면 MIP 그래프가
 | Gamma | int | 100 | 재사용 가능 자투리 최소 길이 mm (>= 0) |
 | Delta | int | 100 | 용접 가능 조각 최소 길이 mm (> 0) |
 | Kerf | int | 0 | 톱날 두께 mm (>= 0) |
-| UsageOrder | enum | SmallToLarge | stock 소비 순서 |
+| UsageOrder | enum | SmallToLarge | stock 소비 순서 (Greedy와 CG 계열 4종 Standard/Stabilized/Multi-column/Integer-master만 적용) |
 | EnableWelding | bool | false | stock 초과 주문 분할 허용 |
+
+### 옵션 지원 범위 (`SolverCatalog`)
+
+`SolverCapability`는 solver가 실제로 반영하는 옵션만 선언한다. UI는 이 값으로 컨트롤
+활성화를 결정하고, `StockUsageOrderContractTests`가 선언과 실제 동작이 일치하는지
+양방향으로 검증한다 (선언한 solver는 순서에 따라 소비 stock이 바뀌어야 하고, 선언하지
+않은 solver는 바뀌면 안 된다).
+
+| 옵션 | 반영하는 solver |
+|---|---|
+| Kerf | 전부 |
+| UsageOrder | Greedy, CG, CG-Stabilized, CG-Multi-column, CG-Integer-master |
+| Welding | Greedy |
+
+`GlobalStockColumnGenerationSolver`와 `ArcFlowSolver`는 stock 길이를 하나의 master/MIP에서
+동시에 고르므로 사용 순서가 없다.
 
 ## 비용 공식
 
@@ -102,7 +126,7 @@ WeldCount   = Σ (group_size − 1) per weld group
 |---|---|
 | 속도 (실시간 미리보기) | `GreedyKnapsackSolver` |
 | 품질 (LP 최적 근접) | `ColumnGenerationSolver` |
-| 증명된 최적 (작은~중간 입력) | `ArcFlowSolver` |
+| 증명된 최적 (작은~중간 입력, kerf=0 권장) | `ArcFlowSolver` |
 | 용접 필요 | `GreedyKnapsackSolver` (다른 두 솔버는 미지원) |
 | 대량 동일 cut | `ColumnGenerationSolver` / `ArcFlowSolver` (Greedy는 비최적) |
 
