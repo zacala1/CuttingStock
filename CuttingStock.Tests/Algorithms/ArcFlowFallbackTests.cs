@@ -61,7 +61,6 @@ namespace CuttingStock.Tests.Algorithms
             // 1 ms: SCIP cannot prove optimality on the kerf graph, and may find no incumbent at all.
             var result = Run(new ArcFlowSolver(mipTimeLimitMs: 1), stock, orders, options);
 
-            TestContext.WriteLine($"{result.AlgorithmName} | stock={result.StockUsed} material={result.StockMaterial}");
             result.Success.Should().BeTrue(result.ErrorMessage);
             result.AlgorithmName.Should().StartWith(PlainName)
                 .And.NotBe(PlainName, "an unproven result must say so instead of posing as optimal");
