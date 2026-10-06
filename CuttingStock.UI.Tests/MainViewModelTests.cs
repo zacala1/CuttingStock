@@ -143,9 +143,11 @@ namespace CuttingStock.UI.Tests
             await _vm.CompareAlgorithmsCommand.ExecuteAsync(null);
 
             _vm.HasComparisonResults.Should().BeTrue();
+            // Same ordering the ranking uses: cost, then higher efficiency; exact ties keep catalog order.
             var successfulByCost = _vm.ComparisonResults
                 .Where(row => row.Success)
-                .OrderBy(row => row.TotalCost)
+                .OrderBy(row => ComparisonRankKey.CostThenEfficiency(row.TotalCost, row.MaterialEfficiency).Primary)
+                .ThenBy(row => ComparisonRankKey.CostThenEfficiency(row.TotalCost, row.MaterialEfficiency).Secondary)
                 .ToList();
             successfulByCost.Select(row => row.Rank)
                 .Should().Equal(Enumerable.Range(

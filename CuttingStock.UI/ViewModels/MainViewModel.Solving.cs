@@ -122,7 +122,11 @@ namespace CuttingStock.UI.ViewModels
                         },
                         createResultRow: (optimizer, result) => new ComparisonResult
                         {
-                            AlgorithmName = optimizer.Name,
+                            // Keep the solver's own label so a fallback / time-limited answer is
+                            // not presented as the solver's regular result.
+                            AlgorithmName = string.IsNullOrWhiteSpace(result.AlgorithmName)
+                                ? optimizer.Name
+                                : result.AlgorithmName,
                             TotalCost = result.TotalCost,
                             WasteLength = result.WasteLength,
                             StockUsed = result.StockUsed,
@@ -139,7 +143,7 @@ namespace CuttingStock.UI.ViewModels
                     var summary = ComparisonWorkflow.Complete(
                         comparison,
                         row => row.Success,
-                        row => new ComparisonRankKey(row.TotalCost),
+                        row => ComparisonRankKey.CostThenEfficiency(row.TotalCost, row.MaterialEfficiency),
                         (row, rank) => row.Rank = rank,
                         "═══════════════════════════════════════════════════" + Environment.NewLine +
                         "  알고리즘 상세 비교" + Environment.NewLine +

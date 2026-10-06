@@ -4,7 +4,16 @@ using System.Text;
 
 namespace CuttingStock.UI.ViewModels
 {
-    public readonly record struct ComparisonRankKey(long Primary, long Secondary = 0);
+    public readonly record struct ComparisonRankKey(long Primary, long Secondary = 0)
+    {
+        /// <summary>
+        /// Lowest cost first; equal costs prefer higher material efficiency (less stock consumed).
+        /// Leftovers at or above Gamma are free in the 1D cost model, so many solvers tie at the
+        /// same cost and a cost-only key would rank them by catalog order.
+        /// </summary>
+        public static ComparisonRankKey CostThenEfficiency(long totalCost, double materialEfficiency) =>
+            new(totalCost, -(long)Math.Round(materialEfficiency * 1000d));
+    }
 
     public sealed record CompletedComparison<TSolver, TResult, TRow>(
         SolverComparisonOutcome<TSolver, TResult, TRow>? BestOutcome,
