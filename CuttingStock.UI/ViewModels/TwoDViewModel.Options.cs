@@ -81,6 +81,8 @@ namespace CuttingStock.UI.ViewModels
             OnPropertyChanged(nameof(SelectedSolverCapabilityText));
             OnPropertyChanged(nameof(SelectedSolverAdvancedNotes));
             OnPropertyChanged(nameof(CanConfigureTimeLimit));
+            OnPropertyChanged(nameof(CanConfigureUsageOrder));
+            OnPropertyChanged(nameof(UsageOrderOptionTip));
             OnPropertyChanged(nameof(CanConfigureStage));
             OnPropertyChanged(nameof(TimeLimitOptionTip));
             OnPropertyChanged(nameof(StageOptionTip));

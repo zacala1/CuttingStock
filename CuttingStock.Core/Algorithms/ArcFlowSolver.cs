@@ -11,16 +11,32 @@ namespace CuttingStock.Core.Algorithms
 {
     /// <summary>
     /// Arc flow network model solved by OR-Tools SCIP. DAG nodes = positions,
-    /// item arcs = cuts (width = length + kerf). Provably optimal.
+    /// item arcs = cuts (width = length + kerf). The result is optimal only when SCIP proves
+    /// it inside its 30 s limit; otherwise the incumbent is labelled as time-limited and is
+    /// replaced by the column generation / greedy result when that consumes less stock, and
+    /// when SCIP finds no solution at all the heuristic result is returned instead of a failure.
     /// Ref: Valerio de Carvalho 1999.
     /// </summary>
     public class ArcFlowSolver : ICuttingSolver
     {
-        private const int MipTimeLimitMs = 30000;
+        private const int DefaultMipTimeLimitMs = 30000;
+
+        private readonly int _mipTimeLimitMs;
+
+        public ArcFlowSolver() : this(DefaultMipTimeLimitMs)
+        {
+        }
+
+        /// <summary>Test seam: lets tests exercise the time-limit paths without waiting 30 s.</summary>
+        internal ArcFlowSolver(int mipTimeLimitMs)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(mipTimeLimitMs);
+            _mipTimeLimitMs = mipTimeLimitMs;
+        }
 
         public string Name => "Arc Flow MIP (OR-Tools)";
-        public string Description => "Exact arc flow network + SCIP MIP.";
-        public string TimeComplexity => "Exact (MIP, 30s limit)";
+        public string Description => "Arc flow network + SCIP MIP (optimal when proven within the 30s limit).";
+        public string TimeComplexity => "MIP, 30s limit";
 
         /// <inheritdoc />
         public SolverResult Solve(List<RebarStock> stock, List<Order> orders, SolverOptions options, IProgress<double>? progress = null)
@@ -63,7 +79,10 @@ namespace CuttingStock.Core.Algorithms
                 progress?.Report(10);
 
                 // Build and solve the model
-                SolveArcFlow(result, stockByLength, sortedStockLengths, demand, itemLengths, kerf, gcd, options, progress);
+                var status = SolveArcFlow(
+                    result, stockByLength, sortedStockLengths, demand, itemLengths, kerf, gcd, options, progress);
+                bool hasSolution =
+                    status == Solver.ResultStatus.OPTIMAL || status == Solver.ResultStatus.FEASIBLE;
 
                 // Verify fulfillment
                 var remainingDemand = new Dictionary<int, int>(demand);
@@ -77,9 +96,41 @@ namespace CuttingStock.Core.Algorithms
                 }
 
                 int unfulfilled = remainingDemand.Values.Where(v => v > 0).Sum();
-                result.Success = unfulfilled == 0;
+                result.Success = hasSolution && unfulfilled == 0;
+
                 if (!result.Success)
-                    result.ErrorMessage = $"Failed to process {unfulfilled} order(s). MIP solver could not find a feasible solution.";
+                {
+                    // SCIP can exhaust its time limit without any incumbent (e.g. kerf > 0 on a
+                    // mixed stock). A heuristic answer is more useful than an error, so fall
+                    // back before reporting a failure.
+                    var fallback = TryHeuristicFallback(stock, orders, options);
+                    if (fallback != null)
+                    {
+                        fallback.ExecutionTimeMs = stopwatch.Elapsed.TotalMilliseconds;
+                        progress?.Report(100);
+                        return fallback;
+                    }
+
+                    result.ErrorMessage = hasSolution
+                        ? $"Failed to process {unfulfilled} order(s). MIP solution could not be decomposed into cutting plans."
+                        : $"MIP solver returned status: {status}. No feasible solution found.";
+                }
+                else if (status == Solver.ResultStatus.FEASIBLE)
+                {
+                    // Feasible but not proven optimal: the time limit stopped the search. With
+                    // kerf > 0 the graph is large enough that the incumbent is often far worse
+                    // than a heuristic (11 bars vs 6 in a 12 m, kerf 3 probe), so never return
+                    // an answer that consumes more stock than the heuristics would.
+                    var fallback = TryHeuristicFallback(stock, orders, options);
+                    if (fallback != null && fallback.StockMaterial < result.StockMaterial)
+                    {
+                        fallback.ExecutionTimeMs = stopwatch.Elapsed.TotalMilliseconds;
+                        progress?.Report(100);
+                        return fallback;
+                    }
+
+                    result.AlgorithmName = $"{Name} (time limit, best found)";
+                }
 
                 SolverResultFinalizer.FinalizeAndValidate(stock, orders, options, result);
 
@@ -99,7 +150,7 @@ namespace CuttingStock.Core.Algorithms
             return result;
         }
 
-        private void SolveArcFlow(
+        private Solver.ResultStatus SolveArcFlow(
             SolverResult result,
             Dictionary<int, int> stockByLength,
             List<int> stockLengths,
@@ -116,8 +167,8 @@ namespace CuttingStock.Core.Algorithms
                 throw new InvalidOperationException("SCIP solver not available. Ensure Google.OrTools is correctly installed.");
             }
 
-            // Set time limit (30 seconds)
-            solver.SetTimeLimit(MipTimeLimitMs);
+            // Time limit (30 seconds by default)
+            solver.SetTimeLimit(_mipTimeLimitMs);
 
             // For each stock length, build an arc flow sub-graph
             // z[s] = number of bars of stock length s used
@@ -257,12 +308,50 @@ namespace CuttingStock.Core.Algorithms
             progress?.Report(80);
 
             if (status != Solver.ResultStatus.OPTIMAL && status != Solver.ResultStatus.FEASIBLE)
-            {
-                throw new InvalidOperationException($"MIP solver returned status: {status}. No feasible solution found.");
-            }
+                return status;
 
             // Extract solution: convert flows to CuttingPlans, trim excess cuts
             ExtractPlans(result, solver, stockLengths, itemLengths, itemFlows, zVars, demand, kerf, gcd, options);
+            return status;
+        }
+
+        /// <summary>
+        /// Best of column generation and the greedy knapsack by stock consumed (ties keep
+        /// column generation). Welding is not an arc-flow feature, so it is switched off to
+        /// keep the fallback's semantics identical to the MIP's. Null when both fail.
+        /// </summary>
+        private SolverResult? TryHeuristicFallback(
+            List<RebarStock> stock, List<Order> orders, SolverOptions options)
+        {
+            var heuristicOptions = new SolverOptions
+            {
+                Alpha = options.Alpha,
+                Beta = options.Beta,
+                Gamma = options.Gamma,
+                Delta = options.Delta,
+                Kerf = options.Kerf,
+                UsageOrder = options.UsageOrder,
+                EnableWelding = false,
+            };
+
+            SolverResult? best = null;
+            foreach (ICuttingSolver heuristic in new ICuttingSolver[]
+                     {
+                         new ColumnGenerationSolver(),
+                         new GreedyKnapsackSolver(),
+                     })
+            {
+                // Models are immutable but the lists are not; keep the caller's lists intact for
+                // the final validation.
+                var candidate = heuristic.Solve(
+                    new List<RebarStock>(stock), new List<Order>(orders), heuristicOptions);
+                if (candidate.Success && (best == null || candidate.StockMaterial < best.StockMaterial))
+                    best = candidate;
+            }
+
+            if (best != null)
+                best.AlgorithmName = $"{Name} (fallback: {best.AlgorithmName})";
+            return best;
         }
 
         private void ExtractPlans(

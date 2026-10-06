@@ -81,6 +81,32 @@ namespace CuttingStock.UI.Tests
             _vm.CanConfigureStage.Should().BeTrue();
         }
 
+        [TestCase("shelf-guillotine", true)]
+        [TestCase("two-stage-shelf-guillotine", true)]
+        [TestCase("column-generation-2d", false)]
+        [TestCase("staged-mip-guillotine", false)]
+        public void CanConfigureUsageOrder_FollowsSolverCapability(string key, bool expected)
+        {
+            _vm.AlgorithmIndex = _vm.SolverDescriptors.ToList().FindIndex(d => d.Key == key);
+
+            _vm.CanConfigureUsageOrder.Should().Be(expected);
+            _vm.UsageOrderOptionTip.Should().NotBeNullOrWhiteSpace();
+            if (!expected)
+                _vm.UsageOrderOptionTip.Should().Contain("적용하지 않습니다");
+        }
+
+        [Test]
+        public void CanConfigureUsageOrder_RaisesPropertyChangedWhenSolverChanges()
+        {
+            var raised = new List<string?>();
+            _vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+            _vm.AlgorithmIndex = _vm.SolverDescriptors.ToList().FindIndex(d => d.Key == "column-generation-2d");
+
+            raised.Should().Contain(nameof(TwoDViewModel.CanConfigureUsageOrder));
+            raised.Should().Contain(nameof(TwoDViewModel.UsageOrderOptionTip));
+        }
+
         // ─── Calculate validation ───────────────────────────────────
 
         [Test]

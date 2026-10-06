@@ -52,6 +52,8 @@ namespace CuttingStock.UI.ViewModels
             OnPropertyChanged(nameof(SelectedSolverCapabilityText));
             OnPropertyChanged(nameof(SelectedSolverAdvancedNotes));
             OnPropertyChanged(nameof(CanConfigureWelding));
+            OnPropertyChanged(nameof(CanConfigureUsageOrder));
+            OnPropertyChanged(nameof(UsageOrderOptionTip));
             OnPropertyChanged(nameof(WeldingOptionTip));
         }
 

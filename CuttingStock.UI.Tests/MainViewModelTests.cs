@@ -33,6 +33,35 @@ namespace CuttingStock.UI.Tests
             _vm.Dispose();
         }
 
+        // ─── Capability-driven option gating ────────────────────────
+
+        [TestCase("greedy-knapsack", true)]
+        [TestCase("column-generation", true)]
+        [TestCase("column-generation-integer-master", true)]
+        [TestCase("global-stock-column-generation", false)]
+        [TestCase("arc-flow", false)]
+        public void CanConfigureUsageOrder_FollowsSolverCapability(string key, bool expected)
+        {
+            _vm.AlgorithmIndex = _vm.SolverDescriptors.ToList().FindIndex(d => d.Key == key);
+
+            _vm.CanConfigureUsageOrder.Should().Be(expected);
+            _vm.UsageOrderOptionTip.Should().NotBeNullOrWhiteSpace();
+            if (!expected)
+                _vm.UsageOrderOptionTip.Should().Contain("적용하지 않습니다");
+        }
+
+        [Test]
+        public void CanConfigureUsageOrder_RaisesPropertyChangedWhenSolverChanges()
+        {
+            var raised = new List<string?>();
+            _vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+            _vm.AlgorithmIndex = _vm.SolverDescriptors.ToList().FindIndex(d => d.Key == "arc-flow");
+
+            raised.Should().Contain(nameof(MainViewModel.CanConfigureUsageOrder));
+            raised.Should().Contain(nameof(MainViewModel.UsageOrderOptionTip));
+        }
+
         // ─── Re-entrancy gate ───────────────────────────────────────
 
         [Test]

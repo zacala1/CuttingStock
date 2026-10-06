@@ -177,9 +177,12 @@
                     </Grid>
 
                     <TextBlock Text="재고 사용 순서:" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="5"
-                               ToolTip="여러 시트 크기 중 어떤 것부터 소진할지"/>
+                               IsEnabled="{Binding CanConfigureUsageOrder}"
+                               ToolTip="{Binding UsageOrderOptionTip}"/>
                     <ComboBox Grid.Row="2" Grid.Column="1" Margin="5,0,5,5"
-                              SelectedIndex="{Binding UsageOrderIndex}">
+                              SelectedIndex="{Binding UsageOrderIndex}"
+                              IsEnabled="{Binding CanConfigureUsageOrder}"
+                              ToolTip="{Binding UsageOrderOptionTip}">
                         <ComboBoxItem Content="작은 것부터 (Small to Large)"/>
                         <ComboBoxItem Content="큰 것부터 (Large to Small)"/>
                     </ComboBox>

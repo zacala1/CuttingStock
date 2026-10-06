@@ -36,6 +36,10 @@ namespace CuttingStock.UI.ViewModels
         public string SelectedSolverCapabilityText => SelectedSolverDescriptor.CapabilitySummary;
         public string SelectedSolverAdvancedNotes => SelectedSolverDescriptor.AdvancedNotes;
         public bool CanConfigureWelding => SelectedSolverDescriptor.Supports(SolverCapability.Welding);
+        public bool CanConfigureUsageOrder => SelectedSolverDescriptor.Supports(SolverCapability.StockUsageOrder);
+        public string UsageOrderOptionTip => CanConfigureUsageOrder
+            ? "여러 길이의 재고가 있을 때 어떤 것부터 사용할지"
+            : $"{SelectedSolverDescriptor.Name}은(는) 전체 재고를 함께 최적화하므로 재고 사용 순서를 적용하지 않습니다.";
         public string WeldingOptionTip => CanConfigureWelding
             ? "체크하면 재고 길이를 초과하는 주문을 Delta 이상의 조각들로 분할해 용접"
             : $"{SelectedSolverDescriptor.Name}은(는) 용접 옵션을 지원하지 않습니다.";

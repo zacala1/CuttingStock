@@ -36,6 +36,10 @@ namespace CuttingStock.UI.ViewModels
         public string SelectedSolverCapabilityText => SelectedSolverDescriptor.CapabilitySummary;
         public string SelectedSolverAdvancedNotes => SelectedSolverDescriptor.AdvancedNotes;
         public bool CanConfigureTimeLimit => SelectedSolverDescriptor.Supports(SolverCapability.TimeLimit);
+        public bool CanConfigureUsageOrder => SelectedSolverDescriptor.Supports(SolverCapability.StockUsageOrder);
+        public string UsageOrderOptionTip => CanConfigureUsageOrder
+            ? "여러 시트 크기 중 어떤 것부터 소진할지"
+            : $"{SelectedSolverDescriptor.Name}은(는) 전체 시트 풀을 함께 최적화하므로 재고 사용 순서를 적용하지 않습니다.";
         public bool CanConfigureStage =>
             SelectedSolverDescriptor.Supports(SolverCapability.AdvisoryStage) ||
             (SelectedSolverDescriptor.Supports(SolverCapability.EnforcedStage) &&

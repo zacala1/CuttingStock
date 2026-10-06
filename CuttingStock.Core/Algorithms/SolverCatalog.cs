@@ -87,25 +87,23 @@ namespace CuttingStock.Core.Algorithms
                 TimeComplexity: "Poly/iter + MIP polish, exp worst-case",
                 Capabilities:
                     SolverCapability.Kerf |
-                    SolverCapability.StockUsageOrder |
                     SolverCapability.LinearRelaxation |
                     SolverCapability.IntegerProgramming,
-                CapabilitySummary: "여러 stock 길이를 하나의 master에서 함께 선택합니다. 용접은 지원하지 않습니다.",
+                CapabilitySummary: "Kerf를 반영하고 여러 stock 길이를 하나의 master에서 함께 선택합니다. 재고 사용 순서와 용접은 지원하지 않습니다.",
                 AdvancedNotes: "stock 길이별 순차 처리 대신 전체 재고 pool의 pattern을 CBC 정수 master에서 동시에 고릅니다.",
                 CreateSolver: () => new GlobalStockColumnGenerationSolver()),
 
             new SolverDescriptor(
                 Key: "arc-flow",
-                DisplayName: "Arc Flow MIP (정확, OR-Tools)",
+                DisplayName: "Arc Flow MIP (OR-Tools, 최대 30초)",
                 Name: "Arc Flow MIP (OR-Tools)",
-                Description: "Exact arc flow network + SCIP MIP.",
-                TimeComplexity: "Exact (MIP, 30s limit)",
+                Description: "Arc flow network + SCIP MIP (optimal when proven within the 30s limit).",
+                TimeComplexity: "MIP, 30s limit",
                 Capabilities:
                     SolverCapability.Kerf |
-                    SolverCapability.StockUsageOrder |
                     SolverCapability.IntegerProgramming,
-                CapabilitySummary: "Kerf와 재고 사용 순서를 반영합니다. 용접은 지원하지 않습니다.",
-                AdvancedNotes: "SCIP 기반 정수계획 모델이며 내부 30초 제한을 사용합니다.",
+                CapabilitySummary: "Kerf를 반영합니다. 재고 사용 순서와 용접은 지원하지 않습니다.",
+                AdvancedNotes: "SCIP 기반 정수계획 모델이며 내부 30초 제한을 사용합니다. 제한 안에 최적이 증명되지 않으면 찾은 해를 \"time limit\"로 표시하며, 해가 없거나 CG/Greedy보다 재료를 더 쓰면 그 휴리스틱 결과로 대체합니다.",
                 CreateSolver: () => new ArcFlowSolver()),
         ];
 

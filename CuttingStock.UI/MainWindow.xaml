@@ -210,9 +210,12 @@
 
                             <!-- UsageOrder -->
                             <TextBlock Text="재고 사용 순서:" Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Margin="0,5"
-                                       ToolTip="여러 길이의 재고가 있을 때 어떤 것부터 사용할지"/>
+                                       IsEnabled="{Binding CanConfigureUsageOrder}"
+                                       ToolTip="{Binding UsageOrderOptionTip}"/>
                             <ComboBox Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Margin="5"
-                                      SelectedIndex="{Binding UsageOrderIndex}">
+                                      SelectedIndex="{Binding UsageOrderIndex}"
+                                      IsEnabled="{Binding CanConfigureUsageOrder}"
+                                      ToolTip="{Binding UsageOrderOptionTip}">
                                 <ComboBoxItem Content="작은 것부터 (Small to Large)"/>
                                 <ComboBoxItem Content="큰 것부터 (Large to Small)"/>
                             </ComboBox>

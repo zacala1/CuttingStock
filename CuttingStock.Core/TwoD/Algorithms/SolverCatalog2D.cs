@@ -54,11 +54,10 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     SolverCapability.Kerf |
                     SolverCapability.Trim |
                     SolverCapability.Rotation |
-                    SolverCapability.StockUsageOrder |
                     SolverCapability.TimeLimit |
                     SolverCapability.AdvisoryStage |
                     SolverCapability.LinearRelaxation,
-                CapabilitySummary: "Kerf, Trim, 회전, 시간 제한, 재고 사용 순서를 반영합니다.",
+                CapabilitySummary: "Kerf, Trim, 회전, 시간 제한을 반영합니다. 재고 사용 순서는 지원하지 않습니다(전체 시트 풀에서 최적화).",
                 AdvancedNotes: "Stage 값은 현재 결과를 제한하지 않는 advisory 값입니다.",
                 SupportedStages: [2, 3],
                 CreateSolver: () => new ColumnGeneration2DSolver()),
@@ -73,11 +72,10 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     SolverCapability.Kerf |
                     SolverCapability.Trim |
                     SolverCapability.Rotation |
-                    SolverCapability.StockUsageOrder |
                     SolverCapability.TimeLimit |
                     SolverCapability.AdvisoryStage |
                     SolverCapability.IntegerProgramming,
-                CapabilitySummary: "Kerf, Trim, 회전, 시간 제한, 재고 사용 순서를 반영합니다.",
+                CapabilitySummary: "Kerf, Trim, 회전, 시간 제한을 반영합니다. 재고 사용 순서는 지원하지 않습니다(전체 시트 풀에서 최적화).",
                 AdvancedNotes: "이름은 staged지만 현재 Stage=2/3을 강제하지는 않습니다. 패턴은 unrestricted guillotine입니다.",
                 SupportedStages: [2, 3],
                 CreateSolver: () => new StagedMipGuillotineSolver()),
