@@ -74,13 +74,16 @@ namespace CuttingStock.Core.Domain
         public string? ErrorMessage { get; set; }
         public int StockUsed => CuttingPlans.Count(plan => !plan.UsesReusableLeftover);
 
+        /// <summary>Total length of stock consumed (plans cut from reusable leftovers are excluded).</summary>
+        public long StockMaterial => CuttingPlans
+            .Where(plan => !plan.UsesReusableLeftover)
+            .Sum(plan => (long)plan.StockLength);
+
         public double MaterialEfficiency
         {
             get
             {
-                long totalStockLength = CuttingPlans
-                    .Where(plan => !plan.UsesReusableLeftover)
-                    .Sum(plan => (long)plan.StockLength);
+                long totalStockLength = StockMaterial;
                 if (totalStockLength == 0) return 0;
                 long totalUsedLength = CuttingPlans.Sum(p => p.Cuts.Sum(c => (long)c.Length));
                 return 100.0 * totalUsedLength / totalStockLength;

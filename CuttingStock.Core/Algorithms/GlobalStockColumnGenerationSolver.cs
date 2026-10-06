@@ -82,11 +82,21 @@ namespace CuttingStock.Core.Algorithms
                     if (!anyAdded) break;
                 }
 
-                if (!TrySolveIntegerMaster(columns, demandVector, lengths, stockByLength, kerf, out var plans))
+                bool masterOk = TrySolveIntegerMaster(
+                    columns, demandVector, lengths, stockByLength, kerf, out var plans);
+
+                // The master only chooses among generated columns, so it can be feasible yet
+                // worse than the sequential CG baseline. Keep whichever consumes less stock.
+                var baseline = new ColumnGenerationSolver().Solve(stock, orders, options);
+                if (!masterOk ||
+                    (baseline.Success && baseline.StockMaterial < StockMaterial(plans)))
                 {
-                    var fallback = new ColumnGenerationSolver().Solve(stock, orders, options, progress);
-                    fallback.AlgorithmName = $"{Name} (fallback)";
-                    return fallback;
+                    baseline.AlgorithmName = $"{Name} (fallback)";
+                    // The fallback object is returned instead of `result`, so the finally block
+                    // below would stamp the wrong instance; report the total elapsed time here.
+                    baseline.ExecutionTimeMs = sw.Elapsed.TotalMilliseconds;
+                    progress?.Report(100.0);
+                    return baseline;
                 }
 
                 result.CuttingPlans.AddRange(plans);
@@ -246,14 +256,14 @@ namespace CuttingStock.Core.Algorithms
                 {
                     int count = columns[p].Counts[i];
                     if (count > 0)
-                        ub = Math.Min(ub, demand[i] / count);
+                        ub = Math.Min(ub, (demand[i] + count - 1) / count);   // covering master: allow one pattern to overshoot
                 }
                 vars[p] = solver.MakeIntVar(0, ub, $"x{p}");
             }
 
             for (int i = 0; i < demand.Length; i++)
             {
-                var c = solver.MakeConstraint(demand[i], demand[i], $"d{i}");
+                var c = solver.MakeConstraint(demand[i], double.PositiveInfinity, $"d{i}");
                 for (int p = 0; p < columns.Count; p++)
                     if (columns[p].Counts[i] != 0)
                         c.SetCoefficient(vars[p], columns[p].Counts[i]);
@@ -269,7 +279,7 @@ namespace CuttingStock.Core.Algorithms
 
             var obj = solver.Objective();
             for (int p = 0; p < columns.Count; p++)
-                obj.SetCoefficient(vars[p], ComputeWaste(columns[p], lengths, kerf));
+                obj.SetCoefficient(vars[p], columns[p].StockLength);   // minimize stock consumed
             obj.SetMinimization();
 
             var status = solver.Solve();
@@ -287,11 +297,14 @@ namespace CuttingStock.Core.Algorithms
                     {
                         for (int k = 0; k < columns[p].Counts[i]; k++)
                         {
-                            if (remaining[i] <= 0) return false;
+                            // Trim surplus: a covering master may overproduce an item.
+                            if (remaining[i] <= 0) continue;
                             cuts.Add(new Cut { Length = lengths[i] });
                             remaining[i]--;
                         }
                     }
+
+                    if (cuts.Count == 0) continue;   // pattern fully trimmed away
 
                     var plan = new CuttingPlan
                     {
@@ -307,19 +320,8 @@ namespace CuttingStock.Core.Algorithms
             return remaining.All(v => v == 0);
         }
 
-        private static long ComputeWaste(Column column, List<int> lengths, int kerf)
-        {
-            long cutCount = 0;
-            long used = 0;
-            for (int i = 0; i < lengths.Count; i++)
-            {
-                cutCount += column.Counts[i];
-                used += (long)column.Counts[i] * lengths[i];
-            }
-
-            long kerfLoss = cutCount > 0 ? (cutCount - 1) * (long)kerf : 0;
-            return column.StockLength - used - kerfLoss;
-        }
+        private static long StockMaterial(IEnumerable<CuttingPlan> plans) =>
+            plans.Where(plan => !plan.UsesReusableLeftover).Sum(plan => (long)plan.StockLength);
 
         private static bool AddIfNew(List<Column> columns, HashSet<string> signatures, Column column)
         {

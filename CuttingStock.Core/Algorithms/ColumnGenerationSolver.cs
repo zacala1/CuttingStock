@@ -335,15 +335,41 @@ namespace CuttingStock.Core.Algorithms
             var finalSolver = new SimplexSolver();
             var finalResult = finalSolver.SolveRelaxed(patterns, demand, distinctLengths);
 
-            if (_profile.UseIntegerMaster &&
-                TryGenerateSolutionIntegerMaster(
-                    result, patterns, demand, distinctLengths, stockLength, maxStockCount, kerf))
+            if (!_profile.UseIntegerMaster)
             {
+                GenerateSolutionFloorResidual(result, patterns, finalResult.Primals,
+                                              demand, distinctLengths, stockLength, maxStockCount, kerf);
                 return;
             }
 
-            GenerateSolutionFloorResidual(result, patterns, finalResult.Primals,
+            // Integer-master profile: build BOTH the LP-rounded solution and the CBC
+            // master solution, then keep the better one. The master only ever sees the
+            // generated columns, so it is a candidate, not a guaranteed improvement.
+            // Accepting it unconditionally used to let a feasible-but-poor master solution
+            // (one single-cut bar per piece) replace a much better rounded solution.
+            var rounded = new SolverResult();
+            GenerateSolutionFloorResidual(rounded, patterns, finalResult.Primals,
                                           demand, distinctLengths, stockLength, maxStockCount, kerf);
+
+            var masterPlans = TryBuildIntegerMasterPlans(
+                patterns, demand, distinctLengths, stockLength, maxStockCount, kerf);
+
+            result.CuttingPlans.AddRange(
+                masterPlans != null && !IsWorse(masterPlans, rounded.CuttingPlans)
+                    ? masterPlans
+                    : rounded.CuttingPlans);
+        }
+
+        /// <summary>
+        /// True when <paramref name="candidate"/> is strictly worse than <paramref name="baseline"/>:
+        /// it covers fewer cuts, or covers the same number using more bars.
+        /// </summary>
+        private static bool IsWorse(List<CuttingPlan> candidate, List<CuttingPlan> baseline)
+        {
+            int candidateCuts = candidate.Sum(plan => plan.Cuts.Count);
+            int baselineCuts = baseline.Sum(plan => plan.Cuts.Count);
+            if (candidateCuts != baselineCuts) return candidateCuts < baselineCuts;
+            return candidate.Count > baseline.Count;
         }
 
         private List<double> GetPricingDuals(List<double> currentDuals, List<double>? previousDuals)
@@ -433,8 +459,21 @@ namespace CuttingStock.Core.Algorithms
             return col;
         }
 
-        private bool TryGenerateSolutionIntegerMaster(
-            SolverResult result,
+        /// <summary>
+        /// CBC covering master over the generated columns: minimize the stock consumed
+        /// subject to demand coverage (<c>&gt;=</c>, matching the LP master). Surplus cuts a
+        /// pattern would produce beyond the remaining demand are trimmed when the plans
+        /// are materialized. Returns null when CBC fails or the plans cannot cover demand.
+        /// </summary>
+        /// <remarks>
+        /// The previous formulation used equality demand rows plus a waste objective. Over
+        /// a limited column pool an exact cover rarely exists, so the only feasible exact
+        /// covers were dominated by single-cut "identity" columns and the master returned
+        /// solutions with ~2x the bars of the LP rounding. With <c>&gt;=</c> rows the
+        /// objective must be material (stock length), not pattern waste: waste would reward
+        /// overproduction because surplus items shrink a pattern's apparent waste.
+        /// </remarks>
+        private List<CuttingPlan>? TryBuildIntegerMasterPlans(
             List<CuttingPatternColumn> patterns,
             Dictionary<int, int> demand,
             List<int> lengths,
@@ -443,7 +482,7 @@ namespace CuttingStock.Core.Algorithms
             int kerf)
         {
             using var solver = Solver.CreateSolver("CBC");
-            if (solver == null) return false;
+            if (solver == null) return null;
             if (_profile.IntegerMasterTimeLimitMs > 0)
                 solver.SetTimeLimit(_profile.IntegerMasterTimeLimitMs);
 
@@ -456,14 +495,14 @@ namespace CuttingStock.Core.Algorithms
                 {
                     int count = patterns[p].Counts[i];
                     if (count > 0)
-                        ub = Math.Min(ub, demand[lengths[i]] / count);
+                        ub = Math.Min(ub, (demand[lengths[i]] + count - 1) / count);
                 }
                 vars[p] = solver.MakeIntVar(0, ub, $"x{p}");
             }
 
             for (int i = 0; i < lengths.Count; i++)
             {
-                var c = solver.MakeConstraint(demand[lengths[i]], demand[lengths[i]], $"d{i}");
+                var c = solver.MakeConstraint(demand[lengths[i]], double.PositiveInfinity, $"d{i}");
                 for (int p = 0; p < patternCount; p++)
                 {
                     int count = patterns[p].Counts[i];
@@ -478,12 +517,12 @@ namespace CuttingStock.Core.Algorithms
 
             var obj = solver.Objective();
             for (int p = 0; p < patternCount; p++)
-                obj.SetCoefficient(vars[p], ComputePatternWaste(patterns[p], lengths, stockLength, kerf));
+                obj.SetCoefficient(vars[p], stockLength);
             obj.SetMinimization();
 
             var status = solver.Solve();
             if (status != Solver.ResultStatus.OPTIMAL && status != Solver.ResultStatus.FEASIBLE)
-                return false;
+                return null;
 
             var currentDemand = new Dictionary<int, int>(demand);
             var plans = new List<CuttingPlan>();
@@ -492,55 +531,32 @@ namespace CuttingStock.Core.Algorithms
             for (int p = 0; p < patternCount; p++)
             {
                 int useCount = (int)Math.Round(vars[p].SolutionValue());
-                if (useCount <= 0) continue;
-
                 for (int use = 0; use < useCount; use++)
                 {
-                    if (usedStockCount >= maxStockCount) return false;
-
                     var plan = new CuttingPlan { StockLength = stockLength, Cuts = new List<Cut>() };
                     for (int i = 0; i < lengths.Count; i++)
                     {
                         int len = lengths[i];
                         for (int k = 0; k < patterns[p].Counts[i]; k++)
                         {
-                            if (currentDemand[len] <= 0) return false;
+                            // Trim surplus: a covering master may overproduce an item.
+                            if (currentDemand[len] <= 0) continue;
                             plan.Cuts.Add(new Cut { Length = len });
                             currentDemand[len]--;
                         }
                     }
 
+                    if (plan.Cuts.Count == 0) continue;   // pattern fully trimmed away
+
+                    if (usedStockCount >= maxStockCount) return null;
                     plan.Leftover = SolverUtils.ComputeLeftover(stockLength, plan.Cuts, kerf);
-                    if (plan.Leftover < 0) return false;
+                    if (plan.Leftover < 0) return null;
                     plans.Add(plan);
                     usedStockCount++;
                 }
             }
 
-            if (currentDemand.Any(kv => kv.Value != 0))
-                return false;
-
-            result.CuttingPlans.AddRange(plans);
-            return true;
-        }
-
-        private static long ComputePatternWaste(
-            CuttingPatternColumn pattern,
-            List<int> lengths,
-            int stockLength,
-            int kerf)
-        {
-            long cutCount = 0;
-            long usedLength = 0;
-            for (int i = 0; i < lengths.Count; i++)
-            {
-                int count = pattern.Counts[i];
-                cutCount += count;
-                usedLength += (long)count * lengths[i];
-            }
-
-            long kerfLoss = cutCount > 0 ? (cutCount - 1) * (long)kerf : 0;
-            return stockLength - usedLength - kerfLoss;
+            return currentDemand.Any(kv => kv.Value != 0) ? null : plans;
         }
 
         private static double ComputePatternDualValue(KnapsackResult pattern, List<double> duals)
