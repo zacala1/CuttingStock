@@ -25,6 +25,13 @@ namespace CuttingStock.Tests.TwoD
                 .Select(d => new TestCaseData(d).SetName($"{d.Key}_absolute_deadline_contract"));
         }
 
+        private static IEnumerable<TestCaseData> HeavyTimedCatalogSolvers()
+        {
+            return SolverCatalog2D.All
+                .Where(d => d.Supports(SolverCapability.TimeLimit))
+                .Select(d => new TestCaseData(d).SetName($"{d.Key}_heavy_pricing_deadline_contract"));
+        }
+
         [TestCaseSource(nameof(CatalogSolvers))]
         public void CatalogSolver_DuplicateSheetDims_UsesAggregatedInventory(SolverDescriptor2D descriptor)
         {
@@ -144,6 +151,50 @@ namespace CuttingStock.Tests.TwoD
             result.ExecutionTimeMs.Should().BeLessThan(
                 1000,
                 "{0} should return its valid fallback without runaway work under a tiny deadline",
+                descriptor.Key);
+            SolverUtils2D.ValidateSuccessfulResult(sheets, orders, options, result)
+                .Should().BeNull();
+        }
+
+        [TestCaseSource(nameof(HeavyTimedCatalogSolvers))]
+        public void CatalogSolver_HeavyPricingInstance_HonorsTimeLimit(SolverDescriptor2D descriptor)
+        {
+            // Many distinct dimensions on a full-size sheet: a single guillotine-DP pricing call
+            // used to run for seconds regardless of TimeLimitMs, so the limit was only checked
+            // between DP calls and results arrived 3-6x late.
+            var rng = new Random(12345);
+            var sheets = new List<Sheet> { new(2440, 1220, 200) };
+            var orders = new List<RectOrder>();
+            var seen = new HashSet<(int, int)>();
+            while (orders.Count < 40)
+            {
+                int w = 97 + rng.Next(0, 400);
+                int h = 61 + rng.Next(0, 300);
+                if (seen.Add((w, h)))
+                    orders.Add(new RectOrder(w, h, 1 + rng.Next(1, 6), allowRotation: true));
+            }
+
+            // 3s: StagedMip only reaches the long DP after its half-budget pricing phase.
+            const int limitMs = 3000;
+            var options = new SolverOptions2D
+            {
+                TimeLimitMs = limitMs,
+                Kerf = 3,
+                AllowRotation = true,
+                Stage = 2,
+            };
+
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var result = descriptor.CreateSolver().Solve(
+                CloneSheets(sheets),
+                CloneOrders(orders),
+                options);
+            clock.Stop();
+
+            result.Success.Should().BeTrue(result.ErrorMessage);
+            clock.ElapsedMilliseconds.Should().BeLessThan(
+                limitMs + 1500,
+                "{0} must stop pricing at the TimeLimitMs deadline instead of finishing a whole DP",
                 descriptor.Key);
             SolverUtils2D.ValidateSuccessfulResult(sheets, orders, options, result)
                 .Should().BeNull();

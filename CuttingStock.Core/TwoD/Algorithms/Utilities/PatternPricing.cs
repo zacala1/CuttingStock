@@ -104,11 +104,14 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                 int usableHeight = sheet.Height - 2 * options.Trim;
                 if (usableWidth <= 0 || usableHeight <= 0) continue;
 
-                var result = new GuillotineKnapsackDp(
-                    usableWidth,
-                    usableHeight,
-                    items,
-                    options.Kerf).Solve();
+                // The DP itself is the expensive step; hand it the deadline so a heavy sheet
+                // cannot overrun TimeLimitMs by a whole pricing round.
+                if (!new GuillotineKnapsackDp(
+                        usableWidth,
+                        usableHeight,
+                        items,
+                        options.Kerf).TrySolve(cancel, out var result))
+                    yield break;
 
                 double reducedCost = sheet.Area - result.Profit;
                 if (reducedCost >= -epsilon) continue;

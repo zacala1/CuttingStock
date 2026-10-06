@@ -198,7 +198,8 @@ namespace CuttingStock.Core.TwoD.Algorithms
                     if (Wu <= 0 || Hu <= 0) continue;
 
                     var dp = new GuillotineKnapsackDp(Wu, Hu, dpItems, options.Kerf);
-                    var dpRes = dp.Solve();
+                    if (!dp.TrySolve(() => deadline.HasLessThanReserve(1000), out var dpRes))
+                        return;   // out of pricing budget; the integer master needs the rest
                     var col = PatternMaterializer.FromDpResult(sheet, dpRes, n, options.Trim);
                     if (col.Counts.Sum() == 0) continue;
                     PatternColumnPool.AddIfNew(columns, signatures, col);

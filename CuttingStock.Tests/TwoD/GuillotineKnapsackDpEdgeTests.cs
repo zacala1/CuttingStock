@@ -235,5 +235,79 @@ namespace CuttingStock.Tests.TwoD
             }
             placedProfit.Should().BeApproximately(res.Profit, 1e-9);
         }
+
+        // ----- cooperative cancellation -----
+
+        /// <summary>Many distinct dimensions on a sizeable sheet: thousands of DP cells.</summary>
+        private static List<GuillotineKnapsackDp.Item> ManyDimensionItems()
+        {
+            var rng = new System.Random(7);
+            var items = new List<GuillotineKnapsackDp.Item>();
+            for (int i = 0; i < 30; i++)
+                items.Add(new GuillotineKnapsackDp.Item
+                {
+                    OrderIndex = i,
+                    W = 97 + rng.Next(0, 300),
+                    H = 61 + rng.Next(0, 200),
+                    Profit = 1000 + rng.Next(0, 5000),
+                });
+            return items;
+        }
+
+        [Test]
+        public void TrySolve_NullCancel_MatchesSolve()
+        {
+            var items = ManyDimensionItems();
+            var expected = new GuillotineKnapsackDp(900, 700, items, kerf: 3).Solve();
+
+            new GuillotineKnapsackDp(900, 700, items, kerf: 3)
+                .TrySolve(cancel: null, out var actual).Should().BeTrue();
+
+            actual!.Profit.Should().Be(expected.Profit);
+            actual.Placements.Should().HaveCount(expected.Placements.Count);
+        }
+
+        [Test]
+        public void TrySolve_CancelAlreadyRequested_ReturnsFalseWithoutResult()
+        {
+            var dp = new GuillotineKnapsackDp(900, 700, ManyDimensionItems(), kerf: 3);
+
+            bool completed = dp.TrySolve(cancel: () => true, out var result);
+
+            completed.Should().BeFalse();
+            result.Should().BeNull();
+        }
+
+        [Test]
+        public void TrySolve_CancelledRun_DoesNotPoisonLaterSolve()
+        {
+            var items = ManyDimensionItems();
+            var expected = new GuillotineKnapsackDp(900, 700, items, kerf: 3).Solve();
+
+            // Cancel part-way through the recurrence, then re-solve on the SAME instance:
+            // partial (truncated) cell values must not have been memoized.
+            var dp = new GuillotineKnapsackDp(900, 700, items, kerf: 3);
+            int polls = 0;
+            dp.TrySolve(cancel: () => ++polls > 20, out _).Should().BeFalse();
+            polls.Should().BeGreaterThan(20, "the DP should poll repeatedly rather than only once");
+
+            dp.TrySolve(cancel: null, out var retry).Should().BeTrue();
+            retry!.Profit.Should().Be(expected.Profit);
+        }
+
+        [Test]
+        public void TrySolve_HeavyInstance_StopsPromptlyOnceCancelled()
+        {
+            // Large sheet + many distinct dimensions: an uncancelled solve takes seconds.
+            var items = ManyDimensionItems();
+            var dp = new GuillotineKnapsackDp(2440, 1220, items, kerf: 3);
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
+            bool completed = dp.TrySolve(cancel: () => clock.ElapsedMilliseconds >= 100, out _);
+
+            completed.Should().BeFalse("the instance is far too large to finish in 100ms");
+            clock.ElapsedMilliseconds.Should().BeLessThan(
+                1000, "cancellation must interrupt the recurrence, not wait for the whole DP");
+        }
     }
 }

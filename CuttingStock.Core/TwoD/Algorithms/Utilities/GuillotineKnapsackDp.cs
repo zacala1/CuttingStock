@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using CuttingStock.Core.TwoD.Domain;
 
 namespace CuttingStock.Core.TwoD.Algorithms.Utilities
@@ -38,6 +39,14 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
         private readonly byte[,] _tag;
         private readonly int[,] _data;
 
+        // Cooperative cancellation. F() polls the callback every CancelPollMask+1 fresh
+        // evaluations; once it fires, every frame unwinds without writing the memo so a
+        // truncated value is never cached.
+        private const int CancelPollMask = 0x3F;
+        private Func<bool>? _cancel;
+        private bool _cancelled;
+        private int _pollCounter;
+
         /// <summary>Construct a solver for one rectangle / item set.</summary>
         public GuillotineKnapsackDp(int width, int height, List<Item> items, int kerf = 0)
         {
@@ -64,13 +73,34 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
         /// <summary>Solve the unbounded 2D guillotine knapsack.</summary>
         public Result Solve()
         {
+            TrySolve(cancel: null, out var result);
+            return result!;   // never cancelled without a callback
+        }
+
+        /// <summary>
+        /// Solve with cooperative cancellation. The DP can run for seconds on large sheets with
+        /// many distinct item dimensions, so callers that own a wall-clock deadline pass a
+        /// predicate that is polled during the recurrence. Returns false (and a null result)
+        /// when <paramref name="cancel"/> fired before the optimum was proven.
+        /// </summary>
+        public bool TrySolve(Func<bool>? cancel, [NotNullWhen(true)] out Result? result)
+        {
+            _cancel = cancel;
+            _cancelled = false;
+            _pollCounter = 0;
+
             int xiMax = _xs.Length - 1;
             int yiMax = _ys.Length - 1;
             double best = F(xiMax, yiMax);
+            if (_cancelled)
+            {
+                result = null;
+                return false;
+            }
 
-            var result = new Result { Profit = best };
+            result = new Result { Profit = best };
             Reconstruct(0, 0, xiMax, yiMax, result.Placements);
-            return result;
+            return true;
         }
 
         // ---------- recurrence ----------
@@ -79,6 +109,13 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
         {
             double cached = _memo[xi, yi];
             if (!double.IsNaN(cached)) return cached;
+            if (_cancelled) return 0.0;
+            if (_cancel != null && (++_pollCounter & CancelPollMask) == 0 && _cancel())
+            {
+                _cancelled = true;
+                return 0.0;
+            }
+
             int W = _xs[xi];
             int H = _ys[yi];
 
@@ -101,6 +138,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             // Vertical cuts. Only x <= W/2 — F(a,H)+F(b,H) == F(b,H)+F(a,H).
             for (int k = 1; k < xi; k++)
             {
+                if (_cancelled) break;
                 int x = _xs[k];
                 if (x > W / 2) break;
                 int rest = W - x - _kerf;
@@ -119,6 +157,7 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
             // Horizontal cuts. Same symmetry.
             for (int k = 1; k < yi; k++)
             {
+                if (_cancelled) break;
                 int y = _ys[k];
                 if (y > H / 2) break;
                 int rest = H - y - _kerf;
@@ -133,6 +172,8 @@ namespace CuttingStock.Core.TwoD.Algorithms.Utilities
                     bestData = y;
                 }
             }
+
+            if (_cancelled) return best;   // partial value: do not memoize
 
             _memo[xi, yi] = best;
             _tag[xi, yi]  = bestTag;
